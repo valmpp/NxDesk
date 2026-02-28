@@ -1,0 +1,47 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" 
+             x:Class="NxDesk.Client.Controls.WindowActionsControl">
+
+    <Grid>
+        <!-- Action Panel (Initially hidden, expands on click) -->
+        <Border Name="ActionsPanel"
+                Background="White"
+                CornerRadius="21"
+                Padding="5"
+                IsVisible="False"
+                BoxShadow="0 2 10 0 #40000000">
+            <StackPanel Orientation="Horizontal" Spacing="5">
+                <!-- Minimize -->
+                <Button Classes="Action" Click="Minimize_Click" ToolTip.Tip="Minimizar">
+                    <Path Data="M 0 5 H 10" Stroke="#333" StrokeThickness="1.5" Width="12" Height="12" Stretch="Uniform"/>
+                </Button>
+                <!-- Maximize -->
+                <Button Classes="Action" Click="Maximize_Click" ToolTip.Tip="Maximizar">
+                    <Path Data="M 0 0 H 8 V 8 H 0 Z" Stroke="#333" StrokeThickness="1.5" Width="10" Height="10" Stretch="Uniform"/>
+                </Button>
+                <!-- Separator -->
+                <Rectangle Width="1" Height="20" Fill="#E0E0E0" Margin="5,0"/>
+                <!-- Logout/Close -->
+                <Button Classes="Action" Click="Close_Click" ToolTip.Tip="Cerrar">
+                    <Path Data="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"
+                          Fill="#e81123" Width="16" Height="16" Stretch="Uniform"/>
+                </Button>
+            </StackPanel>
+        </Border>
+
+        <!-- Main Trigger Button -->
+        <Button Name="MainButton" 
+                Click="MainButton_Click" 
+                Classes="Trigger" 
+                ToolTip.Tip="Opciones de ventana"
+                IsVisible="{Binding !#ActionsPanel.IsVisible}">
+            <Path Data="M12,8c1.1,0,2-0.9,2-2s-0.9-2-2-2s-2,0.9-2,2S10.9,8,12,8z M12,10c-1.1,0-2,0.9-2,2s0.9,2,2,2s2-0.9,2-2S13.1,10,12,10z M12,16c-1.1,0-2,0.9-2,2s0.9,2,2,2s2-0.9,2-2S13.1,16,12,16z"
+                  Fill="#555"
+                  Stretch="Uniform"
+                  Width="16" Height="16"/>
+        </Button>
+    </Grid>
+</UserControl>

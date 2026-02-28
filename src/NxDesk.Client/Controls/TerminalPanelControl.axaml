@@ -1,0 +1,109 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:NxDesk.Client.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="400" d:DesignHeight="600"
+             x:Class="NxDesk.Client.Controls.TerminalPanelControl"
+             x:DataType="vm:MainWindowViewModel">
+
+    <Border Background="#0D1117" CornerRadius="6" Margin="4" ClipToBounds="True"
+            BorderBrush="#30363D" BorderThickness="1"
+            Width="{Binding IsTerminalExpanded, Converter={StaticResource BoolToDoubleConverter}, ConverterParameter='350|NaN'}">
+        <Grid RowDefinitions="Auto, *, Auto">
+            <!-- Header -->
+            <Border Grid.Row="0" Background="#161B22" 
+                    Padding="{Binding IsTerminalExpanded, Converter={StaticResource BoolToThicknessConverter}, ConverterParameter='12,8|4,8'}">
+                <Grid ColumnDefinitions="Auto, *, Auto">
+                    <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsTerminalExpanded}">
+                        <Path Data="M20,19V7H4V19H20M20,3A2,2 0 0,1 22,5V19A2,2 0 0,1 20,21H4A2,2 0 0,1 2,19V5C2,3.89 2.9,3 4,3H20M13,17V15H18V17H13M9.58,13L5.57,9H8.4L11.7,12.3C12.09,12.69 12.09,13.33 11.7,13.72L8.42,17H5.59L9.58,13Z"
+                              Fill="#8B949E"
+                              Stretch="Uniform"
+                              Width="16" Height="16"
+                              VerticalAlignment="Center"/>
+                        <TextBlock Text="Terminal Remoto"
+                                   Foreground="#C9D1D9"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
+                        <Border Background="#1F6FEB" CornerRadius="10" Padding="8,2"
+                                IsVisible="{Binding IsTerminalExpanded}">
+                            <Panel IsVisible="{Binding IsRemoteControlEnabled}">
+                                <TextBlock Text="ACTIVO" Foreground="White" FontSize="10" FontWeight="Bold"
+                                           VerticalAlignment="Center"/>
+                            </Panel>
+                        </Border>
+                        
+                        <Button Classes="ModernIcon" 
+                                Command="{Binding ToggleTerminalExpandedCommand}"
+                                Width="24" Height="24" Padding="0">
+                            <Path Data="{Binding IsTerminalExpanded, Converter={StaticResource BoolToPathDataConverter}, ConverterParameter='M15.41,16.59L10.83,12L15.41,7.41L14,6L8,12L14,18L15.41,16.59Z|M8.59,16.59L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.59Z'}"
+                                  Fill="#8B949E" Width="14" Height="14" Stretch="Uniform"/>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Terminal Output -->
+            <ScrollViewer Grid.Row="1" Name="TerminalScrollViewer"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Auto"
+                          Background="#0D1117"
+                          IsVisible="{Binding IsTerminalExpanded}">
+                <ItemsControl ItemsSource="{Binding TerminalLines}" Margin="12,8">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding}" 
+                                       Foreground="#C9D1D9" 
+                                       FontFamily="Cascadia Code, Consolas, Courier New, monospace"
+                                       FontSize="12"
+                                       TextWrapping="Wrap"
+                                       Margin="0,1"/>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <!-- Input Area -->
+            <Border Grid.Row="2" Background="#161B22" Padding="8"
+                    BorderBrush="#30363D" BorderThickness="0,1,0,0"
+                    IsVisible="{Binding IsTerminalExpanded}">
+                <Grid ColumnDefinitions="Auto, *, Auto">
+                    <TextBlock Text="$"
+                               Foreground="#3FB950"
+                               FontFamily="Cascadia Code, Consolas, Courier New, monospace"
+                               FontSize="13"
+                               FontWeight="Bold"
+                               VerticalAlignment="Center"
+                               Margin="6,0,8,0"/>
+                    <TextBox Grid.Column="1"
+                             Name="TerminalInputBox"
+                             Text="{Binding TerminalInput}"
+                             Watermark="Escribe un comando..."
+                             Background="#0D1117"
+                             Foreground="#C9D1D9"
+                             CaretBrush="#58A6FF"
+                             FontFamily="Cascadia Code, Consolas, Courier New, monospace"
+                             FontSize="12"
+                             BorderThickness="0"
+                             Padding="4,8"
+                             VerticalContentAlignment="Center"
+                             KeyDown="OnInputKeyDown"/>
+                    <Button Grid.Column="2" 
+                            Classes="ModernIcon"
+                            ToolTip.Tip="Enviar comando"
+                            Command="{Binding SendTerminalInputCommand}"
+                            Margin="4,0,0,0">
+                        <Path Data="M2,21L23,12L2,3V10L17,12L2,14V21Z"
+                              Fill="#58A6FF"
+                              Stretch="Uniform"
+                              Width="14" Height="14"/>
+                    </Button>
+                </Grid>
+            </Border>
+
+        </Grid>
+    </Border>
+</UserControl>

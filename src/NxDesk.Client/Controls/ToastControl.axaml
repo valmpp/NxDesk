@@ -1,0 +1,19 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="NxDesk.Client.Controls.ToastControl">
+    <Border Background="{DynamicResource ThemeBackgroundSecondary}"
+            CornerRadius="10"
+            Padding="12"
+            Margin="0,0,0,10"
+            BoxShadow="0 4 12 0 #40000000"
+            BorderBrush="{DynamicResource ThemeBorder}"
+            BorderThickness="1">
+        <StackPanel Orientation="Horizontal" Spacing="10">
+            <Ellipse Fill="{DynamicResource ThemePrimary}" Width="8" Height="8" VerticalAlignment="Center"/>
+            <StackPanel VerticalAlignment="Center">
+                <TextBlock Text="Notificación" FontWeight="Bold" Foreground="{DynamicResource ThemeText}"/>
+                <TextBlock Text="Se ha establecido la conexión correctamente." FontSize="{DynamicResource FontSizeSmall}" Foreground="{DynamicResource ThemeTextSecondary}"/>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</UserControl>

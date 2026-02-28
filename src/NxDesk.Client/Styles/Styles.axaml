@@ -1,0 +1,339 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Global Window & Element Font Inheritance (Resources are merged in App.axaml) -->
+    
+    <!-- Global Window & Element Font Inheritance (Resources are merged in App.axaml) -->
+    
+    <Styles.Resources>
+        <!-- Premium Design Tokens -->
+        <LinearGradientBrush x:Key="ThemePrimaryGradient" StartPoint="0%,0%" EndPoint="100%,100%">
+            <GradientStop Offset="0" Color="#4E9CFF"/>
+            <GradientStop Offset="1" Color="#0066FF"/>
+        </LinearGradientBrush>
+        
+        <BoxShadows x:Key="ThemePremiumShadow">0 10 30 0 #40000000</BoxShadows>
+        <BoxShadows x:Key="ThemeSubtleShadow">0 4 12 0 #20000000</BoxShadows>
+        
+        <!-- Dynamic Font Scaling Tokens -->
+        <x:Double x:Key="FontSizeSmall">12</x:Double>
+        <x:Double x:Key="FontSizeNormal">14</x:Double>
+        <x:Double x:Key="FontSizeLarge">16</x:Double>
+        <x:Double x:Key="FontSizeTitle">24</x:Double>
+        
+        <!-- Current App Font Size (Modified at runtime) -->
+        <x:Double x:Key="AppFontSize">14</x:Double>
+    </Styles.Resources>
+
+    <!-- Modern Button Style -->
+    <Style Selector="Button.Modern">
+        <Setter Property="Background" Value="{DynamicResource ThemePrimaryGradient}"/>
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="FontSize" Value="{DynamicResource AppFontSize}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Padding" Value="20,8"/>
+        <Setter Property="CornerRadius" Value="5"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.1"/>
+            </Transitions>
+        </Setter>
+    </Style>
+    <Style Selector="Button.Modern:pointerover">
+        <Setter Property="Opacity" Value="0.9"/>
+    </Style>
+    <Style Selector="Button.Modern:pressed">
+        <Setter Property="Background" Value="{DynamicResource ThemePrimaryActive}"/>
+        <Setter Property="RenderTransform" Value="scale(0.98)"/>
+    </Style>
+
+    <!-- Modern Icon Button Style (Circular/Rounded) -->
+    <Style Selector="Button.ModernIcon">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{DynamicResource ThemeText}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Width" Value="34"/>
+        <Setter Property="Height" Value="34"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Name="border" 
+                        Background="{TemplateBinding Background}" 
+                        CornerRadius="5"
+                        Padding="{TemplateBinding Padding}">
+                    <ContentPresenter Name="PART_ContentPresenter"
+                                      Content="{TemplateBinding Content}"
+                                      HorizontalContentAlignment="Center"
+                                      VerticalContentAlignment="Center"
+                                      RenderTransformOrigin="50%,50%"/>
+                </Border>
+            </ControlTemplate>
+        </Setter>
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.1"/>
+                <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.1"/>
+            </Transitions>
+        </Setter>
+    </Style>
+    <Style Selector="Button.ModernIcon:pointerover /template/ Border#border">
+        <Setter Property="Opacity" Value="0.7"/>
+    </Style>
+    <Style Selector="Button.ModernIcon:pressed">
+        <Setter Property="RenderTransform" Value="scale(0.85)"/>
+    </Style>
+    <Style Selector="Button.ModernIcon:pressed /template/ Border#border">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+
+    <!-- Disconnect Button (Red) -->
+    <Style Selector="Button.Disconnect">
+        <Setter Property="Background" Value="#D13438"/>
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="Padding" Value="15,6"/>
+        <Setter Property="CornerRadius" Value="5"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Name="border" Background="{TemplateBinding Background}" CornerRadius="{TemplateBinding CornerRadius}">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock Text="✕" FontSize="14" Margin="0,0,8,0" Foreground="White" FontWeight="Bold"/>
+                        <ContentPresenter Content="{TemplateBinding Content}"/>
+                    </StackPanel>
+                </Border>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+    <Style Selector="Button.Disconnect:pointerover /template/ Border#border">
+        <Setter Property="Opacity" Value="0.9"/>
+    </Style>
+    <Style Selector="Button.Disconnect:pressed /template/ Border#border">
+        <Setter Property="Background" Value="#781D20"/>
+    </Style>
+
+    <!-- Modern TextBox Style -->
+    <Style Selector="TextBox.Modern">
+        <Setter Property="Background" Value="{DynamicResource ThemeBackgroundTertiary}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ThemeText}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorder}"/>
+        <Setter Property="Padding" Value="10,8"/>
+        <Setter Property="CornerRadius" Value="15"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="Template">
+            <ControlTemplate>
+                <DataValidationErrors>
+                    <Panel>
+                        <Border Name="PART_BorderElement"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{TemplateBinding CornerRadius}">
+                        </Border>
+                        <ScrollViewer Name="PART_ScrollViewer"
+                                      Margin="{TemplateBinding BorderThickness}"
+                                      Padding="{TemplateBinding Padding}">
+                            <TextPresenter Name="PART_TextPresenter"
+                                           Text="{TemplateBinding Text, Mode=TwoWay}"
+                                           CaretIndex="{TemplateBinding CaretIndex}"
+                                           SelectionStart="{TemplateBinding SelectionStart}"
+                                           SelectionEnd="{TemplateBinding SelectionEnd}"
+                                           TextAlignment="{TemplateBinding TextAlignment}"
+                                           TextWrapping="{TemplateBinding TextWrapping}"
+                                           PasswordChar="{TemplateBinding PasswordChar}"
+                                           RevealPassword="{TemplateBinding RevealPassword}"
+                                           SelectionBrush="{TemplateBinding SelectionBrush}"
+                                           SelectionForegroundBrush="{TemplateBinding SelectionForegroundBrush}"
+                                           CaretBrush="{TemplateBinding CaretBrush}"
+                                           HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                           VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                        </ScrollViewer>
+                    </Panel>
+                </DataValidationErrors>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+    <Style Selector="TextBox.Modern:focus /template/ Border#PART_BorderElement">
+        <Setter Property="BorderBrush" Value="{DynamicResource ThemeAccentColor}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+    </Style>
+
+    <!-- Action Button (Circular) -->
+    <Style Selector="Button.Action">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Width" Value="32"/>
+        <Setter Property="Height" Value="32"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Panel>
+                    <Ellipse Name="background" Fill="{TemplateBinding Background}"/>
+                    <ContentPresenter Name="PART_ContentPresenter"
+                                      Content="{TemplateBinding Content}"
+                                      HorizontalContentAlignment="Center"
+                                      VerticalContentAlignment="Center"/>
+                </Panel>
+            </ControlTemplate>
+        </Setter>
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.1"/>
+            </Transitions>
+        </Setter>
+    </Style>
+    <Style Selector="Button.Action:pointerover /template/ Ellipse#background">
+        <Setter Property="Opacity" Value="0.7"/>
+    </Style>
+    <Style Selector="Button.Action:pressed">
+        <Setter Property="RenderTransform" Value="scale(0.9)"/>
+    </Style>
+    
+    <!-- Trigger Button Style -->
+    <Style Selector="Button.Trigger">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="Button.Trigger:pointerover">
+        <Setter Property="Opacity" Value="0.7"/>
+    </Style>
+
+    <!-- ContextMenu & MenuItem -->
+    <Style Selector="ContextMenu">
+        <Setter Property="Background" Value="{DynamicResource ThemeBackgroundSecondary}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorder}"/>
+        <Setter Property="Padding" Value="5"/>
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="15"
+                        BoxShadow="0 5 20 0 #80000000">
+                    <ScrollViewer Name="PART_ScrollViewer">
+                        <ItemsPresenter Name="PART_ItemsPresenter"
+                                        ItemsPanel="{TemplateBinding ItemsPanel}"
+                                        Margin="{TemplateBinding Padding}" />
+                    </ScrollViewer>
+                </Border>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+
+    <Style Selector="MenuItem">
+        <Setter Property="Padding" Value="15,8"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Foreground" Value="{DynamicResource ThemeText}"/>
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Border Name="PART_LayoutRoot"
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="8"
+                        Margin="4,2">
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                        <ContentPresenter Name="PART_Icon"
+                                          Content="{TemplateBinding Icon}"
+                                          Width="16"
+                                          Height="16"
+                                          Margin="0,0,10,0"
+                                          VerticalAlignment="Center"/>
+                        <ContentPresenter Name="PART_HeaderPresenter"
+                                          Content="{TemplateBinding Header}"
+                                          Grid.Column="1"
+                                          VerticalAlignment="Center">
+                            <ContentPresenter.DataTemplates>
+                                <DataTemplate DataType="x:String">
+                                    <TextBlock Text="{Binding}" />
+                                </DataTemplate>
+                            </ContentPresenter.DataTemplates>
+                        </ContentPresenter>
+                    </Grid>
+                </Border>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+    <Style Selector="MenuItem:pointerover /template/ Border#PART_LayoutRoot">
+        <Setter Property="Background" Value="{DynamicResource ThemePrimaryTransparent}"/>
+    </Style>
+
+    <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
+        <Setter Property="Opacity" Value="0.8"/>
+    </Style>
+    <Style Selector="ListBoxItem">
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+
+    <!-- Device Card Style -->
+    <Style Selector="Border.DeviceCard">
+        <Setter Property="Background" Value="{DynamicResource ThemeSurface}"/>
+        <Setter Property="CornerRadius" Value="15"/>
+        <Setter Property="Width" Value="220"/>
+        <Setter Property="Height" Value="140"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.2"/>
+                <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.2"/>
+            </Transitions>
+        </Setter>
+    </Style>
+    <Style Selector="Border.DeviceCard:pointerover">
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="RenderTransform" Value="scale(1.02)"/>
+    </Style>
+
+    <!-- Toggle Switch Style (iOS-like) -->
+    <Style Selector="CheckBox.Toggle">
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="MinWidth" Value="44"/>
+        <Setter Property="MinHeight" Value="24"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <ControlTemplate>
+                <Panel>
+                    <Border Name="track" 
+                            Width="44" Height="24" 
+                            CornerRadius="12"
+                            Background="{DynamicResource ThemeSurface}"
+                            BorderBrush="{DynamicResource ThemeBorder}"
+                            BorderThickness="1"/>
+                    <Ellipse Name="thumb" 
+                             Width="20" Height="20" 
+                             Fill="White"
+                             HorizontalAlignment="Left"
+                             Margin="2,0,2,0">
+                        <Ellipse.RenderTransform>
+                            <TranslateTransform X="0"/>
+                        </Ellipse.RenderTransform>
+                    </Ellipse>
+                </Panel>
+            </ControlTemplate>
+        </Setter>
+    </Style>
+    <Style Selector="CheckBox.Toggle:checked /template/ Border#track">
+        <Setter Property="Background" Value="{DynamicResource ThemePrimary}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource ThemePrimary}"/>
+    </Style>
+    <Style Selector="CheckBox.Toggle:checked /template/ Ellipse#thumb">
+        <Setter Property="RenderTransform" Value="translateX(20px)"/>
+    </Style>
+
+    <!-- Connection Option Card Style -->
+    <Style Selector="Border.ConnectionOptionCard">
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="BorderBrush" Duration="0:0:0.15"/>
+                <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.15"/>
+            </Transitions>
+        </Setter>
+    </Style>
+    <Style Selector="Border.ConnectionOptionCard:pointerover">
+        <Setter Property="RenderTransform" Value="scale(1.01)"/>
+    </Style>
+
+</Styles>

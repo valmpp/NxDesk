@@ -1,0 +1,35 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- Navigation -->
+    <x:String x:Key="S_Settings_Title">SETTINGS</x:String>
+    <x:String x:Key="S_Settings_Preferences">Preferences</x:String>
+    <x:String x:Key="S_Settings_Appearance">Appearance</x:String>
+    <x:String x:Key="S_Settings_Session">Session</x:String>
+    <x:String x:Key="S_Settings_Security">Security</x:String>
+    <x:String x:Key="S_Settings_Close">Close window</x:String>
+
+    <!-- Appearance -->
+    <x:String x:Key="S_Settings_Apperance_Desc">Customize your application appearance</x:String>
+    <x:String x:Key="S_Settings_ThemeDark">Dark Theme</x:String>
+    <x:String x:Key="S_Settings_ThemeDesc">Switch between dark and light mode</x:String>
+    <x:String x:Key="S_Settings_Language">Language</x:String>
+    <x:String x:Key="S_Settings_LanguageDesc">Select your preferred language</x:String>
+    <x:String x:Key="S_Settings_FontSize">Font Size</x:String>
+    <x:String x:Key="S_Settings_FontSizeDesc">Adjust text readability</x:String>
+
+    <!-- Session -->
+    <x:String x:Key="S_Settings_Session_Desc">History and recent connections</x:String>
+    <x:String x:Key="S_Settings_History">Connection History</x:String>
+    <x:String x:Key="S_Settings_Clear">Clear</x:String>
+    <x:String x:Key="S_Settings_Today">Today</x:String>
+    <x:String x:Key="S_Settings_Yesterday">Yesterday</x:String>
+
+    <!-- Security -->
+    <x:String x:Key="S_Settings_Security_Desc">Access control and privacy</x:String>
+    <x:String x:Key="S_Settings_Password">Access Password</x:String>
+    <x:String x:Key="S_Settings_Password_Desc">Allows automatic connection without manual approval if this password is known.</x:String>
+    <x:String x:Key="S_Settings_Password_Watermark">Enter new password...</x:String>
+    <x:String x:Key="S_Settings_Save">Save</x:String>
+    <x:String x:Key="S_Settings_Confirmation">Connection confirmation</x:String>
+    <x:String x:Key="S_Settings_AlwaysAsk">Always ask for permission</x:String>
+</ResourceDictionary>

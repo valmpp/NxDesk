@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/NxDesk.Application/NxDesk.Application.csproj" />
+    <Project Path="src/NxDesk.Client/NxDesk.Client.csproj" />
+    <Project Path="src/NxDesk.Core/NxDesk.Core.csproj" />
+    <Project Path="src/NxDesk.Infrastructure/NxDesk.Infrastructure.csproj" />
+    <Project Path="src/NxDesk.Server/NxDesk.Server.csproj" />
+  </Folder>
+</Solution>
