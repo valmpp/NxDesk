@@ -692,7 +692,7 @@ public partial class MainWindowViewModel : ViewModelBase
         if (peer == null) return;
         _pendingPeerId = peer.Id;
         PendingPeerAlias = peer.Alias;
-        IsControlModeSelected = false; // Default: ViewOnly
+        IsControlModeSelected = true; // Default: ViewWithControl (user requested manipulation by default)
         IsConnectionDialogVisible = true;
     }
 
