@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -8,6 +8,7 @@ using CommunityToolkit.Mvvm.Input;
 using NxDesk.Application.DTOs;
 using NxDesk.Application.Interfaces;
 using NxDesk.Core.Models;
+using System.Runtime.InteropServices;
 
 namespace NxDesk.Client.ViewModels;
 
@@ -105,6 +106,13 @@ public partial class MainWindowViewModel : ViewModelBase
     private bool _isTerminalExpanded = true;
 
     public ObservableCollection<string> TerminalLines { get; } = new();
+
+    private string _fullTerminalOutput = string.Empty;
+    public string FullTerminalOutput
+    {
+        get => _fullTerminalOutput;
+        set => SetProperty(ref _fullTerminalOutput, value);
+    }
     public event Action? OnTerminalOutputReceived;
 
     // --- File Transfer Interaction ---
@@ -216,7 +224,10 @@ public partial class MainWindowViewModel : ViewModelBase
             });
         };
 
-        ProcessArgs(args);
+        if (args != null)
+        {
+            ProcessArgs(args);
+        }
         
         // Start signaling server and discovery
         NxDesk.Infrastructure.Services.EmbeddedSignalingServer.Start();
@@ -411,7 +422,7 @@ public partial class MainWindowViewModel : ViewModelBase
                     // Push frame to recording pipeline if active
                     if (IsRecording && frame.IsCompressed)
                     {
-                        _ = _recordingService.PushFrameAsync(frame);
+                    _ = _recordingService.PushFrameAsync(frame);
                     }
                     
                     UpdateFps();
@@ -434,7 +445,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 var screens = message.GetPayload<NxDesk.Application.DTOs.ScreenInfoDto[]>();
                 if (screens != null)
                 {
-                    Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => 
+                    _ = Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => 
                     {
                         RemoteScreens.Clear();
                         foreach (var s in screens)
@@ -474,12 +485,12 @@ public partial class MainWindowViewModel : ViewModelBase
                     _streamingCts = new System.Threading.CancellationTokenSource();
                     
                     // Update input service with new screen bounds
-                    Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => 
+                    _ = Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => 
                     {
                         _inputService.SetScreenBounds(screen.X, screen.Y, screen.Width, screen.Height);
                     });
 
-                    Task.Run(async () => 
+                    _ = Task.Run(async () => 
                     {
                         await StreamingLoop(_streamingCts.Token, screen.X, screen.Y, screen.Width, screen.Height, screen.Index);
                     });
@@ -538,7 +549,7 @@ public partial class MainWindowViewModel : ViewModelBase
             if (termData != null && !string.IsNullOrEmpty(termData.Data))
             {
                 Console.WriteLine($"[Terminal] [RECEIVER] Processing output: '{termData.Data.Substring(0, Math.Min(termData.Data.Length, 20))}...'");
-                Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                _ = Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
                 {
                     // Clean carriage returns 
                     string clean = termData.Data.Replace("\r", "");
@@ -553,6 +564,8 @@ public partial class MainWindowViewModel : ViewModelBase
                     
                     while (TerminalLines.Count > 1000)
                         TerminalLines.RemoveAt(0);
+
+                    FullTerminalOutput = string.Join(Environment.NewLine, TerminalLines);
                     OnTerminalOutputReceived?.Invoke();
                 });
             }
@@ -677,11 +690,7 @@ public partial class MainWindowViewModel : ViewModelBase
         StatusMessage = "Buscando equipos en la red local...";
     }
 
-    [RelayCommand]
-    private void ToggleTheme()
-    {
-        _themeService.ToggleTheme();
-    }
+
 
     [ObservableProperty]
     private string _targetId = "";
@@ -738,6 +747,7 @@ public partial class MainWindowViewModel : ViewModelBase
             TerminalLines.Add($"> {input}");
             TerminalLines.Add("[System] Enviando...");
             while (TerminalLines.Count > 1000) TerminalLines.RemoveAt(0);
+            FullTerminalOutput = string.Join(Environment.NewLine, TerminalLines);
             OnTerminalOutputReceived?.Invoke();
         });
 
@@ -762,6 +772,7 @@ public partial class MainWindowViewModel : ViewModelBase
                     Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                     {
                         TerminalLines.Add("[Error] No se pudo iniciar el terminal.");
+                        FullTerminalOutput = string.Join(Environment.NewLine, TerminalLines);
                         OnTerminalOutputReceived?.Invoke();
                     });
                 }
@@ -833,6 +844,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public async Task ConnectToId(string id, string? alias = null, string? ip = null, int port = 5000)
     {
         TerminalLines.Clear();
+        FullTerminalOutput = string.Empty;
         if (string.IsNullOrEmpty(id)) return;
 
         // [FIX] Clean up any resources from a previous session before starting a new one
@@ -1117,6 +1129,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public async Task Disconnect()
     {
         TerminalLines.Clear();
+        FullTerminalOutput = string.Empty;
         _streamingCts?.Cancel();
         _streamingCts = null;
         
@@ -1131,6 +1144,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
         // Cleanup terminal
         TerminalLines.Clear();
+        FullTerminalOutput = string.Empty;
         _terminalService.Dispose();
         _isTerminalInitialized = false; // Reset so handler is re-attached on next session
 
@@ -1210,7 +1224,7 @@ public partial class MainWindowViewModel : ViewModelBase
                     Console.WriteLine("[Terminal] [HOST] terminal_output relay call completed.");
 
                     // Also add to local terminal lines (Host can see too)
-                    Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                    _ = Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
                     {
                         // Clean carriage returns 
                         string clean = output.Replace("\r", "");
@@ -1226,6 +1240,7 @@ public partial class MainWindowViewModel : ViewModelBase
                         while (TerminalLines.Count > 1000)
                             TerminalLines.RemoveAt(0);
                             
+                        FullTerminalOutput = string.Join(Environment.NewLine, TerminalLines);
                         OnTerminalOutputReceived?.Invoke();
                     });
                 };
@@ -1275,22 +1290,55 @@ public partial class MainWindowViewModel : ViewModelBase
 
             await _recordingService.StopAsync();
             IsRecording = false;
+            Console.WriteLine($"[Recording] Stopped. File: {RecordingPath}");
             AddNotification("Grabación", $"Grabación guardada en: {RecordingPath}", "Info", 5);
             RecordingDuration = "";
         }
         else
         {
             // Start recording
-            var recordingsDir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), 
-                "NxDesk_Recordings");
-            Directory.CreateDirectory(recordingsDir);
+            string recordingsDir;
+            if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Linux))
+            {
+                // On Linux, SpecialFolder.MyVideos is often empty. 
+                // Use ~/Videos or ~/Documents as fallback.
+                var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                recordingsDir = Path.Combine(home, "Videos", "NxDesk_Recordings");
+                if (!Directory.Exists(Path.Combine(home, "Videos")))
+                {
+                    recordingsDir = Path.Combine(home, "Documents", "NxDesk_Recordings");
+                }
+            }
+            else
+            {
+                // Windows or other
+                var videosPath = Environment.GetFolderPath(Environment.SpecialFolder.MyVideos);
+                if (string.IsNullOrEmpty(videosPath))
+                {
+                    videosPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Videos");
+                }
+                recordingsDir = Path.Combine(videosPath, "NxDesk_Recordings");
+            }
+
+            try
+            {
+                Directory.CreateDirectory(recordingsDir);
+            }
+            catch (Exception ex)
+            {
+                AddNotification("Error", $"No se pudo crear carpeta de grabaciones: {ex.Message}", "Error", 5);
+                return;
+            }
 
             var timestamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");
             var outputPath = Path.Combine(recordingsDir, $"NxDesk_{timestamp}.mp4");
             RecordingPath = outputPath;
 
-            await _recordingService.StartAsync(outputPath, 1280, 720, fps: 5);
+            // Determine if we are using RAW frames (Windows DXGI) or MJPEG (Linux GStreamer)
+            bool isRaw = System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows);
+            
+            // Use larger resolution if possible, or just pass current view size
+            await _recordingService.StartAsync(outputPath, 1920, 1080, fps: 8, isRaw: isRaw);
             IsRecording = true;
             _recordingStartTime = DateTime.Now;
             RecordingDuration = "00:00";

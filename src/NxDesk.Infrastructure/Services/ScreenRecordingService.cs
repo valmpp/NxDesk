@@ -15,16 +15,18 @@ public class ScreenRecordingService : IScreenRecordingService
     private string? _outputPath;
     private long _frameCount;
     private int _pushedFrameCount = 0;
+    private bool _isRaw;
 
     public bool IsRecording { get; private set; }
 
-    public Task StartAsync(string outputPath, int width, int height, int fps = 10)
+    public Task StartAsync(string outputPath, int width, int height, int fps = 10, bool isRaw = false)
     {
         if (IsRecording) return Task.CompletedTask;
 
         _outputPath = outputPath;
         _frameCount = 0;
         _pushedFrameCount = 0;
+        _isRaw = isRaw;
 
         // Ensure output directory exists
         var dir = Path.GetDirectoryName(outputPath);
@@ -34,13 +36,24 @@ public class ScreenRecordingService : IScreenRecordingService
             FileLogger.Log("Recording", $"Created directory: {dir}");
         }
 
-        // FFmpeg command: read JPEG images from stdin → H.264 MP4
-        // Using libopenh264 as it's more widely available on Linux (Fedora/RHEL) than libx264
-        var args = $"-y -f mjpeg -framerate {fps} -i pipe:0 " +
+        // FFmpeg command: read JPEG images OR raw BGRA from stdin → H.264 MP4
+        // Using libopenh264 for wide compatibility.
+        string args;
+        if (_isRaw)
+        {
+            args = $"-y -f rawvideo -pixel_format bgra -video_size {width}x{height} -framerate {fps} -i pipe:0 " +
+                   $"-c:v libopenh264 -pix_fmt yuv420p " +
+                   $"-movflags +faststart \"{outputPath}\"";
+        }
+        else
+        {
+            args = $"-y -f mjpeg -framerate {fps} -i pipe:0 " +
                    $"-c:v libopenh264 -pix_fmt yuv420p " +
                    $"-movflags +faststart -vsync vfr \"{outputPath}\"";
+        }
 
-        FileLogger.Log("Recording", $"Starting FFmpeg: ffmpeg {args}");
+        FileLogger.Log("Recording", $"Starting FFmpeg ({(_isRaw ? "RAW" : "MJPEG")}): ffmpeg {args}");
+        Console.WriteLine($"[Recording] Starting FFmpeg with args: {args}");
 
         var psi = new ProcessStartInfo
         {
@@ -71,14 +84,16 @@ public class ScreenRecordingService : IScreenRecordingService
                 try
                 {
                     using var reader = _ffmpegProcess.StandardError;
-                    while (!reader.EndOfStream)
+                    string? line;
+                    while ((line = await reader.ReadLineAsync()) != null)
                     {
-                        var line = await reader.ReadLineAsync();
-                        if (line != null)
-                            FileLogger.Log("Recording/FFmpeg", line);
+                        FileLogger.Log("Recording/FFmpeg", line);
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    FileLogger.Log("Recording/FFmpeg", $"Error reading stderr: {ex.Message}");
+                }
             });
 
             Console.WriteLine($"[Recording] FFmpeg started (PID={_ffmpegProcess.Id}). Output: {outputPath}");
@@ -100,14 +115,23 @@ public class ScreenRecordingService : IScreenRecordingService
         {
             byte[] jpegData;
 
-            if (frame.IsCompressed)
+            if (frame.IsCompressed && !_isRaw)
             {
                 // Frame is already JPEG — use directly
                 jpegData = frame.Pixels;
             }
+            else if (!frame.IsCompressed && _isRaw)
+            {
+                // Frame is raw BGRA — use directly
+                jpegData = frame.Pixels;
+            }
             else
             {
-                // Frame is raw BGRA — cannot pipe to FFmpeg mjpeg input
+                // Frame type mismatch
+                if (_frameCount % 100 == 0)
+                {
+                    FileLogger.Log("Recording", $"WARNING: Frame type mismatch. IsCompressed={frame.IsCompressed}, ServiceIsRaw={_isRaw}. Skipping.");
+                }
                 return Task.CompletedTask;
             }
 
@@ -179,6 +203,7 @@ public class ScreenRecordingService : IScreenRecordingService
             {
                 var size = new FileInfo(_outputPath!).Length;
                 FileLogger.Log("Recording", $"File saved: {_outputPath} ({size / 1024} KB)");
+                Console.WriteLine($"[Recording] COMPLETED. File saved at: {_outputPath}");
             }
             else
             {

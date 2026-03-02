@@ -22,7 +22,7 @@ public partial class SettingsViewModel : ObservableObject
 
         _selectedLanguageIndex = (int)_configService.Language;
         _selectedFontSizeIndex = (int)_configService.FontSize;
-        _isDarkTheme = _themeService.CurrentTheme == AppTheme.Dark;
+        _isDarkTheme = _configService.Theme == AppTheme.Dark;
     }
 
     public ObservableCollection<string> Languages { get; }
@@ -62,7 +62,7 @@ public partial class SettingsViewModel : ObservableObject
         {
             if (SetProperty(ref _isDarkTheme, value))
             {
-                _themeService.SetTheme(value ? AppTheme.Dark : AppTheme.Light);
+                _configService.Theme = value ? AppTheme.Dark : AppTheme.Light;
             }
         }
     }

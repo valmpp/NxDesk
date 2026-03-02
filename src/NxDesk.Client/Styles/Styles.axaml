@@ -25,6 +25,19 @@
         <x:Double x:Key="AppFontSize">14</x:Double>
     </Styles.Resources>
 
+    <!-- Global Button Reset: Removes default generic gray hover/pressed and focus box -->
+    <Style Selector="Button">
+        <Setter Property="FocusAdorner" Value="{x:Null}" />
+    </Style>
+    <Style Selector="Button:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{TemplateBinding Background}" />
+        <Setter Property="BorderBrush" Value="{TemplateBinding BorderBrush}" />
+    </Style>
+    <Style Selector="Button:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{TemplateBinding Background}" />
+        <Setter Property="BorderBrush" Value="{TemplateBinding BorderBrush}" />
+    </Style>
+
     <!-- Modern Button Style -->
     <Style Selector="Button.Modern">
         <Setter Property="Background" Value="{DynamicResource ThemePrimaryGradient}"/>

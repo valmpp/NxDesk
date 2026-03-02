@@ -12,6 +12,7 @@ public class ConfigurationData
     public string? MachineId { get; set; }
     public string? Alias { get; set; }
     public bool IsAdmin { get; set; }
+    public AppTheme Theme { get; set; } = AppTheme.Dark;
 }
 
 public class ConfigurationService : IConfigurationService
@@ -96,9 +97,24 @@ public class ConfigurationService : IConfigurationService
         }
     }
 
+    public AppTheme Theme
+    {
+        get => _data.Theme;
+        set
+        {
+            if (_data.Theme != value)
+            {
+                _data.Theme = value;
+                ThemeChanged?.Invoke(value);
+                Save();
+            }
+        }
+    }
+
     public event Action<AppLanguage>? LanguageChanged;
     public event Action<AppFontSize>? FontSizeChanged;
     public event Action<bool>? IsAdminChanged;
+    public event Action<AppTheme>? ThemeChanged;
 
     public void Load()
     {

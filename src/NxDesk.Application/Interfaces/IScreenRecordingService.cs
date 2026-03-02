@@ -11,7 +11,7 @@ public interface IScreenRecordingService : IDisposable
     bool IsRecording { get; }
 
     /// <summary>Start recording to the specified output file path.</summary>
-    Task StartAsync(string outputPath, int width, int height, int fps = 10);
+    Task StartAsync(string outputPath, int width, int height, int fps = 10, bool isRaw = false);
 
     /// <summary>Push a single video frame into the recording pipeline.</summary>
     Task PushFrameAsync(VideoFrameDto frame);

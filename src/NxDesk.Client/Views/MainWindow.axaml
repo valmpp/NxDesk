@@ -23,25 +23,6 @@
     </Window.Resources>
 
     <Window.Styles>
-        <Style Selector="MenuItem" x:DataType="dto:ScreenInfoDto">
-            <Setter Property="Header" Value="{Binding Name}"/>
-            <Setter Property="Command" Value="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).SelectRemoteScreenCommand}"/>
-            <Setter Property="CommandParameter" Value="{Binding}"/>
-            <Setter Property="Icon">
-                <Template>
-                    <Path Data="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z" 
-                          Fill="{DynamicResource ThemePrimary}"
-                          Width="14" Height="14" Stretch="Uniform">
-                        <Path.IsVisible>
-                            <MultiBinding Converter="{StaticResource ScreenSelectionConverter}">
-                                <Binding Path="."/>
-                                <Binding Path="$parent[Window].((vm:MainWindowViewModel)DataContext).CurrentRemoteScreen"/>
-                            </MultiBinding>
-                        </Path.IsVisible>
-                    </Path>
-                </Template>
-            </Setter>
-        </Style>
     </Window.Styles>
 
     <Border Name="MainBorder"
@@ -51,7 +32,7 @@
             Margin="10"
             BoxShadow="0 10 30 0 #80000000">
 
-        <Grid Name="MainGrid" RowDefinitions="Auto, *, Auto">
+        <Grid Name="MainGrid" RowDefinitions="Auto, *, Auto" ClipToBounds="False">
             <!-- Header / Title Bar -->
             <Border Grid.Row="0" Background="Transparent" Padding="20,10" PointerPressed="OnPointerPressed">
                 <Grid ColumnDefinitions="Auto, *, Auto">
@@ -62,7 +43,7 @@
                     </StackPanel>
 
                     <!-- Center Controls (Changes based on session state) -->
-                    <Panel Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Panel Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" ClipToBounds="False">
                         <!-- Pre-Session: Connection Box -->
                         <StackPanel x:Name="PreSessionControls" Orientation="Horizontal" IsVisible="{Binding !IsSessionActive}">
                             <TextBlock Text="ID de Sala:" Foreground="{DynamicResource ThemeTextSecondary}"
@@ -93,11 +74,14 @@
                         <!-- In-Session: Call Controls -->
                         <Border IsVisible="{Binding IsSessionActive}"
                                 Background="{DynamicResource ThemeBackgroundSecondary}"
-                                CornerRadius="24"
-                                Padding="8,6"
-                                BoxShadow="0 4 12 0 #40000000"
-                                Opacity="0.95">
-                            <StackPanel x:Name="InSessionControls" Orientation="Horizontal" Spacing="6">
+                                CornerRadius="18"
+                                Padding="4,4"
+                                BoxShadow="0 8 30 0 #0C000000"
+                                Margin="0,0,0,20"
+                                ClipToBounds="False"
+                                ZIndex="100"
+                                Opacity="0.99">
+                            <StackPanel x:Name="InSessionControls" Orientation="Horizontal" Spacing="2">
                                 <!-- Remote Control Toggle Button -->
                                 <Button Command="{Binding ToggleRemoteControlCommand}"
                                         Classes="ModernIcon" 
@@ -111,6 +95,11 @@
                                 <!-- Recording Button -->
                                 <Button Classes="ModernIcon" ToolTip.Tip="Grabar Sesión"
                                         Command="{Binding ToggleRecordingCommand}">
+                                    <Button.Styles>
+                                        <Style Selector="Button:pointerover">
+                                            <Setter Property="RenderTransform" Value="scale(1.1)"/>
+                                        </Style>
+                                    </Button.Styles>
                                     <Panel>
                                         <Ellipse Width="16" Height="16" Fill="#FF4444" IsVisible="{Binding !IsRecording}"/>
                                         <Rectangle Width="14" Height="14" Fill="#FF4444" IsVisible="{Binding IsRecording}"/>
@@ -146,35 +135,61 @@
                                 <!-- Separator -->
                                 <Border Width="1" Height="20" Background="{DynamicResource ThemeBorder}" Opacity="0.3" Margin="4,0"/>
 
-                                <!-- Disconnect Button (Pill) -->
+                                <!-- Disconnect Button (Expandable Logout) -->
                                 <Button Command="{Binding DisconnectCommand}"
-                                        Background="{DynamicResource ThemeError}"
-                                        Foreground="White"
-                                        CornerRadius="18"
-                                        Padding="16,8,18,8"
-                                        BorderThickness="0"
+                                        Classes="ModernIcon"
+                                        Width="NaN"
+                                        MinWidth="34"
+                                        Height="34"
+                                        Padding="8,0"
+                                        Foreground="{DynamicResource ThemeError}"
+                                        Background="Transparent"
+                                        Focusable="False"
                                         Cursor="Hand"
                                         ToolTip.Tip="Finalizar sesión">
+                                    <Button.Transitions>
+                                        <Transitions>
+                                            <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.1"/>
+                                        </Transitions>
+                                    </Button.Transitions>
                                     <Button.Styles>
                                         <Style Selector="Button:pointerover">
-                                            <Setter Property="Background" Value="#E03030"/>
-                                            <Setter Property="RenderTransform" Value="scale(1.02)"/>
+                                            <Setter Property="Background" Value="#10D13438"/>
+                                        </Style>
+                                        <!-- Primary expansion trigger -->
+                                        <Style Selector="Button:pointerover Border#PART_Label">
+                                            <Setter Property="Width" Value="85"/>
+                                            <Setter Property="Opacity" Value="1"/>
+                                        </Style>
+                                        <!-- Robust collapse: ensure it returns to 0 even if pointer events are messy -->
+                                        <Style Selector="Border#PART_Label">
+                                            <Setter Property="Width" Value="0"/>
+                                            <Setter Property="Opacity" Value="0"/>
+                                            <Setter Property="Transitions">
+                                                <Transitions>
+                                                    <DoubleTransition Property="Width" Duration="0:0:0.25" Easing="QuarticEaseOut"/>
+                                                    <DoubleTransition Property="Opacity" Duration="0:0:0.2"/>
+                                                </Transitions>
+                                            </Setter>
                                         </Style>
                                         <Style Selector="Button:pressed">
-                                            <Setter Property="Background" Value="#C02020"/>
-                                            <Setter Property="RenderTransform" Value="scale(0.98)"/>
+                                            <Setter Property="RenderTransform" Value="scale(0.95)"/>
                                         </Style>
                                     </Button.Styles>
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <Path Data="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z"
-                                              Fill="White"
+                                    <StackPanel Orientation="Horizontal">
+                                        <Path Data="M19,3H5C3.89,3 3,3.89 3,5V9H5V5H19V19H5V15H3V19C3,20.11 3.89,21 5,21H19C20.11,21 21,20.11 21,19V5C21,3.89 20.11,3 19,3M10.08,15.58L11.5,17L16.5,12L11.5,7L10.08,8.41L12.67,11H3V13H12.67L10.08,15.58Z"
+                                              Fill="{Binding $parent[Button].Foreground}"
                                               Stretch="Uniform"
-                                              Width="14" Height="14"
+                                              Width="16" Height="16"
+                                              IsHitTestVisible="False"
                                               VerticalAlignment="Center"/>
-                                        <TextBlock Text="Desconectar" 
-                                                   FontSize="13" 
-                                                   FontWeight="SemiBold"
-                                                   VerticalAlignment="Center"/>
+                                        <Border Name="PART_Label" ClipToBounds="True" IsHitTestVisible="False">
+                                            <TextBlock Text="Desconectar" 
+                                                       Margin="10,0,5,0"
+                                                       FontSize="12" 
+                                                       FontWeight="SemiBold"
+                                                       VerticalAlignment="Center"/>
+                                        </Border>
                                     </StackPanel>
                                 </Button>
                             </StackPanel>
@@ -188,18 +203,34 @@
                             <TextBlock Text="⚙" FontSize="{DynamicResource FontSizeLarge}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                         </Button>
 
-                        <!-- Theme Toggle -->
-                        <Button Classes="ModernIcon" ToolTip.Tip="Cambiar Tema" Command="{Binding ToggleThemeCommand}">
-                            <Path Data="M12,3c-4.97,0-9,4.03-9,9s4.03,9,9,9s9-4.03,9-9c0-0.46-0.04-0.92-0.1-1.36c-0.98,1.37-2.58,2.26-4.4,2.26c-2.98,0-5.4-2.42-5.4-5.4c0-1.81,0.89-3.42,2.26-4.4C12.92,3.04,12.46,3,12,3L12,3z"
-                                  Fill="{Binding $parent[Button].Foreground}"
-                                  Stretch="Uniform"
-                                  Width="16" Height="16"/>
-                        </Button>
+
 
                         <!-- Screen Menu -->
                         <Button Name="MenuButton" Classes="ModernIcon" ToolTip.Tip="Pantallas" IsVisible="{Binding IsSessionActive}">
                             <Button.Flyout>
-                                <MenuFlyout ItemsSource="{Binding RemoteScreens}"/>
+                                <MenuFlyout ItemsSource="{Binding RemoteScreens}">
+                                    <MenuFlyout.ItemContainerTheme>
+                                        <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="dto:ScreenInfoDto">
+                                            <Setter Property="Header" Value="{Binding Name}"/>
+                                            <Setter Property="Command" Value="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).SelectRemoteScreenCommand}"/>
+                                            <Setter Property="CommandParameter" Value="{Binding}"/>
+                                            <Setter Property="Icon">
+                                                <Template>
+                                                    <Path Data="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z" 
+                                                          Fill="{DynamicResource ThemePrimary}"
+                                                          Width="14" Height="14" Stretch="Uniform">
+                                                        <Path.IsVisible>
+                                                            <MultiBinding Converter="{StaticResource ScreenSelectionConverter}">
+                                                                <Binding Path="."/>
+                                                                <Binding Path="$parent[Window].((vm:MainWindowViewModel)DataContext).CurrentRemoteScreen"/>
+                                                            </MultiBinding>
+                                                        </Path.IsVisible>
+                                                    </Path>
+                                                </Template>
+                                            </Setter>
+                                        </ControlTheme>
+                                    </MenuFlyout.ItemContainerTheme>
+                                </MenuFlyout>
                             </Button.Flyout>
                             <Path Data="M21,16H3V4H21M21,2H3C1.89,2 1,2.89 1,4V16A2,2 0 0,0 3,18H10V20H8V22H16V20H14V18H21A2,2 0 0,0 23,16V4C23,2.89 22.1,2 21,2Z"
                                   Fill="{Binding $parent[Button].Foreground}"

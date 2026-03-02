@@ -42,11 +42,15 @@ public partial class App : Avalonia.Application
             BindingPlugins.DataValidators.RemoveAt(0);
             
             var config = serviceProvider.GetRequiredService<IConfigurationService>();
+            var themeService = serviceProvider.GetRequiredService<IThemeService>();
+
             ApplyFontSize(config.FontSize);
             ApplyLanguage(config.Language);
+            themeService.SetTheme(config.Theme);
             
             config.FontSizeChanged += ApplyFontSize;
             config.LanguageChanged += ApplyLanguage;
+            config.ThemeChanged += theme => themeService.SetTheme(theme);
 
             desktop.MainWindow = new MainWindow(serviceProvider)
             {

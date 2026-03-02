@@ -46,24 +46,34 @@
                 </Grid>
             </Border>
 
-            <!-- Terminal Output -->
             <ScrollViewer Grid.Row="1" Name="TerminalScrollViewer"
                           VerticalScrollBarVisibility="Auto"
                           HorizontalScrollBarVisibility="Auto"
                           Background="#0D1117"
                           IsVisible="{Binding IsTerminalExpanded}">
-                <ItemsControl ItemsSource="{Binding TerminalLines}" Margin="12,8">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <TextBlock Text="{Binding}" 
-                                       Foreground="#C9D1D9" 
-                                       FontFamily="Cascadia Code, Consolas, Courier New, monospace"
-                                       FontSize="12"
-                                       TextWrapping="Wrap"
-                                       Margin="0,1"/>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                <TextBox Name="TerminalOutputBox"
+                         Text="{Binding FullTerminalOutput}"
+                         IsReadOnly="True"
+                         AcceptsReturn="True"
+                         TextWrapping="Wrap"
+                         Background="Transparent"
+                         BorderThickness="0"
+                         Foreground="#C9D1D9"
+                         CaretBrush="Transparent"
+                         FontFamily="Cascadia Code, Consolas, Courier New, monospace"
+                         FontSize="12"
+                         SelectionBrush="#4458A6FF"
+                         Padding="12,8">
+                    <TextBox.Styles>
+                        <Style Selector="TextBox:pointerover /template/ Border#PART_BorderElement">
+                            <Setter Property="Background" Value="Transparent"/>
+                        </Style>
+                        <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="BorderThickness" Value="0"/>
+                        </Style>
+                    </TextBox.Styles>
+                </TextBox>
             </ScrollViewer>
 
             <!-- Input Area -->
