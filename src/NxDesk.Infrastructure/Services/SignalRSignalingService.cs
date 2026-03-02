@@ -42,6 +42,10 @@ public class SignalRSignalingService : ISignalingService
         _hubConnection = new HubConnectionBuilder()
             .WithUrl(_serverUrl, options =>
             {
+                // Force WebSockets and LongPolling for better Linux compatibility
+                options.Transports = Microsoft.AspNetCore.Http.Connections.HttpTransportType.WebSockets | 
+                                    Microsoft.AspNetCore.Http.Connections.HttpTransportType.LongPolling;
+                
                 // Allow self-signed certificates in development
                 options.HttpMessageHandlerFactory = _ => new HttpClientHandler
                 {
@@ -137,7 +141,7 @@ public class SignalRSignalingService : ISignalingService
         });
     }
 
-    public void SetServerUrl(string serverUrl)
+    public async void SetServerUrl(string serverUrl)
     {
         if (_serverUrl == serverUrl) return;
 
@@ -147,8 +151,19 @@ public class SignalRSignalingService : ISignalingService
         // Tear down existing connection and rebuild with the new URL
         if (_hubConnection != null)
         {
-            _ = _hubConnection.DisposeAsync();
-            _hubConnection = null;
+            try 
+            {
+                FileLogger.Log("SignalR", "Disposing old connection...");
+                await _hubConnection.DisposeAsync();
+            }
+            catch (Exception ex)
+            {
+                FileLogger.Log("SignalR", $"Error disposing connection: {ex.Message}");
+            }
+            finally 
+            {
+                _hubConnection = null;
+            }
         }
         InitializeConnection();
     }
@@ -159,12 +174,13 @@ public class SignalRSignalingService : ISignalingService
     {
         FileLogger.Log("SignalR", $"ConnectAsync called for room: {roomId}");
         // Leave previous room if any
-        if (!string.IsNullOrEmpty(_roomId) && _roomId != roomId)
+        if (!string.IsNullOrEmpty(_roomId) && _roomId != (roomId?.Replace(" ", "")))
         {
             await LeaveRoomAsync();
         }
 
-        _roomId = roomId;
+        // Normalize roomId: remove spaces to ensure matching between peers
+        _roomId = roomId?.Replace(" ", "");
 
         // Retry logic with exponential backoff
         int attempt = 0;

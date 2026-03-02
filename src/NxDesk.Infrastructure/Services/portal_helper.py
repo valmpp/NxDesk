@@ -46,14 +46,14 @@ class UnifiedPortalHelper:
 
     # ── Step 0: Create session via RemoteDesktop ──
     def _do_create_session(self):
-        token = "nxdesk" + str(random.randint(1000, 9999))
+        token = "nxdesk_session"
         options = {
             'session_handle_token': GLib.Variant('s', token),
             'handle_token': GLib.Variant('s', token),
         }
         self._step = 0
         try:
-            print("[Portal] Step 0: CreateSession (RemoteDesktop)...", file=sys.stderr)
+            print(f"[Portal] Step 0: CreateSession (RemoteDesktop) restore={self.restore_token is not None}...", file=sys.stderr)
             self.rd_proxy.call_sync(
                 "CreateSession", GLib.Variant('(a{sv})', (options,)),
                 Gio.DBusCallFlags.NONE, 10000, None
@@ -64,11 +64,15 @@ class UnifiedPortalHelper:
 
     # ── Step 1: SelectDevices via RemoteDesktop ──
     def _do_select_devices(self):
-        token = "nxdev" + str(random.randint(1000, 9999))
+        token = "nxdesk_dev"
         options = {
             'handle_token': GLib.Variant('s', token),
             'types': GLib.Variant('u', 3),  # keyboard=1 | pointer=2
+            'persistance_mode': GLib.Variant('u', 2), # Always persist
         }
+        if self.restore_token:
+            options['restore_token'] = GLib.Variant('s', self.restore_token)
+
         self._step = 1
         try:
             print("[Portal] Step 1: SelectDevices (RemoteDesktop)...", file=sys.stderr)
@@ -82,12 +86,16 @@ class UnifiedPortalHelper:
 
     # ── Step 2: SelectSources via ScreenCast ──
     def _do_select_sources(self):
-        token = "nxsrc" + str(random.randint(1000, 9999))
+        token = "nxdesk_src"
         options = {
             'handle_token': GLib.Variant('s', token),
             'types': GLib.Variant('u', 1),       # monitors
             'cursor_mode': GLib.Variant('u', 2),  # embedded
+            'persistance_mode': GLib.Variant('u', 2), # Always persist
         }
+        if self.restore_token:
+            options['restore_token'] = GLib.Variant('s', self.restore_token)
+
         self._step = 2
         try:
             print("[Portal] Step 2: SelectSources (ScreenCast)...", file=sys.stderr)
@@ -103,7 +111,7 @@ class UnifiedPortalHelper:
     # This is the critical fix: RemoteDesktop.Start returns the streams
     # and activates input in a single call.
     def _do_start(self):
-        token = "nxstart" + str(random.randint(1000, 9999))
+        token = "nxdesk_start"
         self._step = 3
         try:
             print("[Portal] Step 3: Start (RemoteDesktop) — unified start...", file=sys.stderr)
@@ -186,6 +194,7 @@ class UnifiedPortalHelper:
             cmd = parts[0]
             if cmd == "MOVE":
                 x, y = float(parts[1]), float(parts[2])
+                print(f"[Portal] Inject MOVE: {x}, {y}", file=sys.stderr)
                 self.rd_proxy.call_sync(
                     "NotifyPointerMotionAbsolute",
                     GLib.Variant('(oa{sv}sdd)', (self.session_handle, {}, "", x, y)),
@@ -193,6 +202,7 @@ class UnifiedPortalHelper:
                 )
             elif cmd == "BUTTON":
                 btn, down = int(parts[1]), parts[2] == "1"
+                print(f"[Portal] Inject BUTTON: {btn} {'DOWN' if down else 'UP'}", file=sys.stderr)
                 self.rd_proxy.call_sync(
                     "NotifyPointerButton",
                     GLib.Variant('(oa{sv}ui)', (self.session_handle, {}, btn, 1 if down else 0)),
@@ -200,6 +210,7 @@ class UnifiedPortalHelper:
                 )
             elif cmd == "KEY":
                 key, down = int(parts[1]), parts[2] == "1"
+                print(f"[Portal] Inject KEY: {key} {'DOWN' if down else 'UP'}", file=sys.stderr)
                 self.rd_proxy.call_sync(
                     "NotifyKeyboardKey",
                     GLib.Variant('(oa{sv}ui)', (self.session_handle, {}, key, 1 if down else 0)),

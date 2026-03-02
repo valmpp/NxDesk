@@ -14,7 +14,7 @@ public class RemoteTerminalService : IRemoteTerminalService
     private Process? _shellProcess;
     private bool _disposed;
 
-    public event Action<string>? OnOutputReceived;
+    public Action<string>? OnOutputReceived { get; set; }
     public bool IsRunning => _shellProcess != null && !_shellProcess.HasExited;
 
     public Task StartAsync()
@@ -32,10 +32,10 @@ public class RemoteTerminalService : IRemoteTerminalService
         {
             FileName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                 ? "cmd.exe"
-                : "/bin/bash",
+                : "script",
             Arguments = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                 ? ""
-                : "-i", // interactive
+                : "-q /dev/null /bin/bash -i", // use script to provide PTY wrapper
             RedirectStandardInput = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
@@ -43,7 +43,8 @@ public class RemoteTerminalService : IRemoteTerminalService
             CreateNoWindow = true,
             Environment =
             {
-                ["TERM"] = "dumb"
+                ["TERM"] = "xterm-256color",
+                ["LANG"] = "en_US.UTF-8"
             }
         };
 
@@ -52,7 +53,7 @@ public class RemoteTerminalService : IRemoteTerminalService
         _shellProcess.Exited += (_, _) =>
         {
             FileLogger.Log("Terminal", "Shell process exited.");
-            OnOutputReceived?.Invoke("[Terminal] El proceso ha terminado.");
+            OnOutputReceived?.Invoke("[Terminal] El proceso ha terminado.\n");
         };
 
         try
@@ -133,7 +134,13 @@ public class RemoteTerminalService : IRemoteTerminalService
             // Even if the client is on Linux, if the Host is Windows, we need \r\n.
             string lineEnding = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "\r\n" : "\n";
             
-            _shellProcess.StandardInput.Write(input + lineEnding);
+            string toWrite = input;
+            if (!toWrite.EndsWith(lineEnding))
+            {
+                toWrite += lineEnding;
+            }
+
+            _shellProcess.StandardInput.Write(toWrite);
             _shellProcess.StandardInput.Flush();
         }
         catch (Exception ex)
@@ -157,6 +164,7 @@ public class RemoteTerminalService : IRemoteTerminalService
                 FileLogger.Log("Terminal", "Shell process killed.");
             }
             _shellProcess?.Dispose();
+            _shellProcess = null;
         }
         catch (Exception ex)
         {

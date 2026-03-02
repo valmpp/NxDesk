@@ -176,7 +176,7 @@ public class EmbeddedHub : Hub
         await Clients.OthersInGroup(roomId).SendAsync("ParticipantLeft", Context.ConnectionId);
     }
 
-    public async Task RelayMessage(string roomId, SdpMessage message)
+    public async Task RelayMessage(string roomId, NxDesk.Core.Models.SignalingMessage message)
     {
         if (string.IsNullOrEmpty(roomId)) return;
         await Clients.OthersInGroup(roomId).SendAsync("ReceiveMessage", message);

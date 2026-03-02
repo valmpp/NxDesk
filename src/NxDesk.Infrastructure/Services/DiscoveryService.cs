@@ -37,6 +37,13 @@ public class DiscoveryService : IDiscoveryService, IDisposable
         {
             _listener = new UdpClient();
             _listener.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+            
+            // On Linux/macOS, ReusePort allows multiple processes to bind to the same port
+            try { 
+                // SO_REUSEPORT is usually 15 on Linux
+                _listener.Client.SetSocketOption(SocketOptionLevel.Socket, (SocketOptionName)15, true); 
+            } catch { /* Not supported on all OS versions */ }
+
             _listener.ExclusiveAddressUse = false; // Required on Windows for port reuse
             _listener.Client.Bind(new IPEndPoint(IPAddress.Any, Port));
             _listener.EnableBroadcast = true;

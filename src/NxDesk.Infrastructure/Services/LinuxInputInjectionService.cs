@@ -46,7 +46,7 @@ public class LinuxInputInjectionService : IInputInjectionService, IDisposable
         {
             string command = inputEvent.Type switch
             {
-                InputEventType.MouseMove => $"MOVE|{(_screenX + inputEvent.X * _screenWidth):F1}|{(_screenY + inputEvent.Y * _screenHeight):F1}",
+                InputEventType.MouseMove => $"MOVE|{inputEvent.X:F6}|{inputEvent.Y:F6}",
                 InputEventType.MouseDown => $"BUTTON|{MapButton(inputEvent.MouseButton)}|1",
                 InputEventType.MouseUp => $"BUTTON|{MapButton(inputEvent.MouseButton)}|0",
                 InputEventType.MouseWheel => $"SCROLL|{inputEvent.DeltaX:F1}|{inputEvent.DeltaY:F1}",

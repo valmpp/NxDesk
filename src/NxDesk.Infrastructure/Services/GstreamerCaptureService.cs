@@ -273,6 +273,13 @@ public class GstreamerCaptureService : IScreenCaptureService
             if (_frameCount % 100 == 0)
                 Console.WriteLine($"[GStreamer] Captured Frame {_frameCount}");
 
+            // Check if process is still alive
+            if (_gstProcess == null || _gstProcess.HasExited)
+            {
+                _initialized = false;
+                return null;
+            }
+
             return new VideoFrameDto(payload, _width, _height, isCompressed: true);
         }
         catch (Exception ex)

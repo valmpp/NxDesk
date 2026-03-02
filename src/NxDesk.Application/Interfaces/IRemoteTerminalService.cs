@@ -17,9 +17,9 @@ public interface IRemoteTerminalService : IDisposable
     Task WriteInputAsync(string input);
 
     /// <summary>
-    /// Fired when the shell produces output (stdout or stderr).
+    /// Callback fired when the shell produces output (stdout or stderr).
     /// </summary>
-    event Action<string> OnOutputReceived;
+    Action<string>? OnOutputReceived { get; set; }
 
     /// <summary>
     /// Whether the shell process is currently running.

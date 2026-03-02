@@ -360,7 +360,11 @@ public partial class MainWindowViewModel : ViewModelBase
             StatusText = "Conectado";
 
             // If we are in our own room and someone joined, we are the HOST
-            if (_currentRoomId == MyId && !_isSharingStarted)
+            // Use normalized comparison to be safe
+            string normalizedRoomId = _currentRoomId?.Replace(" ", "") ?? "";
+            string normalizedMyId = MyId?.Replace(" ", "") ?? "";
+
+            if (normalizedRoomId == normalizedMyId && !_isSharingStarted)
             {
                 Console.WriteLine("[Host] UpdateConnectionStatus: Host mode detected. Cleaning up & starting share.");
                 NxDesk.Infrastructure.Services.FileLogger.Log("Host", $"Host mode detected. _currentRoomId={_currentRoomId}, MyId={MyId}, _isSharingStarted={_isSharingStarted}");
@@ -882,7 +886,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 return;
             }
 
-            _currentRoomId = id;
+            _currentRoomId = normalizedId;
 
             // Auto-resolve the peer's IP from Discovery and point SignalR to their server
             // Compare normalized IDs (without spaces) to handle format differences
@@ -1168,9 +1172,17 @@ public partial class MainWindowViewModel : ViewModelBase
             _signalingService.SetServerUrl(localUrl);
 
             NxDesk.Infrastructure.Services.FileLogger.Log("Connect", $"Re-joining local room after disconnect: {MyId}");
-            _currentRoomId = MyId;
+            _currentRoomId = MyId.Replace(" ", ""); // Store normalized
             _isSharingStarted = false; // Reset sharing flag for the new local session
-            _ = _signalingService.ConnectAsync(MyId);
+            
+            // Actually wait for connection or run in background but ensure it's tracked
+            _ = Task.Run(async () => {
+                try {
+                    await _signalingService.ConnectAsync(MyId);
+                } catch (Exception ex) {
+                    NxDesk.Infrastructure.Services.FileLogger.Log("Connect", $"Failed to re-join local room: {ex.Message}");
+                }
+            });
         }
     }
 
@@ -1214,7 +1226,7 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             if (!_isTerminalInitialized)
             {
-                _terminalService.OnOutputReceived += async output =>
+                _terminalService.OnOutputReceived = async output =>
                 {
                     Console.WriteLine($"[Terminal] [HOST] Output captured from shell ({output.Length} chars). Relaying...");
                     // Relay output to receiver via signaling
