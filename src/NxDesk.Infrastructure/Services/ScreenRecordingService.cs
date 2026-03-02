@@ -42,14 +42,14 @@ public class ScreenRecordingService : IScreenRecordingService
         if (_isRaw)
         {
             args = $"-y -f rawvideo -pixel_format bgra -video_size {width}x{height} -framerate {fps} -i pipe:0 " +
-                   $"-c:v libopenh264 -pix_fmt yuv420p " +
+                   $"-c:v libx264 -crf 18 -preset veryfast -pix_fmt yuv420p " +
                    $"-movflags +faststart \"{outputPath}\"";
         }
         else
         {
             // MJPEG input: Add robustness parameters to avoid "unspecified size" errors.
             args = $"-y -analyzeduration 0 -probesize 5000000 -f mjpeg -framerate {fps} -video_size {width}x{height} -i pipe:0 " +
-                   $"-c:v libopenh264 -pix_fmt yuv420p " +
+                   $"-c:v libx264 -crf 18 -preset veryfast -pix_fmt yuv420p " +
                    $"-movflags +faststart -vsync vfr \"{outputPath}\"";
         }
 

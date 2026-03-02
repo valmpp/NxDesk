@@ -245,6 +245,8 @@ public partial class MainWindowViewModel : ViewModelBase
     private bool _isAutoConnect = false;
     private bool _isSharingStarted = false;
     private bool _lastFrameWasCompressed = false;
+    private int _lastFrameWidth = 1920;
+    private int _lastFrameHeight = 1080;
 
     /// <summary>
     /// Centralised cleanup of all resources from a previous session.
@@ -399,6 +401,8 @@ public partial class MainWindowViewModel : ViewModelBase
                     int height = int.Parse(message.Metadata["Height"]);
                     bool isCompressed = message.Metadata.ContainsKey("IsCompressed") && bool.Parse(message.Metadata["IsCompressed"]);
                     _lastFrameWasCompressed = isCompressed;
+                    _lastFrameWidth = width;
+                    _lastFrameHeight = height;
                     frame = new NxDesk.Application.DTOs.VideoFrameDto(message.ByteData, width, height, isCompressed: isCompressed);
                 }
                 else if (!string.IsNullOrEmpty(message.Payload))
@@ -1333,8 +1337,8 @@ public partial class MainWindowViewModel : ViewModelBase
             // Explicitly force MJPEG if we know frames are compressed, otherwise default to raw
             // This is more robust than relying on local OS type.
             
-            // Use larger resolution if possible, or just pass current view size
-            await _recordingService.StartAsync(outputPath, 1920, 1080, fps: 8, isRaw: isRaw);
+            // Use actual frame dimensions to ensure native quality (no blurry scaling)
+            await _recordingService.StartAsync(outputPath, _lastFrameWidth, _lastFrameHeight, fps: 8, isRaw: isRaw);
             IsRecording = true;
             _recordingStartTime = DateTime.Now;
             RecordingDuration = "00:00";
