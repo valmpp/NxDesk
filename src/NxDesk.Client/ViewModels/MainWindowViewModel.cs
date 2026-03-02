@@ -1300,27 +1300,18 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             // Start recording
             string recordingsDir;
-            if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Linux))
+            
+            // Get the system's Videos folder path
+            var videosPath = Environment.GetFolderPath(Environment.SpecialFolder.MyVideos);
+            
+            // Fallback for systems where MyVideos might be empty (like some Linux distros)
+            if (string.IsNullOrEmpty(videosPath))
             {
-                // On Linux, SpecialFolder.MyVideos is often empty. 
-                // Use ~/Videos or ~/Documents as fallback.
                 var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-                recordingsDir = Path.Combine(home, "Videos", "NxDesk_Recordings");
-                if (!Directory.Exists(Path.Combine(home, "Videos")))
-                {
-                    recordingsDir = Path.Combine(home, "Documents", "NxDesk_Recordings");
-                }
+                videosPath = Path.Combine(home, "Videos");
             }
-            else
-            {
-                // Windows or other
-                var videosPath = Environment.GetFolderPath(Environment.SpecialFolder.MyVideos);
-                if (string.IsNullOrEmpty(videosPath))
-                {
-                    videosPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Videos");
-                }
-                recordingsDir = Path.Combine(videosPath, "NxDesk_Recordings");
-            }
+            
+            recordingsDir = Path.Combine(videosPath, "NxDesk_Recordings");
 
             try
             {
