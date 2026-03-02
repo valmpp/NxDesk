@@ -47,7 +47,8 @@ public class ScreenRecordingService : IScreenRecordingService
         }
         else
         {
-            args = $"-y -f mjpeg -framerate {fps} -i pipe:0 " +
+            // MJPEG input: Add robustness parameters to avoid "unspecified size" errors.
+            args = $"-y -analyzeduration 0 -probesize 5000000 -f mjpeg -framerate {fps} -video_size {width}x{height} -i pipe:0 " +
                    $"-c:v libopenh264 -pix_fmt yuv420p " +
                    $"-movflags +faststart -vsync vfr \"{outputPath}\"";
         }
@@ -130,9 +131,14 @@ public class ScreenRecordingService : IScreenRecordingService
                 // Frame type mismatch
                 if (_frameCount % 100 == 0)
                 {
-                    FileLogger.Log("Recording", $"WARNING: Frame type mismatch. IsCompressed={frame.IsCompressed}, ServiceIsRaw={_isRaw}. Skipping.");
+                    FileLogger.Log("Recording", $"WARNING: Frame type mismatch. IsCompressed={frame.IsCompressed}, ServiceIsRaw={_isRaw}. Skipping frame {_frameCount}.");
                 }
                 return Task.CompletedTask;
+            }
+
+            if (_frameCount % 50 == 0)
+            {
+                FileLogger.Log("Recording", $"Pushing frame {_frameCount}. Size={frame.Pixels.Length / 1024} KB. IsRaw={_isRaw}");
             }
 
             lock (_lock)

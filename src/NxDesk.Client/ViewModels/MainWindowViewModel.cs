@@ -244,6 +244,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private bool _isAutoShare = false;
     private bool _isAutoConnect = false;
     private bool _isSharingStarted = false;
+    private bool _lastFrameWasCompressed = false;
 
     /// <summary>
     /// Centralised cleanup of all resources from a previous session.
@@ -397,6 +398,7 @@ public partial class MainWindowViewModel : ViewModelBase
                     int width = int.Parse(message.Metadata["Width"]);
                     int height = int.Parse(message.Metadata["Height"]);
                     bool isCompressed = message.Metadata.ContainsKey("IsCompressed") && bool.Parse(message.Metadata["IsCompressed"]);
+                    _lastFrameWasCompressed = isCompressed;
                     frame = new NxDesk.Application.DTOs.VideoFrameDto(message.ByteData, width, height, isCompressed: isCompressed);
                 }
                 else if (!string.IsNullOrEmpty(message.Payload))
@@ -420,9 +422,9 @@ public partial class MainWindowViewModel : ViewModelBase
                     OnFrameReceived?.Invoke(frame);
                     
                     // Push frame to recording pipeline if active
-                    if (IsRecording && frame.IsCompressed)
+                    if (IsRecording)
                     {
-                    _ = _recordingService.PushFrameAsync(frame);
+                        _ = _recordingService.PushFrameAsync(frame);
                     }
                     
                     UpdateFps();
@@ -1334,8 +1336,11 @@ public partial class MainWindowViewModel : ViewModelBase
             var outputPath = Path.Combine(recordingsDir, $"NxDesk_{timestamp}.mp4");
             RecordingPath = outputPath;
 
-            // Determine if we are using RAW frames (Windows DXGI) or MJPEG (Linux GStreamer)
-            bool isRaw = System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows);
+            // Determine if we are using RAW frames (based on last received frame)
+            bool isRaw = !_lastFrameWasCompressed;
+            
+            // Explicitly force MJPEG if we know frames are compressed, otherwise default to raw
+            // This is more robust than relying on local OS type.
             
             // Use larger resolution if possible, or just pass current view size
             await _recordingService.StartAsync(outputPath, 1920, 1080, fps: 8, isRaw: isRaw);
