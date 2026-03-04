@@ -87,4 +87,13 @@ public partial class MainWindow : Window
     {
         this.Close();
     }
+
+    private void OnRoomIdKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter && DataContext is MainWindowViewModel vm)
+        {
+            vm.ConnectByIdCommand.Execute(null);
+            e.Handled = true;
+        }
+    }
 }

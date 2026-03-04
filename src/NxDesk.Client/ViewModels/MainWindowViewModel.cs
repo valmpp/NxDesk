@@ -45,6 +45,34 @@ public partial class MainWindowViewModel : ViewModelBase
     partial void OnIsSessionActiveChanged(bool value)
     {
         _discoveryService.SetStatus(value ? PeerStatus.Connected : PeerStatus.Background);
+        
+        if (value)
+        {
+            _connectionStartTime = DateTime.Now;
+            ConnectionDuration = "00:00:00";
+            if (_connectionTimer == null)
+            {
+                _connectionTimer = new System.Timers.Timer(1000);
+                _connectionTimer.Elapsed += (s, e) =>
+                {
+                    var duration = DateTime.Now - _connectionStartTime;
+                    string formatted = duration.TotalHours >= 1 
+                        ? $"{(int)duration.TotalHours:D2}:{duration.Minutes:D2}:{duration.Seconds:D2}"
+                        : $"{duration.Minutes:D2}:{duration.Seconds:D2}";
+
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    {
+                        ConnectionDuration = formatted;
+                    });
+                };
+            }
+            _connectionTimer.Start();
+        }
+        else
+        {
+            _connectionTimer?.Stop();
+            ConnectionDuration = "00:00:00";
+        }
     }
 
     [ObservableProperty]
@@ -76,6 +104,9 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private System.Timers.Timer? _recordingTimer;
     private DateTime _recordingStartTime;
+
+    private System.Timers.Timer? _connectionTimer;
+    private DateTime _connectionStartTime;
 
     [ObservableProperty]
     private bool _isRemoteControlEnabled = true;
@@ -109,6 +140,12 @@ public partial class MainWindowViewModel : ViewModelBase
 
     [ObservableProperty]
     private bool _isTerminalExpanded = true;
+
+    // --- Screen Lock State ---
+    [ObservableProperty]
+    private bool _isScreenLocked;
+
+    private NxDesk.Client.Views.ScreenLockOverlay? _screenLockOverlay;
 
     public ObservableCollection<string> TerminalLines { get; } = new();
 
@@ -198,6 +235,29 @@ public partial class MainWindowViewModel : ViewModelBase
     private void CancelLeaveAdminMode()
     {
         IsAdminLeaveConfirmationVisible = false;
+    }
+
+    // --- Screen Lock (remote) ---
+    [RelayCommand]
+    private async Task ToggleScreenLock()
+    {
+        if (!IsSessionActive) return;
+
+        IsScreenLocked = !IsScreenLocked;
+        var msgType = IsScreenLocked ? "lock_screen" : "unlock_screen";
+
+        var msg = new NxDesk.Application.DTOs.SdpMessage
+        {
+            Type = msgType,
+            SenderId = MyId,
+            SenderAlias = MyAlias
+        };
+        await _signalingService.RelayMessageAsync(msg);
+        Console.WriteLine($"[ScreenLock] Sent {msgType} signal.");
+
+        AddNotification("Bloqueo",
+            IsScreenLocked ? "Pantalla del host bloqueada" : "Pantalla del host desbloqueada",
+            IsScreenLocked ? "Warning" : "Success", 3);
     }
 
     // --- File Transfer Interaction ---
@@ -499,6 +559,9 @@ public partial class MainWindowViewModel : ViewModelBase
             }
             CleanupPreviousSession();
             _isSharingStarted = false; // Reset so we can start again if someone reconnects
+
+            // Auto-dismiss screen lock overlay when peer leaves
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => DismissScreenLockOverlay());
         }
         else
         {
@@ -812,6 +875,16 @@ public partial class MainWindowViewModel : ViewModelBase
                 }
             }
         }
+        else if (message.Type == "lock_screen")
+        {
+            Console.WriteLine("[ScreenLock] Received lock_screen signal from remote admin.");
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => ShowScreenLockOverlay());
+        }
+        else if (message.Type == "unlock_screen")
+        {
+            Console.WriteLine("[ScreenLock] Received unlock_screen signal from remote admin.");
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => DismissScreenLockOverlay());
+        }
             else
             {
                 Console.WriteLine($"[Signaling] Message: {message.Type} from {message.SenderAlias}");
@@ -822,6 +895,32 @@ public partial class MainWindowViewModel : ViewModelBase
             Console.WriteLine($"[Signaling] ERROR in HandleSignalingMessage for {message.Type}: {ex.Message}");
             NxDesk.Infrastructure.Services.FileLogger.Log("Signaling", $"ERROR: {ex.Message}\n{ex.StackTrace}");
         }
+    }
+
+    // --- Screen Lock Overlay Helpers ---
+    private void ShowScreenLockOverlay()
+    {
+        if (_screenLockOverlay != null) return; // Already showing
+
+        _screenLockOverlay = new NxDesk.Client.Views.ScreenLockOverlay();
+        _screenLockOverlay.Show();
+        Console.WriteLine("[ScreenLock] Overlay shown.");
+    }
+
+    private void DismissScreenLockOverlay()
+    {
+        if (_screenLockOverlay == null) return;
+
+        try
+        {
+            _screenLockOverlay.ForceClose();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ScreenLock] Error closing overlay: {ex.Message}");
+        }
+        _screenLockOverlay = null;
+        Console.WriteLine("[ScreenLock] Overlay dismissed.");
     }
 
     private int _frameCount = 0;
@@ -1326,10 +1425,14 @@ public partial class MainWindowViewModel : ViewModelBase
         
         IsSessionActive = false;
         IsTerminalVisible = false;
+        IsScreenLocked = false;
         StatusText = "Desconectado";
         StatusMessage = "Sesión finalizada";
         _currentRoomId = null;
         OnSessionClosed?.Invoke();
+
+        // Dismiss any screen lock overlay
+        DismissScreenLockOverlay();
 
         // Comprehensive cleanup
         CleanupPreviousSession();

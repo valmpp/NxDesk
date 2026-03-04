@@ -58,7 +58,8 @@
                                          Watermark="Ingrese ID..."
                                          VerticalContentAlignment="Center"
                                          Padding="10,8,40,8"
-                                         Text="{Binding TargetId}"/>
+                                         Text="{Binding TargetId}"
+                                         KeyDown="OnRoomIdKeyDown"/>
                                 <Button HorizontalAlignment="Right"
                                         VerticalAlignment="Center"
                                         Width="32" Height="32"
@@ -96,6 +97,17 @@
                                           Data="M12,17C10.89,17 10,16.1 10,15C10,13.89 10.89,13 12,13A2,2 0 0,1 14,15A2,2 0 0,1 12,17M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6A2,2 0 0,1 4,20V10C4,8.89 4.89,8 6,8H7V6A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,3A3,3 0 0,0 9,6V8H15V6A3,3 0 0,0 12,3Z" />
                                 </Button>
 
+                                <!-- Screen Lock Toggle Button (admin only) -->
+                                <Button Command="{Binding ToggleScreenLockCommand}"
+                                        Classes="ModernIcon" 
+                                        IsVisible="{Binding IsAdmin}"
+                                        ToolTip.Tip="Bloquear/Desbloquear pantalla del Host"
+                                        Foreground="{Binding IsScreenLocked, Converter={StaticResource RemoteControlBrushConverter}}">
+                                    <Path Width="16" Height="16" Stretch="Uniform" 
+                                          Fill="{Binding $parent[Button].Foreground}"
+                                          Data="M21,21H3V3H21V21M19,13H13V19H19V13M11,19V13H5V19H11M19,5H13V11H19V5M11,11V5H5V11H11Z" />
+                                </Button>
+
                                 <!-- Recording Button -->
                                 <Button Classes="ModernIcon" ToolTip.Tip="Grabar Sesión"
                                         Command="{Binding ToggleRecordingCommand}">
@@ -113,8 +125,9 @@
                                 <!-- Separator -->
                                 <Border Width="1" Height="20" Background="{DynamicResource ThemeBorder}" Opacity="0.3" Margin="4,0"/>
 
-                                <!-- File Transfer Button -->
-                                <Button Classes="ModernIcon" ToolTip.Tip="Transferir Archivos">
+                                <!-- File Transfer Button (admin only) -->
+                                <Button Classes="ModernIcon" ToolTip.Tip="Transferir Archivos"
+                                        IsVisible="{Binding IsAdmin}">
                                     <Button.Flyout>
                                         <MenuFlyout>
                                             <MenuItem Header="Enviar Archivo..." Command="{Binding SendFileCommand}">

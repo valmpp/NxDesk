@@ -51,6 +51,18 @@
                         <TextBlock Text="SÓLO LECTURA" Foreground="White" FontSize="11" FontWeight="Bold" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Border>
+
+                <!-- Screen Locked Indicator -->
+                <Border Background="#80D32F2F" IsVisible="{Binding IsScreenLocked}" 
+                        VerticalAlignment="Top" HorizontalAlignment="Right" 
+                        Margin="20,50,20,0" Padding="12,6" CornerRadius="20"
+                        BorderBrush="#40FFFFFF" BorderThickness="1">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Path Data="M21,21H3V3H21V21M19,13H13V19H19V13M11,19V13H5V19H11M19,5H13V11H19V5M11,11V5H5V11H11Z" 
+                              Fill="#FF5252" Width="14" Height="14" Stretch="Uniform"/>
+                        <TextBlock Text="BLOQUEADA" Foreground="White" FontSize="11" FontWeight="Bold" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
             </Panel>
         </Border>
 
