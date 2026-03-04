@@ -10,11 +10,25 @@ namespace NxDesk.Client.Views;
 public partial class MainWindow : Window
 {
     private readonly IServiceProvider _serviceProvider;
+    public bool IsExiting { get; set; } = false;
 
     public MainWindow(IServiceProvider serviceProvider)
     {
         _serviceProvider = serviceProvider;
         InitializeComponent();
+    }
+
+    protected override void OnClosing(WindowClosingEventArgs e)
+    {
+        if (!IsExiting)
+        {
+            e.Cancel = true;
+            this.Hide();
+        }
+        else
+        {
+            base.OnClosing(e);
+        }
     }
 
     protected override void OnOpened(EventArgs e)

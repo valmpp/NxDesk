@@ -6,6 +6,22 @@
              RequestedThemeVariant="Default">
              <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
 
+    <TrayIcon.Icons>
+        <TrayIcons>
+            <TrayIcon Icon="/Assets/icon.png" 
+                      ToolTipText="NxDesk - Remote Desktop"
+                      Clicked="TrayIcon_OnClicked">
+                <TrayIcon.Menu>
+                    <NativeMenu>
+                        <NativeMenuItem Header="Abrir NxDesk" Click="ToggleWindow_Click" />
+                        <NativeMenuItemSeparator />
+                        <NativeMenuItem Header="Salir" Click="Exit_Click" />
+                    </NativeMenu>
+                </TrayIcon.Menu>
+            </TrayIcon>
+        </TrayIcons>
+    </TrayIcon.Icons>
+
     <Application.DataTemplates>
         <local:ViewLocator/>
     </Application.DataTemplates>

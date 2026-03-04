@@ -61,6 +61,45 @@ public partial class App : Avalonia.Application
         base.OnFrameworkInitializationCompleted();
     }
 
+    private void TrayIcon_OnClicked(object? sender, EventArgs e)
+    {
+        ToggleWindow();
+    }
+
+    private void ToggleWindow_Click(object? sender, EventArgs e)
+    {
+        ToggleWindow();
+    }
+
+    private void ToggleWindow()
+    {
+        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop && desktop.MainWindow != null)
+        {
+            if (desktop.MainWindow.IsVisible)
+            {
+                desktop.MainWindow.Hide();
+            }
+            else
+            {
+                desktop.MainWindow.Show();
+                desktop.MainWindow.Activate();
+            }
+        }
+    }
+
+    private void Exit_Click(object? sender, EventArgs e)
+    {
+        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            // Set a flag or handle shutdown properly to avoid being intercepted by MainWindow.Closing
+            if (desktop.MainWindow is MainWindow mainWin)
+            {
+                mainWin.IsExiting = true;
+            }
+            desktop.Shutdown();
+        }
+    }
+
     private void ApplyFontSize(AppFontSize size)
     {
         double scale = size switch
