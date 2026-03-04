@@ -20,6 +20,9 @@
         MinWidth="1020" MinHeight="691">
 
     <Window.Resources>
+        <controls:BoolToControlTextConverter x:Key="BoolToControlTextConverter"/>
+        <controls:RemoteControlBrushConverter x:Key="RemoteControlBrushConverter"/>
+        <controls:BoolToControlTextConverter x:Key="AdminModeTextConverter"/> <!-- Reuse or specific label -->
     </Window.Resources>
 
     <Window.Styles>
@@ -85,6 +88,7 @@
                                 <!-- Remote Control Toggle Button -->
                                 <Button Command="{Binding ToggleRemoteControlCommand}"
                                         Classes="ModernIcon" 
+                                        IsVisible="{Binding IsAdmin}"
                                         ToolTip.Tip="{Binding IsRemoteControlEnabled, Converter={StaticResource BoolToControlTextConverter}}"
                                         Foreground="{Binding IsRemoteControlEnabled, Converter={StaticResource RemoteControlBrushConverter}}">
                                     <Path Width="16" Height="16" Stretch="Uniform" 
@@ -198,6 +202,17 @@
 
                     <!-- Right Controls -->
                     <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Spacing="5">
+                        <!-- Admin Toggle -->
+                        <Button Classes="ModernIcon" 
+                                ToolTip.Tip="{Binding IsAdmin, ConverterParameter='Dejar de ser Admin', Converter={StaticResource BoolToControlTextConverter}, FallbackValue='Acceso Admin'}" 
+                                Command="{Binding ToggleAdminModeCommand}"
+                                Foreground="{Binding IsAdmin, Converter={StaticResource RemoteControlBrushConverter}}">
+                            <Path Data="M12,1L3,5V11C3,16.55 6.84,21.74 12,23C17.16,21.74 21,16.55 21,11V5L12,1M12,5A3,3 0 0,1 15,8V10H16A2,2 0 0,1 18,12V17A2,2 0 0,1 16,19H8A2,2 0 0,1 6,17V12A2,2 0 0,1 8,10H9V8A3,3 0 0,1 12,5M12,7A1,1 0 0,0 11,8V10H13V8A1,1 0 0,0 12,7Z"
+                                  Fill="{Binding $parent[Button].Foreground}"
+                                  Stretch="Uniform"
+                                  Width="18" Height="18"/>
+                        </Button>
+
                         <!-- Settings -->
                         <Button Classes="ModernIcon" ToolTip.Tip="Configuración" Click="OnSettingsClick">
                             <TextBlock Text="⚙" FontSize="{DynamicResource FontSizeLarge}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
@@ -381,6 +396,91 @@
                         </Border>
                     </Border>
                 </Panel>
+            </Border>
+
+            <!-- Admin Password Overlay -->
+            <Border Grid.Row="0" Grid.RowSpan="3" 
+                    Background="#80000000" 
+                    IsVisible="{Binding IsAdminPasswordDialogVisible}" 
+                    ZIndex="1000">
+                <Border Background="{DynamicResource ThemeBackground}" 
+                        CornerRadius="20" 
+                        Width="350" 
+                        VerticalAlignment="Center" 
+                        HorizontalAlignment="Center"
+                        Padding="30"
+                        BoxShadow="0 10 40 0 #40000000">
+                    <StackPanel Spacing="20">
+                        <TextBlock Text="Acceso Administrativo" 
+                                   FontSize="20" FontWeight="Bold" 
+                                   HorizontalAlignment="Center"/>
+                        
+                        <TextBlock Text="Ingrese la contraseña para activar el modo administrador." 
+                                   FontSize="13" Foreground="{DynamicResource ThemeTextSecondary}"
+                                   TextWrapping="Wrap" HorizontalAlignment="Center" TextAlignment="Center"/>
+
+                        <Panel>
+                            <TextBox Classes="Modern" 
+                                     PasswordChar="*" 
+                                     Watermark="Contraseña" 
+                                     Text="{Binding AdminPassword}"
+                                     FontSize="16"
+                                     HorizontalContentAlignment="Center"/>
+                        </Panel>
+
+                        <TextBlock Text="{Binding AdminPasswordError}" 
+                                   Foreground="{DynamicResource ThemeError}" 
+                                   FontSize="12" 
+                                   HorizontalAlignment="Center"
+                                   IsVisible="{Binding !!AdminPasswordError}"/>
+
+                        <Grid ColumnDefinitions="*, * " ColumnSpacing="10">
+                            <Button Grid.Column="0" Content="Cancelar" 
+                                    Command="{Binding CancelAdminPasswordCommand}" 
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                    Classes="Secondary"/>
+                            <Button Grid.Column="1" Content="Listo" 
+                                    Command="{Binding ConfirmAdminPasswordCommand}" 
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                    Classes="Primary"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </Border>
+
+            <!-- Admin Leave Confirmation Overlay -->
+            <Border Grid.Row="0" Grid.RowSpan="3" 
+                    Background="#80000000" 
+                    IsVisible="{Binding IsAdminLeaveConfirmationVisible}" 
+                    ZIndex="1000">
+                <Border Background="{DynamicResource ThemeBackground}" 
+                        CornerRadius="20" 
+                        Width="350" 
+                        VerticalAlignment="Center" 
+                        HorizontalAlignment="Center"
+                        Padding="30"
+                        BoxShadow="0 10 40 0 #40000000">
+                    <StackPanel Spacing="20">
+                        <TextBlock Text="Cerrar Sesión Admin" 
+                                   FontSize="20" FontWeight="Bold" 
+                                   HorizontalAlignment="Center"/>
+                        
+                        <TextBlock Text="¿Desea dejar de ser administrador y volver a la vista normal?" 
+                                   FontSize="13" Foreground="{DynamicResource ThemeTextSecondary}"
+                                   TextWrapping="Wrap" HorizontalAlignment="Center" TextAlignment="Center"/>
+
+                        <Grid ColumnDefinitions="*, * " ColumnSpacing="10">
+                            <Button Grid.Column="0" Content="No, seguir" 
+                                    Command="{Binding CancelLeaveAdminModeCommand}" 
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                    Classes="Secondary"/>
+                            <Button Grid.Column="1" Content="Sí, salir" 
+                                    Command="{Binding LeaveAdminModeCommand}" 
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                    Classes="Primary"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
             </Border>
 
             <!-- Status Bar -->

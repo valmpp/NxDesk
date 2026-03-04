@@ -79,6 +79,7 @@
                     <Border Name="ControlOption"
                             Classes="ConnectionOptionCard"
                             Classes.selected="{Binding IsControlModeSelected}"
+                            IsVisible="{Binding IsAdmin}"
                             CornerRadius="12"
                             Padding="16"
                             Cursor="Hand"

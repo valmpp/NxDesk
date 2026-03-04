@@ -47,17 +47,21 @@ public class GstreamerCaptureService : IScreenCaptureService
 
             // 1. Always start/check portal helper (no nodeId caching to avoid stale nodes)
             FileLogger.Log("GStreamer", $"Requesting fresh Portal session (target: {requestedSize})");
+            Console.WriteLine($"[GStreamer] Requesting fresh Portal session (target: {requestedSize})");
             if (!StartPortalHelper(requestedSize, out nodeId))
             {
                 FileLogger.Log("GStreamer", "Portal negotiation failed.");
+                Console.WriteLine("[GStreamer] Portal negotiation failed.");
                 return false;
             }
 
             if (string.IsNullOrEmpty(nodeId))
             {
                 FileLogger.Log("GStreamer", $"No matching Node ID found for size {requestedSize}");
+                Console.WriteLine($"[GStreamer] No matching Node ID found for size {requestedSize}");
                 return false;
             }
+            Console.WriteLine($"[GStreamer] Portal negotiation SUCCESS. Node ID: {nodeId}");
 
             // 3. Start GStreamer pipeline using the Node ID
             string pipeline = $"pipewiresrc path={nodeId} do-timestamp=true ! videorate ! " +
@@ -110,7 +114,7 @@ public class GstreamerCaptureService : IScreenCaptureService
         {
             if (_cachedPortalProcess != null && !_cachedPortalProcess.HasExited)
             {
-                _cachedPortalProcess.Kill();
+                try { _cachedPortalProcess.Kill(); _cachedPortalProcess.WaitForExit(1000); } catch { }
             }
 
             string helperPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "portal_helper.py");
@@ -153,7 +157,12 @@ public class GstreamerCaptureService : IScreenCaptureService
 
             FileLogger.Log("GStreamer", $"Portal Helper Environment: PYTHONPATH={_cachedPortalProcess.StartInfo.EnvironmentVariables["PYTHONPATH"]}");
 
-            if (!_cachedPortalProcess.Start()) return false;
+            if (!_cachedPortalProcess.Start()) 
+            {
+                Console.WriteLine("[Portal] ERROR: Failed to start python3 portal_helper.py");
+                return false;
+            }
+            Console.WriteLine($"[Portal] Helper process started (PID: {_cachedPortalProcess.Id})");
             
             _cachedPortalProcess.ErrorDataReceived += (s, e) => {
                 if (!string.IsNullOrEmpty(e.Data))
@@ -169,40 +178,44 @@ public class GstreamerCaptureService : IScreenCaptureService
             while (stopwatch.ElapsedMilliseconds < 30000)
             {
                 if (_cachedPortalProcess.HasExited) break;
-                if (_cachedPortalProcess.StandardOutput.EndOfStream) break;
 
-                string? line = _cachedPortalProcess.StandardOutput.ReadLine();
-                if (line != null)
+                // Non-blocking read check
+                if (_cachedPortalProcess.StandardOutput.Peek() > -1)
                 {
-                    if (line.Contains("NODE_ID:"))
+                    string? line = _cachedPortalProcess.StandardOutput.ReadLine();
+                    if (line != null)
                     {
-                        var parts = line.Split(',');
-                        string nodeId = parts[0].Split(':')[1].Trim();
-                        
-                        if (parts.Length > 1 && parts[1].Contains("SIZE:"))
+                        if (line.Contains("NODE_ID:"))
                         {
-                            string sizePart = parts[1].Split(':')[1].Trim();
-                            localNodeIds[sizePart] = nodeId;
-                            if (sizePart == targetSize) matchingNodeId = nodeId;
+                            var parts = line.Split(',');
+                            string nodeId = parts[0].Split(':')[1].Trim();
+                            
+                            if (parts.Length > 1 && parts[1].Contains("SIZE:"))
+                            {
+                                string sizePart = parts[1].Split(':')[1].Trim();
+                                localNodeIds[sizePart] = nodeId;
+                                if (sizePart == targetSize) matchingNodeId = nodeId;
+                            }
+                            
+                            if (matchingNodeId == null) matchingNodeId = nodeId;
                         }
-                        
-                        // Fallback: if we haven't found a match by size yet, 
-                        // take the first Node ID available (most common case for single-screen share)
-                        if (matchingNodeId == null) matchingNodeId = nodeId;
-                    }
-                    if (line.Contains("RESTORE_TOKEN:"))
-                    {
-                        newRestoreToken = line.Split(':')[1].Trim();
-                        _cachedRestoreToken = newRestoreToken;
-                        SaveToken(_cachedRestoreToken);
-                    }
+                        if (line.Contains("RESTORE_TOKEN:"))
+                        {
+                            newRestoreToken = line.Split(':')[1].Trim();
+                            _cachedRestoreToken = newRestoreToken;
+                            SaveToken(_cachedRestoreToken);
+                        }
 
-                    if (line == "READY")
-                    {
-                        if (matchingNodeId != null) break;
+                        if (line == "READY")
+                        {
+                            if (matchingNodeId != null) break;
+                        }
                     }
                 }
-                Thread.Sleep(10);
+                else
+                {
+                    Thread.Sleep(50); // Sleep more if no data
+                }
             }
 
             return matchingNodeId != null;
@@ -332,13 +345,15 @@ public class GstreamerCaptureService : IScreenCaptureService
         {
             if (_gstProcess != null && !_gstProcess.HasExited)
             {
-                _gstProcess.Kill();
+                try { _gstProcess.Kill(); _gstProcess.WaitForExit(1000); } catch { }
                 _gstProcess.Dispose();
             }
         }
         catch { }
         _gstProcess = null;
         _gstOutput = null;
+        _readBufferPos = 0;
+        _readBufferSize = 0;
     }
 
     public void Dispose()

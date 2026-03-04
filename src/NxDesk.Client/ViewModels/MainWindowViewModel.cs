@@ -119,6 +119,86 @@ public partial class MainWindowViewModel : ViewModelBase
         set => SetProperty(ref _fullTerminalOutput, value);
     }
     public event Action? OnTerminalOutputReceived;
+    
+    // --- Admin Access Toggle ---
+    [ObservableProperty]
+    private string _adminPassword = string.Empty;
+
+    [ObservableProperty]
+    private bool _isAdminPasswordDialogVisible;
+
+    [ObservableProperty]
+    private string _adminPasswordError = string.Empty;
+
+    [ObservableProperty]
+    private bool _isAdminLeaveConfirmationVisible;
+
+    [RelayCommand]
+    private void ToggleAdminMode()
+    {
+        if (IsAdmin)
+        {
+            IsAdminLeaveConfirmationVisible = true;
+        }
+        else
+        {
+            AdminPassword = string.Empty;
+            AdminPasswordError = string.Empty;
+            IsAdminPasswordDialogVisible = true;
+        }
+    }
+
+    [RelayCommand]
+    private void ConfirmAdminPassword()
+    {
+        if (AdminPassword == "0000")
+        {
+            _configService.IsAdmin = true;
+            IsAdminPasswordDialogVisible = false;
+            OnPropertyChanged(nameof(IsAdmin));
+            AddNotification("Admin", "Modo administrador activado", "Success", 3);
+
+            // If a session is already active, enable admin features immediately
+            if (IsSessionActive)
+            {
+                IsTerminalVisible = true;
+                IsRemoteControlEnabled = true;
+
+                // Start the terminal shell if not already running
+                _ = Task.Run(async () => await StartTerminalIfNeeded());
+            }
+        }
+        else
+        {
+            AdminPasswordError = "Contraseña incorrecta";
+        }
+    }
+
+    [RelayCommand]
+    private void CancelAdminPassword()
+    {
+        IsAdminPasswordDialogVisible = false;
+    }
+
+    [RelayCommand]
+    private void LeaveAdminMode()
+    {
+        _configService.IsAdmin = false;
+        IsAdminLeaveConfirmationVisible = false;
+
+        // Disable restricted features when leaving Admin mode
+        IsRemoteControlEnabled = false;
+        IsTerminalVisible = false;
+
+        OnPropertyChanged(nameof(IsAdmin));
+        AddNotification("Admin", "Modo administrador desactivado", "Info", 3);
+    }
+
+    [RelayCommand]
+    private void CancelLeaveAdminMode()
+    {
+        IsAdminLeaveConfirmationVisible = false;
+    }
 
     // --- File Transfer Interaction ---
     public Func<Task<string?>>? RequestFilePicker { get; set; }
@@ -273,6 +353,14 @@ public partial class MainWindowViewModel : ViewModelBase
             StartDiscovery();
         };
 
+        _configService.IsAdminChanged += isAdmin => 
+        {
+            Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => 
+            {
+                OnPropertyChanged(nameof(IsAdmin));
+            });
+        };
+
         NxDesk.Infrastructure.Services.EmbeddedSignalingServer.Start();
         StartDiscovery();
     }
@@ -365,6 +453,20 @@ public partial class MainWindowViewModel : ViewModelBase
                 killGst.Start();
                 killGst.WaitForExit(2000);
                 Console.WriteLine("[Cleanup] Killed orphan gst-launch processes.");
+
+                var killPortal = new System.Diagnostics.Process
+                {
+                    StartInfo = new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = "pkill",
+                        Arguments = "-f portal_helper.py",
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    }
+                };
+                killPortal.Start();
+                killPortal.WaitForExit(2000);
+                Console.WriteLine("[Cleanup] Killed orphan portal_helper processes.");
             }
             catch { /* pkill may fail if no processes found — that's OK */ }
         }
@@ -395,6 +497,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 _streamingCts.Cancel();
                 _streamingCts = null;
             }
+            CleanupPreviousSession();
             _isSharingStarted = false; // Reset so we can start again if someone reconnects
         }
         else
@@ -754,7 +857,7 @@ public partial class MainWindowViewModel : ViewModelBase
         if (peer == null) return;
         _pendingPeerId = peer.Id;
         PendingPeerAlias = peer.Alias;
-        IsControlModeSelected = true; // Default: ViewWithControl (user requested manipulation by default)
+        IsControlModeSelected = IsAdmin; // Only admins can select manipulation by default
         IsConnectionDialogVisible = true;
     }
 
@@ -994,7 +1097,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
             NxDesk.Infrastructure.Services.FileLogger.Log("Connect", $"SUCCESS: Connected to room '{_currentRoomId}'");
             IsSessionActive = true;
-            IsTerminalVisible = true;
+            IsTerminalVisible = IsAdmin;
             IsConnecting = false;
             UpdateConnectionStatus();
         }
@@ -1094,11 +1197,12 @@ public partial class MainWindowViewModel : ViewModelBase
                 }
             });
 
-            // Start remote terminal (Host side)
+            /* [LAZY TERMINAL] Defer terminal startup until actual input is received to avoid TTY issues on Linux
             _ = Task.Run(async () =>
             {
                 await StartTerminalIfNeeded();
             });
+            */
 
             int w = 0, h = 0;
             NxDesk.Infrastructure.Services.FileLogger.Log("Host", "Requesting screen dimensions from UI thread...");
@@ -1129,10 +1233,12 @@ public partial class MainWindowViewModel : ViewModelBase
             StatusMessage = "Iniciando captura...";
             bool initSuccess = _captureService.Initialize(x, y, width, height, index);
             NxDesk.Infrastructure.Services.FileLogger.Log("Streaming", $"CaptureService.Initialize returned: {initSuccess}");
+            Console.WriteLine($"[Streaming] CaptureService.Initialize returned: {initSuccess}");
             
             if (!initSuccess)
             {
                 NxDesk.Infrastructure.Services.FileLogger.Log("Streaming", "FAILED: CaptureService.Initialize returned false — aborting StreamingLoop");
+                Console.WriteLine("[Streaming] FAILED: CaptureService.Initialize returned false — aborting StreamingLoop");
                 StatusMessage = "Error: No se pudo iniciar la captura de pantalla.";
                 AddNotification("Error", "La captura de pantalla falló. Asegúrate de tener permisos o soporte para X11/DXGI.", "Error", 10);
                 return;
@@ -1225,11 +1331,8 @@ public partial class MainWindowViewModel : ViewModelBase
         _currentRoomId = null;
         OnSessionClosed?.Invoke();
 
-        // Cleanup terminal
-        TerminalLines.Clear();
-        FullTerminalOutput = string.Empty;
-        _terminalService.Dispose();
-        _isTerminalInitialized = false; // Reset so handler is re-attached on next session
+        // Comprehensive cleanup
+        CleanupPreviousSession();
 
         if (_inputService is IDisposable disposable)
         {
@@ -1262,6 +1365,12 @@ public partial class MainWindowViewModel : ViewModelBase
     [RelayCommand]
     private void ToggleRemoteControl()
     {
+        if (!IsAdmin)
+        {
+            IsRemoteControlEnabled = false;
+            return;
+        }
+
         IsRemoteControlEnabled = !IsRemoteControlEnabled;
         if (IsRemoteControlEnabled)
         {
@@ -1347,7 +1456,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
             Console.WriteLine("[Terminal] [HOST] Starting RemoteTerminalService shell...");
             await _terminalService.StartAsync();
-            Avalonia.Threading.Dispatcher.UIThread.Post(() => IsTerminalVisible = true);
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => IsTerminalVisible = IsAdmin);
             NxDesk.Infrastructure.Services.FileLogger.Log("Terminal", "[HOST] Remote terminal started via StartTerminalIfNeeded.");
         }
         catch (Exception ex)

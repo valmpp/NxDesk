@@ -35,7 +35,7 @@ public class RemoteTerminalService : IRemoteTerminalService
                 : (File.Exists("/usr/bin/script") ? "/usr/bin/script" : "/bin/bash"),
             Arguments = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                 ? ""
-                : (File.Exists("/usr/bin/script") ? "-q /dev/null /bin/bash -i" : "-i"), 
+                : (File.Exists("/usr/bin/script") ? "-q /dev/null /bin/bash" : ""), 
             RedirectStandardInput = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
