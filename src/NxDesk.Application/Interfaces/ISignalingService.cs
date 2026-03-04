@@ -56,5 +56,5 @@ public interface ISignalingService
     /// The connection will be rebuilt with the new URL on the next ConnectAsync call.
     /// </summary>
     /// <param name="serverUrl">Full URL, e.g. "http://192.168.1.50:5000/signalinghub"</param>
-    void SetServerUrl(string serverUrl);
+    Task SetServerUrl(string serverUrl);
 }

@@ -5,10 +5,15 @@
              mc:Ignorable="d" 
              x:Class="NxDesk.Client.Controls.WindowActionsControl">
 
-        <StackPanel Name="ControlWrapper" Orientation="Horizontal" Spacing="0" HorizontalAlignment="Right" Background="Transparent">
+        <StackPanel Name="ControlWrapper" 
+                    Orientation="Horizontal" 
+                    Spacing="0" 
+                    HorizontalAlignment="Right" 
+                    Background="Transparent"
+                    PointerExited="ControlWrapper_PointerExited">
             <StackPanel.Styles>
-                <!-- Trigger expansion specifically when THIS StackPanel is hovered -->
-                <Style Selector="StackPanel:pointerover Border#ActionsPanel">
+                <!-- Trigger expansion specifically when THIS StackPanel is expanded via click -->
+                <Style Selector="StackPanel.expanded Border#ActionsPanel">
                     <Setter Property="Width" Value="100"/>
                     <Setter Property="Opacity" Value="1"/>
                 </Style>
@@ -38,7 +43,8 @@
                     Padding="8"
                     Margin="0,0,5,0"
                     Cursor="Hand"
-                    Focusable="False">
+                    Focusable="False"
+                    Click="MainButton_Click">
                 <Path Data="M12,8c1.1,0,2-0.9,2-2s-0.9-2-2-2s-2,0.9-2,2S10.9,8,12,8z M12,10c-1.1,0-2,0.9-2,2s0.9,2,2,2s2-0.9,2-2S13.1,10,12,10z M12,16c-1.1,0-2,0.9-2,2s0.9,2,2,2s2-0.9,2-2S13.1,16,12,16z"
                       Fill="#555"
                       Stretch="Uniform"

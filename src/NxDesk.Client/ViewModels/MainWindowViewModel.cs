@@ -190,11 +190,26 @@ public partial class MainWindowViewModel : ViewModelBase
 
         _discoveryService.OnPeerDiscovered += peer =>
         {
-            if (DiscoveredPeers.All(p => p.Id != peer.Id))
+            Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => 
             {
-                Console.WriteLine($"[Discovery] Peer found: {peer.Alias} ({peer.Id})");
-                Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => DiscoveredPeers.Add(peer));
-            }
+                var existing = DiscoveredPeers.FirstOrDefault(p => p.Id == peer.Id);
+                if (existing != null)
+                {
+                    // Refresh IP/Alias if they changed (e.g. peer rebooted or IP moved)
+                    if (existing.IpAddress != peer.IpAddress || existing.Alias != peer.Alias)
+                    {
+                        NxDesk.Infrastructure.Services.FileLogger.Log("Discovery", $"Updating peer {peer.Id} IP: {existing.IpAddress} -> {peer.IpAddress}");
+                        existing.IpAddress = peer.IpAddress;
+                        existing.Alias = peer.Alias;
+                        existing.Port = peer.Port;
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"[Discovery] Peer found: {peer.Alias} ({peer.Id}) at {peer.IpAddress}");
+                    DiscoveredPeers.Add(peer);
+                }
+            });
         };
 
         _signalingService.OnMessageReceived += async msg => 
@@ -230,6 +245,16 @@ public partial class MainWindowViewModel : ViewModelBase
         }
         
         // Start signaling server and discovery
+        NxDesk.Infrastructure.Services.EmbeddedSignalingServer.OnServerStarted += async port =>
+        {
+            NxDesk.Infrastructure.Services.FileLogger.Log("SignalR", $"Local server started on port {port}. Synchronizing signaling URL...");
+            await _signalingService.SetServerUrl($"http://localhost:{port}/signalinghub");
+            
+            // Restart discovery with the new port
+            _discoveryService.StopDiscovery();
+            StartDiscovery();
+        };
+
         NxDesk.Infrastructure.Services.EmbeddedSignalingServer.Start();
         StartDiscovery();
     }
@@ -857,58 +882,88 @@ public partial class MainWindowViewModel : ViewModelBase
         FullTerminalOutput = string.Empty;
         if (string.IsNullOrEmpty(id)) return;
 
-        // [FIX] Clean up any resources from a previous session before starting a new one
-        CleanupPreviousSession();
+        // Support manual IP fallback via "ID @ IP" or "ID@IP"
+        string targetId = id;
+        string? manualIp = null;
+        if (id.Contains('@'))
+        {
+            var parts = id.Split('@');
+            targetId = parts[0].Trim();
+            manualIp = parts[1].Trim();
+            NxDesk.Infrastructure.Services.FileLogger.Log("Connect", $"Manual IP overwrite detected: {manualIp} for ID {targetId}");
+        }
 
         // Normalize: remove spaces for comparison
-        string normalizedId = id.Replace(" ", "");
+        string normalizedId = targetId.Replace(" ", "");
         string normalizedMyId = MyId?.Replace(" ", "") ?? "";
 
         // Prevent connecting to self (only in manual UI mode, not --connect auto mode)
         if (!_isAutoConnect && normalizedId == normalizedMyId)
         {
-            NxDesk.Infrastructure.Services.FileLogger.Log("Connect", $"Blocked: connecting to self (id={id}, MyId={MyId})");
+            NxDesk.Infrastructure.Services.FileLogger.Log("Connect", $"Blocked: connecting to self (id={targetId}, MyId={MyId})");
             AddNotification("Aviso", "No puedes conectar a tu propio equipo. Usa el ID de otro compañero.", "Info", 5);
             return;
         }
-        NxDesk.Infrastructure.Services.FileLogger.Log("Connect", $"ConnectToId: room={id}, alias={alias}, MyId={MyId}");
+        NxDesk.Infrastructure.Services.FileLogger.Log("Connect", $"ConnectToId: targetId={targetId}, alias={alias}, MyId={MyId}, manualIp={manualIp ?? "N/A"}");
 
         IsConnecting = true;
-        StatusMessage = $"Conectando a {alias}...";
+        StatusMessage = $"Conectando a {alias ?? targetId}...";
         try
         {
-            // If we are already in this room, just activate session
-            if (_currentRoomId == id && _signalingService.GetConnectionId() != null)
-            {
-                IsSessionActive = true;
-                IsConnecting = false;
-                UpdateConnectionStatus();
-                return;
-            }
-
+            // [FIX] Removed the early-return "if (_currentRoomId == id)" because we might need to 
+            // switch server URLs even if the room ID stays the same (e.g. going from local to remote)
+            
             _currentRoomId = normalizedId;
 
-            // Auto-resolve the peer's IP from Discovery and point SignalR to their server
-            // Compare normalized IDs (without spaces) to handle format differences
-            var discoveredPeer = DiscoveredPeers.FirstOrDefault(p => 
-                p.Id.Replace(" ", "") == normalizedId);
-            
-            if (discoveredPeer != null && !string.IsNullOrEmpty(discoveredPeer.IpAddress))
+            // Resolve peer IP: Manual > Discovery > Default(localhost)
+            if (!string.IsNullOrEmpty(manualIp))
             {
-                int targetPort = discoveredPeer.Port > 0 ? discoveredPeer.Port : 5000;
-                string remoteUrl = $"http://{discoveredPeer.IpAddress}:{targetPort}/signalinghub";
-                NxDesk.Infrastructure.Services.FileLogger.Log("Connect", $"RESOLVED peer IP: {discoveredPeer.IpAddress} → switching to {remoteUrl}");
-                _signalingService.SetServerUrl(remoteUrl);
-
-                // Use the peer's original ID (with spaces) as the room ID so both sides match
-                _currentRoomId = discoveredPeer.Id;
+                string remoteUrl = $"http://{manualIp}:{port}/signalinghub";
+                NxDesk.Infrastructure.Services.FileLogger.Log("Connect", $"Using MANUAL IP: {manualIp} → {remoteUrl}");
+                await _signalingService.SetServerUrl(remoteUrl);
             }
             else
             {
-                NxDesk.Infrastructure.Services.FileLogger.Log("Connect", $"WARNING: Peer not found in discovery list. Connecting to current server (localhost). DiscoveredPeers count={DiscoveredPeers.Count}");
-                foreach (var p in DiscoveredPeers)
+                // Auto-resolve the peer's IP from Discovery
+                // [FIX] Wait for discovery if peer not yet found (especially for --connect at startup)
+                var discoveredPeer = DiscoveredPeers.FirstOrDefault(p => 
+                    p.Id.Replace(" ", "") == normalizedId);
+                
+                if (discoveredPeer == null && (_isAutoConnect || !string.IsNullOrEmpty(targetId)))
                 {
-                    NxDesk.Infrastructure.Services.FileLogger.Log("Connect", $"  Known peer: Id='{p.Id}' Alias='{p.Alias}' IP='{p.IpAddress}'");
+                    NxDesk.Infrastructure.Services.FileLogger.Log("Connect", $"Peer {targetId} not in discovery. Waiting up to 5s...");
+                    StatusMessage = $"Buscando a {alias ?? targetId} en la red...";
+                    
+                    for (int i = 0; i < 10; i++) // 10 * 500ms = 5s
+                    {
+                        await Task.Delay(500);
+                        discoveredPeer = DiscoveredPeers.FirstOrDefault(p => 
+                            p.Id.Replace(" ", "") == normalizedId);
+                        if (discoveredPeer != null) break;
+                    }
+                }
+
+                if (discoveredPeer != null && !string.IsNullOrEmpty(discoveredPeer.IpAddress))
+                {
+                    int targetPort = discoveredPeer.Port > 0 ? discoveredPeer.Port : 5000;
+                    string remoteUrl = $"http://{discoveredPeer.IpAddress}:{targetPort}/signalinghub";
+                    NxDesk.Infrastructure.Services.FileLogger.Log("Connect", $"RESOLVED peer IP: {discoveredPeer.IpAddress} → switching to {remoteUrl}");
+                    await _signalingService.SetServerUrl(remoteUrl);
+
+                    // Use the peer's original ID (with spaces) as the room ID so both sides match
+                    _currentRoomId = discoveredPeer.Id;
+                }
+                else
+                {
+                    // [SECURITY/FIX] If the target ID is NOT our own, and we haven't found an IP,
+                    // we MUST NOT connect to localhost as a fallback.
+                    if (normalizedId != normalizedMyId)
+                    {
+                        NxDesk.Infrastructure.Services.FileLogger.Log("Connect", $"ERROR: Cannot resolve IP for remote peer {targetId}. Aborting.");
+                        throw new Exception($"No se pudo encontrar al equipo {targetId}. Asegúrate de que está en la misma red y que el ID es correcto.");
+                    }
+
+                    NxDesk.Infrastructure.Services.FileLogger.Log("Connect", "Connecting to local server (self-connect or host mode)");
                 }
             }
 
@@ -916,7 +971,7 @@ public partial class MainWindowViewModel : ViewModelBase
             bool connected = await _signalingService.ConnectAsync(_currentRoomId);
             if (!connected)
             {
-                throw new Exception("No se pudo conectar al servidor de señales");
+                throw new Exception("No se pudo establecer conexión con el servidor de señales");
             }
 
             NxDesk.Infrastructure.Services.FileLogger.Log("Connect", $"SUCCESS: Connected to room '{_currentRoomId}'");
@@ -929,8 +984,8 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             NxDesk.Infrastructure.Services.FileLogger.Log("Connect", $"FAILED: {ex.Message}");
             IsConnecting = false;
-            StatusMessage = $"Error: {ex.Message}";
-            AddNotification("Error", $"Error al conectar: {ex.Message}", "Error", 5);
+            StatusMessage = "Error de conexión";
+            AddNotification("Error", ex.Message, "Error", 7);
         }
     }
 
@@ -1169,7 +1224,7 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             var localUrl = $"http://localhost:{NxDesk.Infrastructure.Services.EmbeddedSignalingServer.ActualPort}/signalinghub";
             NxDesk.Infrastructure.Services.FileLogger.Log("Connect", $"Resetting signaling URL to local: {localUrl}");
-            _signalingService.SetServerUrl(localUrl);
+            await _signalingService.SetServerUrl(localUrl);
 
             NxDesk.Infrastructure.Services.FileLogger.Log("Connect", $"Re-joining local room after disconnect: {MyId}");
             _currentRoomId = MyId.Replace(" ", ""); // Store normalized

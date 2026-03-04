@@ -37,9 +37,7 @@
                     <!-- Option 1: View Only (Default) -->
                     <Border Name="ViewOnlyOption"
                             Classes="ConnectionOptionCard"
-                            Background="{DynamicResource ThemeSurface}"
-                            BorderBrush="{DynamicResource ThemePrimary}"
-                            BorderThickness="2"
+                            Classes.selected="{Binding !IsControlModeSelected}"
                             CornerRadius="12"
                             Padding="16"
                             Cursor="Hand"
@@ -80,9 +78,7 @@
                     <!-- Option 2: View with Control -->
                     <Border Name="ControlOption"
                             Classes="ConnectionOptionCard"
-                            Background="{DynamicResource ThemeSurface}"
-                            BorderBrush="{DynamicResource ThemeBorder}"
-                            BorderThickness="1"
+                            Classes.selected="{Binding IsControlModeSelected}"
                             CornerRadius="12"
                             Padding="16"
                             Cursor="Hand"

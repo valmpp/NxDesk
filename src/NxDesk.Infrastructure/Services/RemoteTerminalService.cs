@@ -32,10 +32,10 @@ public class RemoteTerminalService : IRemoteTerminalService
         {
             FileName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                 ? "cmd.exe"
-                : "script",
+                : (File.Exists("/usr/bin/script") ? "/usr/bin/script" : "/bin/bash"),
             Arguments = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
                 ? ""
-                : "-q /dev/null /bin/bash -i", // use script to provide PTY wrapper
+                : (File.Exists("/usr/bin/script") ? "-q /dev/null /bin/bash -i" : "-i"), 
             RedirectStandardInput = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,

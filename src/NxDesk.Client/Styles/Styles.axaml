@@ -338,9 +338,13 @@
 
     <!-- Connection Option Card Style -->
     <Style Selector="Border.ConnectionOptionCard">
+        <Setter Property="Background" Value="{DynamicResource ThemeSurface}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorder}"/>
+        <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="Transitions">
             <Transitions>
                 <BrushTransition Property="BorderBrush" Duration="0:0:0.15"/>
+                <ThicknessTransition Property="BorderThickness" Duration="0:0:0.15"/>
                 <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.15"/>
             </Transitions>
         </Setter>
@@ -348,5 +352,8 @@
     <Style Selector="Border.ConnectionOptionCard:pointerover">
         <Setter Property="RenderTransform" Value="scale(1.01)"/>
     </Style>
-
+    <Style Selector="Border.ConnectionOptionCard.selected">
+        <Setter Property="BorderBrush" Value="{DynamicResource ThemePrimary}"/>
+        <Setter Property="BorderThickness" Value="2"/>
+    </Style>
 </Styles>

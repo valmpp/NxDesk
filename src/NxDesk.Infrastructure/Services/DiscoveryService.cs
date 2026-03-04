@@ -160,12 +160,12 @@ public class DiscoveryService : IDiscoveryService, IDisposable
         {
             foreach (var iface in NetworkInterface.GetAllNetworkInterfaces())
             {
-                if (iface.OperationalStatus != OperationalStatus.Up) continue;
-                if (iface.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
-
+                FileLogger.Log("Discovery", $"Interface: {iface.Name} ({iface.NetworkInterfaceType}), Status: {iface.OperationalStatus}");
                 foreach (var unicast in iface.GetIPProperties().UnicastAddresses)
                 {
                     if (unicast.Address.AddressFamily != AddressFamily.InterNetwork) continue;
+
+                    FileLogger.Log("Discovery", $"  IP: {unicast.Address}, Mask: {unicast.IPv4Mask}");
 
                     var ip = unicast.Address.GetAddressBytes();
                     var mask = unicast.IPv4Mask.GetAddressBytes();

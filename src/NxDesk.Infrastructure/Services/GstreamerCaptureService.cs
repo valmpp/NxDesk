@@ -39,23 +39,23 @@ public class GstreamerCaptureService : IScreenCaptureService
     {
         try
         {
-            Console.WriteLine($"[GStreamer] Initialize(x={x}, y={y}, w={width}, h={height}, idx={monitorIndex})");
+            FileLogger.Log("GStreamer", $"Initialize(x={x}, y={y}, w={width}, h={height}, idx={monitorIndex})");
             StopGstreamer();
 
             string requestedSize = $"{width}x{height}";
             string? nodeId = null;
 
             // 1. Always start/check portal helper (no nodeId caching to avoid stale nodes)
-            Console.WriteLine($"[GStreamer] Requesting fresh Portal session (target: {requestedSize})");
+            FileLogger.Log("GStreamer", $"Requesting fresh Portal session (target: {requestedSize})");
             if (!StartPortalHelper(requestedSize, out nodeId))
             {
-                Console.WriteLine("[GStreamer] Portal negotiation failed.");
+                FileLogger.Log("GStreamer", "Portal negotiation failed.");
                 return false;
             }
 
             if (string.IsNullOrEmpty(nodeId))
             {
-                Console.WriteLine($"[GStreamer] No matching Node ID found for size {requestedSize}");
+                FileLogger.Log("GStreamer", $"No matching Node ID found for size {requestedSize}");
                 return false;
             }
 
@@ -81,7 +81,7 @@ public class GstreamerCaptureService : IScreenCaptureService
             _gstProcess = new Process { StartInfo = startInfo };
             _gstProcess.ErrorDataReceived += (s, e) => {
                 if (!string.IsNullOrEmpty(e.Data))
-                    Console.WriteLine($"[GStreamer Log] {e.Data}");
+                    FileLogger.Log("GStreamer", $"[GStreamer Log] {e.Data}");
             };
 
             if (!_gstProcess.Start()) 
@@ -127,7 +127,7 @@ public class GstreamerCaptureService : IScreenCaptureService
             if (!string.IsNullOrEmpty(_cachedRestoreToken))
                 pythonArgs += $" --restore-token={_cachedRestoreToken}";
 
-            Console.WriteLine($"[GStreamer] Executing Portal Helper: python3 {pythonArgs}");
+            FileLogger.Log("GStreamer", $"Executing Portal Helper: python3 {pythonArgs}");
 
             _cachedPortalProcess = new Process
             {
@@ -143,8 +143,22 @@ public class GstreamerCaptureService : IScreenCaptureService
                 }
             };
 
-            if (!_cachedPortalProcess.Start()) return false;
+            // Force PYTHONPATH to include system packages to fix "ModuleNotFoundError: No module named 'gi'"
+            // On Linux Fedora, these are usually in /usr/lib64/python3.X/site-packages
+            string currentPythonPath = Environment.GetEnvironmentVariable("PYTHONPATH") ?? "";
+            string systemPackages = "/usr/lib64/python3.14/site-packages:/usr/lib/python3.14/site-packages:/usr/local/lib/python3.14/site-packages";
+            _cachedPortalProcess.StartInfo.EnvironmentVariables["PYTHONPATH"] = string.IsNullOrEmpty(currentPythonPath) 
+                ? systemPackages 
+                : $"{systemPackages}:{currentPythonPath}";
 
+            FileLogger.Log("GStreamer", $"Portal Helper Environment: PYTHONPATH={_cachedPortalProcess.StartInfo.EnvironmentVariables["PYTHONPATH"]}");
+
+            if (!_cachedPortalProcess.Start()) return false;
+            
+            _cachedPortalProcess.ErrorDataReceived += (s, e) => {
+                if (!string.IsNullOrEmpty(e.Data))
+                    FileLogger.Log("Portal", $"[Portal Helper Log] {e.Data}");
+            };
             _cachedPortalProcess.BeginErrorReadLine(); 
 
             var stopwatch = Stopwatch.StartNew();

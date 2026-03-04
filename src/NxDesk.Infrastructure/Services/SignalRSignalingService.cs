@@ -141,7 +141,7 @@ public class SignalRSignalingService : ISignalingService
         });
     }
 
-    public async void SetServerUrl(string serverUrl)
+    public async Task SetServerUrl(string serverUrl)
     {
         if (_serverUrl == serverUrl) return;
 
@@ -261,8 +261,13 @@ public class SignalRSignalingService : ISignalingService
         {
             try
             {
-                Console.WriteLine($"[SignalR] RelayMessageAsync: Room={_roomId}, Type={message.Type}");
-                _logger?.LogDebug("Sending message to room: {Type}", message.Type);
+                if (string.IsNullOrEmpty(_roomId))
+                {
+                    _logger?.LogWarning("Cannot relay message: _roomId is null or empty.");
+                    return;
+                }
+                
+                FileLogger.Log("SignalR", $"RelayMessageAsync: Room={_roomId}, Type={message.Type}");
 
                 // Map from Application.DTOs.SdpMessage to Core.Models.SignalingMessage
                 var wireMsg = new NxDesk.Core.Models.SignalingMessage

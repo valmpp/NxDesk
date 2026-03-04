@@ -19,6 +19,7 @@ public static class EmbeddedSignalingServer
     private static Thread? _serverThread;
     private static readonly ManualResetEventSlim _ready = new(false);
     public static int ActualPort { get; private set; } = 5000;
+    public static event Action<int>? OnServerStarted;
 
     /// <summary>
     /// Starts the embedded signaling server on a background thread.
@@ -84,6 +85,7 @@ public static class EmbeddedSignalingServer
 
                 ActualPort = port;
                 FileLogger.Log("Server", $"SignalR embedded server STARTED on http://0.0.0.0:{port}");
+                OnServerStarted?.Invoke(port);
                 _ready.Set(); // Signal that server is ready
                 started = true;
                 

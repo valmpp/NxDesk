@@ -11,6 +11,24 @@ public partial class WindowActionsControl : UserControl
         InitializeComponent();
     }
 
+    private void MainButton_Click(object? sender, RoutedEventArgs e)
+    {
+        var wrapper = this.FindControl<StackPanel>("ControlWrapper");
+        if (wrapper != null && !wrapper.Classes.Contains("expanded"))
+        {
+            wrapper.Classes.Add("expanded");
+        }
+    }
+
+    private void ControlWrapper_PointerExited(object? sender, Avalonia.Input.PointerEventArgs e)
+    {
+        var wrapper = this.FindControl<StackPanel>("ControlWrapper");
+        if (wrapper != null)
+        {
+            wrapper.Classes.Remove("expanded");
+        }
+    }
+
     private void Minimize_Click(object? sender, RoutedEventArgs e)
     {
         var window = VisualRoot as Window;

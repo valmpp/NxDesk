@@ -53,11 +53,12 @@ class UnifiedPortalHelper:
         }
         self._step = 0
         try:
-            print(f"[Portal] Step 0: CreateSession (RemoteDesktop) restore={self.restore_token is not None}...", file=sys.stderr)
+            print(f"[Portal] Step 0: CreateSession (RemoteDesktop) restore={self.restore_token}...", file=sys.stderr)
             self.rd_proxy.call_sync(
                 "CreateSession", GLib.Variant('(a{sv})', (options,)),
                 Gio.DBusCallFlags.NONE, 10000, None
             )
+            print("[Portal] CreateSession CALL sent", file=sys.stderr)
         except Exception as e:
             print(f"[Portal Error] CreateSession failed: {e}", file=sys.stderr)
             self.loop.quit()
@@ -130,7 +131,7 @@ class UnifiedPortalHelper:
         print(f"[Portal Signal] step={self._step} response={response} keys={keys}", file=sys.stderr)
 
         if response != 0:
-            print(f"[Portal Error] Non-zero response {response} at step {self._step}", file=sys.stderr)
+            print(f"[Portal Error] Non-zero response {response} at step {self._step}. Details: {details}", file=sys.stderr)
             self.loop.quit()
             return
 
@@ -197,7 +198,7 @@ class UnifiedPortalHelper:
                 print(f"[Portal] Inject MOVE: {x}, {y}", file=sys.stderr)
                 self.rd_proxy.call_sync(
                     "NotifyPointerMotionAbsolute",
-                    GLib.Variant('(oa{sv}sdd)', (self.session_handle, {}, "", x, y)),
+                    GLib.Variant('(oa{sv}udd)', (self.session_handle, {}, 0, x, y)),
                     Gio.DBusCallFlags.NONE, 1000, None
                 )
             elif cmd == "BUTTON":
@@ -205,7 +206,7 @@ class UnifiedPortalHelper:
                 print(f"[Portal] Inject BUTTON: {btn} {'DOWN' if down else 'UP'}", file=sys.stderr)
                 self.rd_proxy.call_sync(
                     "NotifyPointerButton",
-                    GLib.Variant('(oa{sv}ui)', (self.session_handle, {}, btn, 1 if down else 0)),
+                    GLib.Variant('(oa{sv}iu)', (self.session_handle, {}, btn, 1 if down else 0)),
                     Gio.DBusCallFlags.NONE, 1000, None
                 )
             elif cmd == "KEY":
@@ -213,7 +214,7 @@ class UnifiedPortalHelper:
                 print(f"[Portal] Inject KEY: {key} {'DOWN' if down else 'UP'}", file=sys.stderr)
                 self.rd_proxy.call_sync(
                     "NotifyKeyboardKey",
-                    GLib.Variant('(oa{sv}ui)', (self.session_handle, {}, key, 1 if down else 0)),
+                    GLib.Variant('(oa{sv}iu)', (self.session_handle, {}, key, 1 if down else 0)),
                     Gio.DBusCallFlags.NONE, 1000, None
                 )
             elif cmd == "SCROLL":
