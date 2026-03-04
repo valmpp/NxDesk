@@ -17,9 +17,16 @@ public class DiscoveryService : IDiscoveryService, IDisposable
     private string? _myId;
     private string? _myAlias;
     private int _myPort = 5000;
+    private PeerStatus _myStatus = PeerStatus.Background;
 
     public event Action<PeerIdentity>? OnPeerDiscovered;
     private readonly HashSet<string> _knownPeerIds = new();
+
+    public void SetStatus(PeerStatus status)
+    {
+        _myStatus = status;
+        FileLogger.Log("Discovery", $"My status updated to: {status}");
+    }
 
     public void StartDiscovery(string id, string alias, int port)
     {
@@ -109,19 +116,24 @@ public class DiscoveryService : IDiscoveryService, IDisposable
 
             Task.Run(async () =>
             {
-                var peer = new PeerIdentity { Id = _myId, Alias = _myAlias, Port = _myPort };
-                var message = JsonConvert.SerializeObject(peer);
-                var data = Encoding.UTF8.GetBytes(message);
-
                 await Task.Delay(500);
 
                 while (_isRunning)
                 {
                     try
                     {
+                        var peerPulse = new PeerIdentity 
+                        { 
+                            Id = _myId!, 
+                            Alias = _myAlias!, 
+                            Port = _myPort,
+                            Status = _myStatus 
+                        };
+                        var message = JsonConvert.SerializeObject(peerPulse);
+                        var data = Encoding.UTF8.GetBytes(message);
+
                         // General broadcast
                         await _broadcaster.SendAsync(data, data.Length, new IPEndPoint(IPAddress.Broadcast, Port));
-                        FileLogger.Log("Discovery", $"BROADCAST sent (255.255.255.255:{Port}) - {data.Length} bytes");
 
                         // Subnet-directed broadcasts
                         foreach (var broadcastAddr in GetSubnetBroadcastAddresses())

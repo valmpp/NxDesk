@@ -1,11 +1,22 @@
 namespace NxDesk.Core.Models;
 
+public enum PeerStatus
+{
+    Offline,
+    Background,
+    Connected
+}
+
 public class PeerIdentity
 {
     public string Id { get; set; } = string.Empty;
     public string Alias { get; set; } = string.Empty;
     public string IpAddress { get; set; } = string.Empty;
     public int Port { get; set; } = 5000;
+    public PeerStatus Status { get; set; } = PeerStatus.Background;
+
+    [Newtonsoft.Json.JsonIgnore]
+    public DateTime LastSeen { get; set; } = DateTime.Now;
 }
 
 public class SignalingMessage

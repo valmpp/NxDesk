@@ -55,17 +55,29 @@
                 </ItemsControl.ItemsPanel>
 
                 <ItemsControl.ItemTemplate>
-                    <DataTemplate>
+                    <DataTemplate x:DataType="vm:PeerViewModel">
                         <Border Classes="DeviceCard" Margin="10">
                             <Panel>
+                                <!-- Status Dot (Top-Right Inner) -->
+                                <Ellipse Width="10" Height="10" 
+                                         Fill="{Binding Status, Converter={StaticResource PeerStatusToBrushConverter}}"
+                                         HorizontalAlignment="Right" 
+                                         VerticalAlignment="Top" 
+                                         Margin="0,10,10,0"
+                                         ZIndex="1">
+                                    <Ellipse.Effect>
+                                        <DropShadowEffect BlurRadius="5" Opacity="0.5" Color="Black"/>
+                                    </Ellipse.Effect>
+                                </Ellipse>
+
                                 <!-- Lock Icon (Top-Right) — Opens connection type dialog -->
                                 <Button Classes="ModernIcon"
                                         HorizontalAlignment="Right"
                                         VerticalAlignment="Top"
-                                        Margin="0,8,8,0"
+                                        Margin="0,25,8,0"
                                         ToolTip.Tip="Conectar a este equipo"
                                         Command="{Binding $parent[UserControl].((vm:MainWindowViewModel)DataContext).ShowConnectionDialogCommand}"
-                                        CommandParameter="{Binding}">
+                                        CommandParameter="{Binding Model}">
                                     <Path Data="M12,17C10.89,17 10,16.1 10,15C10,13.89 10.89,13 12,13A2,2 0 0,1 14,15A2,2 0 0,1 12,17M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6A2,2 0 0,1 4,20V10C4,8.89 4.89,8 6,8H7V6A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,3A3,3 0 0,0 9,6V8H15V6A3,3 0 0,0 12,3Z"
                                           Fill="{DynamicResource ThemePrimary}"
                                           Stretch="Uniform"

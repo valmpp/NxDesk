@@ -37,6 +37,7 @@
             <controls:BoolToPathDataConverter x:Key="BoolToPathDataConverter" />
             <controls:BoolToDoubleConverter x:Key="BoolToDoubleConverter" />
             <controls:BoolToThicknessConverter x:Key="BoolToThicknessConverter" />
+            <controls:PeerStatusToBrushConverter x:Key="PeerStatusToBrushConverter" />
 
             <ResourceDictionary.ThemeDictionaries>
                 <ResourceDictionary x:Key="Dark">

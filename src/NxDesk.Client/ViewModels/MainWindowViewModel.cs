@@ -42,6 +42,11 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     private bool _isSessionActive;
 
+    partial void OnIsSessionActiveChanged(bool value)
+    {
+        _discoveryService.SetStatus(value ? PeerStatus.Connected : PeerStatus.Background);
+    }
+
     [ObservableProperty]
     private bool _isConnecting;
 
@@ -119,7 +124,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public Func<Task<string?>>? RequestFilePicker { get; set; }
     public Func<Task<string?>>? RequestFolderPicker { get; set; }
 
-    public ObservableCollection<PeerIdentity> DiscoveredPeers { get; } = new();
+    public ObservableCollection<PeerViewModel> DiscoveredPeers { get; } = new();
     public ObservableCollection<NotificationItemViewModel> Notifications { get; } = new();
 
     // --- Remote File Explorer ---
@@ -195,22 +200,35 @@ public partial class MainWindowViewModel : ViewModelBase
                 var existing = DiscoveredPeers.FirstOrDefault(p => p.Id == peer.Id);
                 if (existing != null)
                 {
-                    // Refresh IP/Alias if they changed (e.g. peer rebooted or IP moved)
-                    if (existing.IpAddress != peer.IpAddress || existing.Alias != peer.Alias)
-                    {
-                        NxDesk.Infrastructure.Services.FileLogger.Log("Discovery", $"Updating peer {peer.Id} IP: {existing.IpAddress} -> {peer.IpAddress}");
-                        existing.IpAddress = peer.IpAddress;
-                        existing.Alias = peer.Alias;
-                        existing.Port = peer.Port;
-                    }
+                    existing.Update(peer);
                 }
                 else
                 {
-                    Console.WriteLine($"[Discovery] Peer found: {peer.Alias} ({peer.Id}) at {peer.IpAddress}");
-                    DiscoveredPeers.Add(peer);
+                    Console.WriteLine($"[Discovery] Peer found: {peer.Alias} ({peer.Id}) at {peer.IpAddress} - Status: {peer.Status}");
+                    DiscoveredPeers.Add(new PeerViewModel(peer));
                 }
             });
         };
+
+        // Timer to detect offline peers
+        var offlineTimer = new System.Timers.Timer(5000);
+        offlineTimer.Elapsed += (s, e) => 
+        {
+            Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => 
+            {
+                foreach (var peer in DiscoveredPeers.ToList())
+                {
+                    if ((DateTime.Now - peer.LastSeen).TotalSeconds > 15)
+                    {
+                        if (peer.Status != PeerStatus.Offline)
+                        {
+                            peer.Status = PeerStatus.Offline;
+                        }
+                    }
+                }
+            });
+        };
+        offlineTimer.Start();
 
         _signalingService.OnMessageReceived += async msg => 
         {
