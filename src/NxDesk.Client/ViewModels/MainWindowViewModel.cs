@@ -455,29 +455,30 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         Console.WriteLine($"[HostWindow] OnIsSharingStartedChanged => {value}");
         
-        // Start/stop connection timer for the Host side
-        if (value)
+        // Initialize connection timer for the Host side
+    if (value)
+    {
+        ConnectionDuration = "00:00";
+        if (_connectionTimer == null)
         {
-            _connectionStartTime = DateTime.Now;
-            ConnectionDuration = "00:00";
-            if (_connectionTimer == null)
+            _connectionTimer = new System.Timers.Timer(1000);
+            _connectionTimer.Elapsed += (s, e) =>
             {
-                _connectionTimer = new System.Timers.Timer(1000);
-                _connectionTimer.Elapsed += (s, e) =>
-                {
-                    var duration = DateTime.Now - _connectionStartTime;
-                    string formatted = duration.TotalHours >= 1 
-                        ? $"{(int)duration.TotalHours:D2}:{duration.Minutes:D2}:{duration.Seconds:D2}"
-                        : $"{duration.Minutes:D2}:{duration.Seconds:D2}";
+                if (_connectionStartTime == default) return;
 
-                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                    {
-                        ConnectionDuration = formatted;
-                    });
-                };
-            }
-            _connectionTimer.Start();
+                var duration = DateTime.Now - _connectionStartTime;
+                string formatted = duration.TotalHours >= 1 
+                    ? $"{(int)duration.TotalHours:D2}:{duration.Minutes:D2}:{duration.Seconds:D2}"
+                    : $"{duration.Minutes:D2}:{duration.Seconds:D2}";
+
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    ConnectionDuration = formatted;
+                });
+            };
         }
+        // Do NOT start the timer yet. It will be started when a peer connects and sends peer_hello.
+    }    
         else
         {
             _connectionTimer?.Stop();
@@ -964,6 +965,12 @@ public partial class MainWindowViewModel : ViewModelBase
                 bool peerIsAdmin = helloData.TryGetProperty("IsAdmin", out var isAdminProp) && isAdminProp.GetBoolean();
                 _connectedPeerIsAdmin = peerIsAdmin;
                 Console.WriteLine($"[Host] Connected peer is admin: {peerIsAdmin}");
+
+                // START THE CONNECTION TIMER NOW - Peer is verified and greeting received
+                _connectionStartTime = DateTime.Now;
+                ConnectionDuration = "00:00";
+                _connectionTimer?.Start();
+                Console.WriteLine("[Host] Session timer started (peer connected).");
 
                 if (peerIsAdmin && _hostDisconnectWindow != null)
                 {
