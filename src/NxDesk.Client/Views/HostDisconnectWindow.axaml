@@ -13,22 +13,22 @@
         ShowInTaskbar="True"
         CanResize="False">
 
-    <Border Background="#1A1A2E"
-            BorderBrush="#2A2A40"
+    <Border Background="{DynamicResource ThemeBackground}"
+            BorderBrush="{DynamicResource ThemeBorder}"
             BorderThickness="1"
             CornerRadius="16"
             Margin="4"
-            BoxShadow="0 8 30 0 #A0000000">
+            BoxShadow="{DynamicResource ThemePremiumShadow}">
         
         <StackPanel>
             
             <!-- Title Bar -->
-            <Border Background="#12122A" CornerRadius="16,16,0,0" Padding="16,10">
+            <Border Background="{DynamicResource ThemeBackgroundDark}" CornerRadius="16,16,0,0" Padding="16,10">
                 <Grid ColumnDefinitions="Auto, *, Auto">
                     <!-- Live indicator -->
                     <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
                         <Panel Width="8" Height="8" VerticalAlignment="Center">
-                            <Ellipse Fill="#EF4444" Width="8" Height="8">
+                            <Ellipse Fill="{DynamicResource ThemeError}" Width="8" Height="8">
                                 <Ellipse.Styles>
                                     <Style Selector="Ellipse">
                                         <Style.Animations>
@@ -46,7 +46,7 @@
                             </Ellipse>
                         </Panel>
                         <TextBlock Text="Sesión Activa" 
-                                   Foreground="#AAA" 
+                                   Foreground="{DynamicResource ThemeTextMuted}" 
                                    FontSize="12" 
                                    FontWeight="SemiBold"
                                    VerticalAlignment="Center"/>
@@ -55,7 +55,7 @@
                     <!-- Connection Duration (centered) -->
                     <TextBlock Grid.Column="1" 
                                Text="{Binding ConnectionDuration}" 
-                               Foreground="#666"
+                               Foreground="{DynamicResource ThemeTextDisabled}"
                                FontSize="12"
                                FontFamily="Consolas, monospace"
                                HorizontalAlignment="Center"
@@ -66,7 +66,7 @@
                             Content="—"
                             Click="Minimize_Click"
                             Background="Transparent"
-                            Foreground="#666"
+                            Foreground="{DynamicResource ThemeTextDisabled}"
                             FontSize="14"
                             Padding="8,2"
                             CornerRadius="4"
@@ -75,8 +75,8 @@
                             ToolTip.Tip="Minimizar">
                         <Button.Styles>
                             <Style Selector="Button:pointerover">
-                                <Setter Property="Background" Value="#222240"/>
-                                <Setter Property="Foreground" Value="#CCC"/>
+                                <Setter Property="Background" Value="{DynamicResource ThemeSurface}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource ThemeTextSecondary}"/>
                             </Style>
                         </Button.Styles>
                     </Button>
@@ -89,17 +89,17 @@
                 <!-- Profile Section -->
                 <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,0,0,16">
                     
-                    <!-- Avatar Circle with Initials -->
+                    <!-- Avatar Circle -->
                     <Border Width="56" Height="56" 
                             CornerRadius="28"
                             ClipToBounds="True">
                         <Border.Background>
                             <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
-                                <GradientStop Color="#22A39F" Offset="0"/>
-                                <GradientStop Color="#1A7F7C" Offset="1"/>
+                                <GradientStop Color="#4E9CFF" Offset="0"/>
+                                <GradientStop Color="#0066FF" Offset="1"/>
                             </LinearGradientBrush>
                         </Border.Background>
-                        <!-- User Icon SVG Path -->
+                        <!-- User Icon -->
                         <Viewbox Width="28" Height="28" HorizontalAlignment="Center" VerticalAlignment="Center">
                             <Path Fill="White" 
                                   Data="M12,4A4,4 0 0,1 16,8A4,4 0 0,1 12,12A4,4 0 0,1 8,8A4,4 0 0,1 12,4M12,14C16.42,14 20,15.79 20,18V20H4V18C4,15.79 7.58,14 12,14Z"/>
@@ -110,12 +110,12 @@
                     <StackPanel VerticalAlignment="Center" Spacing="3">
                         <!-- Peer Name -->
                         <TextBlock Text="{Binding ConnectedPeerAlias, FallbackValue='Esperando conexión...'}" 
-                                   Foreground="#F0F0F0" 
+                                   Foreground="{DynamicResource ThemeText}" 
                                    FontSize="16" 
                                    FontWeight="Bold"/>
                         
                         <!-- Peer ID -->
-                        <TextBlock Foreground="#666" FontSize="12">
+                        <TextBlock Foreground="{DynamicResource ThemeTextMuted}" FontSize="12">
                             <TextBlock.Text>
                                 <MultiBinding StringFormat="ID: {0}">
                                     <Binding Path="ConnectedPeerId"/>
@@ -124,7 +124,7 @@
                         </TextBlock>
                         
                         <!-- IP Address (Admin Only) -->
-                        <TextBlock Foreground="#555" 
+                        <TextBlock Foreground="{DynamicResource ThemeTextDisabled}" 
                                    FontSize="11"
                                    IsVisible="{Binding IsAdmin}">
                             <TextBlock.Text>
@@ -137,19 +137,19 @@
                 </StackPanel>
                 
                 <!-- Connection Duration Display -->
-                <Border Background="#12122A" 
+                <Border Background="{DynamicResource ThemeBackgroundDark}" 
                         CornerRadius="10" 
                         Padding="14,10" 
                         Margin="0,0,0,16">
                     <Grid ColumnDefinitions="Auto, *, Auto">
                         <TextBlock Grid.Column="0" 
                                    Text="⏱  Tiempo conectado" 
-                                   Foreground="#888" 
+                                   Foreground="{DynamicResource ThemeTextMuted}" 
                                    FontSize="12"
                                    VerticalAlignment="Center"/>
                         <TextBlock Grid.Column="2" 
                                    Text="{Binding ConnectionDuration}" 
-                                   Foreground="#22A39F" 
+                                   Foreground="{DynamicResource ThemePrimaryHover}" 
                                    FontSize="18" 
                                    FontWeight="Bold"
                                    FontFamily="Consolas, monospace"
@@ -157,27 +157,16 @@
                     </Grid>
                 </Border>
                 
-                <!-- Disconnect Button -->
-                <Button Content="⏹  Finalizar conexión"
+                <!-- Disconnect Button (uses the theme's Disconnect style) -->
+                <Button Content="Finalizar conexión"
                         Command="{Binding HostDisconnectCommand}"
+                        Classes="Disconnect"
                         HorizontalAlignment="Stretch"
                         HorizontalContentAlignment="Center"
-                        Background="#D32F2F"
-                        Foreground="White"
-                        CornerRadius="10"
                         Padding="0,10"
                         FontSize="14"
                         FontWeight="Bold"
-                        Cursor="Hand">
-                    <Button.Styles>
-                        <Style Selector="Button:pointerover">
-                            <Setter Property="Background" Value="#B71C1C"/>
-                        </Style>
-                        <Style Selector="Button:pressed">
-                            <Setter Property="RenderTransform" Value="scale(0.97)"/>
-                        </Style>
-                    </Button.Styles>
-                </Button>
+                        CornerRadius="10"/>
                 
             </StackPanel>
         </StackPanel>
