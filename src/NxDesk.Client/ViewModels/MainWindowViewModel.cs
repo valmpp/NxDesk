@@ -114,6 +114,17 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     private int _peerCount = 0;
 
+    [ObservableProperty]
+    private string _connectedPeerAlias = string.Empty;
+
+    [ObservableProperty]
+    private string _connectedPeerId = string.Empty;
+
+    [ObservableProperty]
+    private string _connectedPeerIp = string.Empty;
+
+    private bool _connectedPeerIsAdmin = false;
+
     // --- Connection Type Dialog State ---
     [ObservableProperty]
     private bool _isConnectionDialogVisible;
@@ -434,7 +445,75 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private bool _isAutoShare = false;
     private bool _isAutoConnect = false;
+
+    [ObservableProperty]
     private bool _isSharingStarted = false;
+
+    private NxDesk.Client.Views.HostDisconnectWindow? _hostDisconnectWindow;
+
+    partial void OnIsSharingStartedChanged(bool value)
+    {
+        Console.WriteLine($"[HostWindow] OnIsSharingStartedChanged => {value}");
+        
+        // Start/stop connection timer for the Host side
+        if (value)
+        {
+            _connectionStartTime = DateTime.Now;
+            ConnectionDuration = "00:00";
+            if (_connectionTimer == null)
+            {
+                _connectionTimer = new System.Timers.Timer(1000);
+                _connectionTimer.Elapsed += (s, e) =>
+                {
+                    var duration = DateTime.Now - _connectionStartTime;
+                    string formatted = duration.TotalHours >= 1 
+                        ? $"{(int)duration.TotalHours:D2}:{duration.Minutes:D2}:{duration.Seconds:D2}"
+                        : $"{duration.Minutes:D2}:{duration.Seconds:D2}";
+
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    {
+                        ConnectionDuration = formatted;
+                    });
+                };
+            }
+            _connectionTimer.Start();
+        }
+        else
+        {
+            _connectionTimer?.Stop();
+            ConnectionDuration = "00:00";
+        }
+        
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            if (value)
+            {
+                if (_hostDisconnectWindow == null)
+                {
+                    Console.WriteLine("[HostWindow] Creating and showing HostDisconnectWindow.");
+                    _hostDisconnectWindow = new NxDesk.Client.Views.HostDisconnectWindow
+                    {
+                        DataContext = this
+                    };
+                    _hostDisconnectWindow.Show();
+                }
+            }
+            else
+            {
+                Console.WriteLine("[HostWindow] Closing HostDisconnectWindow.");
+                if (_hostDisconnectWindow != null)
+                {
+                    _hostDisconnectWindow.ForceClose();
+                    _hostDisconnectWindow = null;
+                }
+                ConnectedPeerAlias = string.Empty;
+                ConnectedPeerId = string.Empty;
+                ConnectedPeerIp = string.Empty;
+                _connectedPeerIsAdmin = false;
+            }
+        });
+    }
+
     private bool _lastFrameWasCompressed = false;
     private int _lastFrameWidth = 1920;
     private int _lastFrameHeight = 1080;
@@ -532,7 +611,7 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         // 6. Reset sharing flag
-        _isSharingStarted = false;
+        IsSharingStarted = false;
 
         Console.WriteLine("[Cleanup] Previous session cleanup complete.");
         NxDesk.Infrastructure.Services.FileLogger.Log("Cleanup", "Previous session cleanup complete");
@@ -543,7 +622,7 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             StatusMessage = "Esperando a otro compañero...";
             StatusText = "Solo en la sala - Esperando...";
-            _isSharingStarted = false;
+            IsSharingStarted = false;
             
             if (IsSessionActive)
             {
@@ -558,7 +637,7 @@ public partial class MainWindowViewModel : ViewModelBase
                 _streamingCts = null;
             }
             CleanupPreviousSession();
-            _isSharingStarted = false; // Reset so we can start again if someone reconnects
+            IsSharingStarted = false; // Reset so we can start again if someone reconnects
 
             // Auto-dismiss screen lock overlay when peer leaves
             Avalonia.Threading.Dispatcher.UIThread.Post(() => DismissScreenLockOverlay());
@@ -578,14 +657,14 @@ public partial class MainWindowViewModel : ViewModelBase
                 Console.WriteLine("[Host] UpdateConnectionStatus: Host mode detected. Cleaning up & starting share.");
                 NxDesk.Infrastructure.Services.FileLogger.Log("Host", $"Host mode detected. _currentRoomId={_currentRoomId}, MyId={MyId}, _isSharingStarted={_isSharingStarted}");
                 CleanupPreviousSession();
-                _isSharingStarted = true;
+                IsSharingStarted = true;
                 StartScreenSharing();
             }
             // Auto-start sharing only if we were started with --share
             else if (_isAutoShare && !_isSharingStarted)
             {
                 Console.WriteLine("[Host] UpdateConnectionStatus: AutoShare detected. Starting share.");
-                _isSharingStarted = true;
+                IsSharingStarted = true;
                 StartScreenSharing();
             }
         }
@@ -596,6 +675,24 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         try 
         {
+            // Capture the connected peer's identity for the Host UI
+            if (_isSharingStarted && !string.IsNullOrEmpty(message.SenderAlias) && message.SenderId != MyId)
+            {
+                if (string.IsNullOrEmpty(ConnectedPeerAlias) || ConnectedPeerAlias != message.SenderAlias)
+                {
+                    // Try to resolve IP from discovered peers
+                    var discoveredPeer = DiscoveredPeers.FirstOrDefault(p => p.Id == message.SenderId);
+                    string peerIp = discoveredPeer?.IpAddress ?? "";
+                    
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    {
+                        ConnectedPeerAlias = message.SenderAlias ?? "Desconocido";
+                        ConnectedPeerId = message.SenderId ?? "";
+                        ConnectedPeerIp = peerIp;
+                    });
+                }
+            }
+
             if (message.Type == "frame")
         {
             // Drop frame if we are still processing the previous one
@@ -836,6 +933,42 @@ public partial class MainWindowViewModel : ViewModelBase
             if (response != null && _pendingListDirRequests.TryRemove(response.RequestId, out var tcs))
             {
                 tcs.SetResult(response);
+            }
+        }
+        else if (message.Type == "kick_peer")
+        {
+            Console.WriteLine("[Receiver] Received kick_peer from Host.");
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => 
+            {
+                AddNotification("Sesión finalizada", "El anfitrión ha finalizado la sesión compartida.", "Warning", 5);
+                DisconnectCommand.Execute(null);
+            });
+        }
+        else if (message.Type == "peer_hello")
+        {
+            // The connecting peer tells us about their admin status
+            Console.WriteLine($"[Host] Received peer_hello from {message.SenderAlias} (SenderId={message.SenderId})");
+            try
+            {
+                var helloData = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(message.Payload ?? "{}");
+                bool peerIsAdmin = helloData.TryGetProperty("IsAdmin", out var isAdminProp) && isAdminProp.GetBoolean();
+                _connectedPeerIsAdmin = peerIsAdmin;
+                Console.WriteLine($"[Host] Connected peer is admin: {peerIsAdmin}");
+
+                if (peerIsAdmin && _hostDisconnectWindow != null)
+                {
+                    // Admin connected — close the disconnect window, the host cannot kick an admin
+                    Console.WriteLine("[Host] Admin connection detected. Closing disconnect window.");
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    {
+                        _hostDisconnectWindow?.ForceClose();
+                        _hostDisconnectWindow = null;
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Host] Error parsing peer_hello: {ex.Message}");
             }
         }
         else if (message.Type == "file_transfer_request")
@@ -1199,6 +1332,17 @@ public partial class MainWindowViewModel : ViewModelBase
             IsTerminalVisible = IsAdmin;
             IsConnecting = false;
             UpdateConnectionStatus();
+
+            // Send peer_hello to the host so they know our identity and admin status
+            var helloMsg = new NxDesk.Application.DTOs.SdpMessage
+            {
+                Type = "peer_hello",
+                SenderId = MyId,
+                SenderAlias = MyAlias,
+                Payload = System.Text.Json.JsonSerializer.Serialize(new { IsAdmin = IsAdmin })
+            };
+            await _signalingService.RelayMessageAsync(helloMsg);
+            Console.WriteLine($"[Client] Sent peer_hello (IsAdmin={IsAdmin})");
         }
         catch (Exception ex)
         {
@@ -1452,7 +1596,7 @@ public partial class MainWindowViewModel : ViewModelBase
 
             NxDesk.Infrastructure.Services.FileLogger.Log("Connect", $"Re-joining local room after disconnect: {MyId}");
             _currentRoomId = MyId.Replace(" ", ""); // Store normalized
-            _isSharingStarted = false; // Reset sharing flag for the new local session
+            IsSharingStarted = false; // Reset sharing flag for the new local session
             
             // Actually wait for connection or run in background but ensure it's tracked
             _ = Task.Run(async () => {
@@ -1463,6 +1607,26 @@ public partial class MainWindowViewModel : ViewModelBase
                 }
             });
         }
+    }
+
+    [RelayCommand]
+    private async Task HostDisconnect()
+    {
+        Console.WriteLine("[Host] Initiating Host-side Disconnect (kick clients).");
+        
+        // Broadcast a kick message to connected clients
+        var kickMsg = new NxDesk.Application.DTOs.SdpMessage
+        {
+            Type = "kick_peer",
+            SenderId = MyId,
+            SenderAlias = MyAlias
+        };
+        await _signalingService.RelayMessageAsync(kickMsg);
+
+        // Now locally clear and stop everything just as a standard disconnect
+        DisconnectCommand.Execute(null);
+        
+        AddNotification("Sesión", "Compartición de pantalla finalizada.", "Info", 4);
     }
 
     [RelayCommand]

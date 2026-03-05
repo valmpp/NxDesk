@@ -1,0 +1,185 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:NxDesk.Client.ViewModels"
+        x:Class="NxDesk.Client.Views.HostDisconnectWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="NxDesk - Sesión Activa"
+        Width="360" Height="280"
+        SystemDecorations="BorderOnly"
+        Topmost="True"
+        WindowStartupLocation="CenterScreen"
+        Background="Transparent"
+        TransparencyLevelHint="Transparent"
+        ShowInTaskbar="True"
+        CanResize="False">
+
+    <Border Background="#1A1A2E"
+            BorderBrush="#2A2A40"
+            BorderThickness="1"
+            CornerRadius="16"
+            Margin="4"
+            BoxShadow="0 8 30 0 #A0000000">
+        
+        <StackPanel>
+            
+            <!-- Title Bar -->
+            <Border Background="#12122A" CornerRadius="16,16,0,0" Padding="16,10">
+                <Grid ColumnDefinitions="Auto, *, Auto">
+                    <!-- Live indicator -->
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
+                        <Panel Width="8" Height="8" VerticalAlignment="Center">
+                            <Ellipse Fill="#EF4444" Width="8" Height="8">
+                                <Ellipse.Styles>
+                                    <Style Selector="Ellipse">
+                                        <Style.Animations>
+                                            <Animation Duration="0:0:1.2" IterationCount="Infinite" PlaybackDirection="Alternate">
+                                                <KeyFrame Cue="0%">
+                                                    <Setter Property="Opacity" Value="0.3"/>
+                                                </KeyFrame>
+                                                <KeyFrame Cue="100%">
+                                                    <Setter Property="Opacity" Value="1.0"/>
+                                                </KeyFrame>
+                                            </Animation>
+                                        </Style.Animations>
+                                    </Style>
+                                </Ellipse.Styles>
+                            </Ellipse>
+                        </Panel>
+                        <TextBlock Text="Sesión Activa" 
+                                   Foreground="#AAA" 
+                                   FontSize="12" 
+                                   FontWeight="SemiBold"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                    
+                    <!-- Connection Duration (centered) -->
+                    <TextBlock Grid.Column="1" 
+                               Text="{Binding ConnectionDuration}" 
+                               Foreground="#666"
+                               FontSize="12"
+                               FontFamily="Consolas, monospace"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"/>
+
+                    <!-- Minimize -->
+                    <Button Grid.Column="2" 
+                            Content="—"
+                            Click="Minimize_Click"
+                            Background="Transparent"
+                            Foreground="#666"
+                            FontSize="14"
+                            Padding="8,2"
+                            CornerRadius="4"
+                            VerticalAlignment="Center"
+                            Cursor="Hand"
+                            ToolTip.Tip="Minimizar">
+                        <Button.Styles>
+                            <Style Selector="Button:pointerover">
+                                <Setter Property="Background" Value="#222240"/>
+                                <Setter Property="Foreground" Value="#CCC"/>
+                            </Style>
+                        </Button.Styles>
+                    </Button>
+                </Grid>
+            </Border>
+            
+            <!-- Main Content -->
+            <StackPanel Margin="20,16,20,20">
+                
+                <!-- Profile Section -->
+                <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,0,0,16">
+                    
+                    <!-- Avatar Circle with Initials -->
+                    <Border Width="56" Height="56" 
+                            CornerRadius="28"
+                            ClipToBounds="True">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                                <GradientStop Color="#22A39F" Offset="0"/>
+                                <GradientStop Color="#1A7F7C" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <!-- User Icon SVG Path -->
+                        <Viewbox Width="28" Height="28" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <Path Fill="White" 
+                                  Data="M12,4A4,4 0 0,1 16,8A4,4 0 0,1 12,12A4,4 0 0,1 8,8A4,4 0 0,1 12,4M12,14C16.42,14 20,15.79 20,18V20H4V18C4,15.79 7.58,14 12,14Z"/>
+                        </Viewbox>
+                    </Border>
+                    
+                    <!-- Peer Info -->
+                    <StackPanel VerticalAlignment="Center" Spacing="3">
+                        <!-- Peer Name -->
+                        <TextBlock Text="{Binding ConnectedPeerAlias, FallbackValue='Esperando conexión...'}" 
+                                   Foreground="#F0F0F0" 
+                                   FontSize="16" 
+                                   FontWeight="Bold"/>
+                        
+                        <!-- Peer ID -->
+                        <TextBlock Foreground="#666" FontSize="12">
+                            <TextBlock.Text>
+                                <MultiBinding StringFormat="ID: {0}">
+                                    <Binding Path="ConnectedPeerId"/>
+                                </MultiBinding>
+                            </TextBlock.Text>
+                        </TextBlock>
+                        
+                        <!-- IP Address (Admin Only) -->
+                        <TextBlock Foreground="#555" 
+                                   FontSize="11"
+                                   IsVisible="{Binding IsAdmin}">
+                            <TextBlock.Text>
+                                <MultiBinding StringFormat="IP: {0}">
+                                    <Binding Path="ConnectedPeerIp"/>
+                                </MultiBinding>
+                            </TextBlock.Text>
+                        </TextBlock>
+                    </StackPanel>
+                </StackPanel>
+                
+                <!-- Connection Duration Display -->
+                <Border Background="#12122A" 
+                        CornerRadius="10" 
+                        Padding="14,10" 
+                        Margin="0,0,0,16">
+                    <Grid ColumnDefinitions="Auto, *, Auto">
+                        <TextBlock Grid.Column="0" 
+                                   Text="⏱  Tiempo conectado" 
+                                   Foreground="#888" 
+                                   FontSize="12"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="2" 
+                                   Text="{Binding ConnectionDuration}" 
+                                   Foreground="#22A39F" 
+                                   FontSize="18" 
+                                   FontWeight="Bold"
+                                   FontFamily="Consolas, monospace"
+                                   VerticalAlignment="Center"/>
+                    </Grid>
+                </Border>
+                
+                <!-- Disconnect Button -->
+                <Button Content="⏹  Finalizar conexión"
+                        Command="{Binding HostDisconnectCommand}"
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Center"
+                        Background="#D32F2F"
+                        Foreground="White"
+                        CornerRadius="10"
+                        Padding="0,10"
+                        FontSize="14"
+                        FontWeight="Bold"
+                        Cursor="Hand">
+                    <Button.Styles>
+                        <Style Selector="Button:pointerover">
+                            <Setter Property="Background" Value="#B71C1C"/>
+                        </Style>
+                        <Style Selector="Button:pressed">
+                            <Setter Property="RenderTransform" Value="scale(0.97)"/>
+                        </Style>
+                    </Button.Styles>
+                </Button>
+                
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>
