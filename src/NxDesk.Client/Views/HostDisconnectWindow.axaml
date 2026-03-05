@@ -108,20 +108,12 @@
                     
                     <!-- Peer Info -->
                     <StackPanel VerticalAlignment="Center" Spacing="3">
-                        <!-- Peer Name -->
+                        <!-- PC Name (Alias) -->
                         <TextBlock Text="{Binding ConnectedPeerAlias, FallbackValue='Esperando conexión...'}" 
                                    Foreground="{DynamicResource ThemeText}" 
                                    FontSize="16" 
                                    FontWeight="Bold"/>
                         
-                        <!-- Peer ID -->
-                        <TextBlock Foreground="{DynamicResource ThemeTextMuted}" FontSize="12">
-                            <TextBlock.Text>
-                                <MultiBinding StringFormat="ID: {0}">
-                                    <Binding Path="ConnectedPeerId"/>
-                                </MultiBinding>
-                            </TextBlock.Text>
-                        </TextBlock>
                         
                         <!-- IP Address (Admin Only) -->
                         <TextBlock Foreground="{DynamicResource ThemeTextDisabled}" 

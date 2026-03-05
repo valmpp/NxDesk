@@ -484,10 +484,20 @@ public partial class MainWindowViewModel : ViewModelBase
             ConnectionDuration = "00:00";
         }
         
-        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        Avalonia.Threading.Dispatcher.UIThread.Post(async () =>
         {
             if (value)
             {
+                // Give it a second for peer_hello to arrive and indicate if it's an admin
+                await Task.Delay(1000);
+
+                // If the connection was already closed or if the peer is an admin, don't show the window
+                if (!IsSharingStarted || _connectedPeerIsAdmin)
+                {
+                    Console.WriteLine($"[HostWindow] Suppressing HostDisconnectWindow (IsSharingStarted={IsSharingStarted}, IsAdmin={_connectedPeerIsAdmin})");
+                    return;
+                }
+
                 if (_hostDisconnectWindow == null)
                 {
                     Console.WriteLine("[HostWindow] Creating and showing HostDisconnectWindow.");
