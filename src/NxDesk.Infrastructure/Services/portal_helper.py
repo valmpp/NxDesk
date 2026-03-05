@@ -195,41 +195,41 @@ class UnifiedPortalHelper:
             cmd = parts[0]
             if cmd == "MOVE":
                 x, y = float(parts[1]), float(parts[2])
-                print(f"[Portal] Inject MOVE: {x}, {y}", file=sys.stderr)
-                self.rd_proxy.call_sync(
+                # print(f"[Portal] Inject MOVE: {x}, {y}", file=sys.stderr)
+                self.rd_proxy.call(
                     "NotifyPointerMotionAbsolute",
                     GLib.Variant('(oa{sv}udd)', (self.session_handle, {}, 0, x, y)),
-                    Gio.DBusCallFlags.NONE, 1000, None
+                    Gio.DBusCallFlags.NONE, 1000, None, None, None
                 )
             elif cmd == "BUTTON":
                 btn, down = int(parts[1]), parts[2] == "1"
-                print(f"[Portal] Inject BUTTON: {btn} {'DOWN' if down else 'UP'}", file=sys.stderr)
-                self.rd_proxy.call_sync(
+                # print(f"[Portal] Inject BUTTON: {btn} {'DOWN' if down else 'UP'}", file=sys.stderr)
+                self.rd_proxy.call(
                     "NotifyPointerButton",
                     GLib.Variant('(oa{sv}iu)', (self.session_handle, {}, btn, 1 if down else 0)),
-                    Gio.DBusCallFlags.NONE, 1000, None
+                    Gio.DBusCallFlags.NONE, 1000, None, None, None
                 )
             elif cmd == "KEY":
                 key, down = int(parts[1]), parts[2] == "1"
-                print(f"[Portal] Inject KEY: {key} {'DOWN' if down else 'UP'}", file=sys.stderr)
-                self.rd_proxy.call_sync(
+                # print(f"[Portal] Inject KEY: {key} {'DOWN' if down else 'UP'}", file=sys.stderr)
+                self.rd_proxy.call(
                     "NotifyKeyboardKey",
                     GLib.Variant('(oa{sv}iu)', (self.session_handle, {}, key, 1 if down else 0)),
-                    Gio.DBusCallFlags.NONE, 1000, None
+                    Gio.DBusCallFlags.NONE, 1000, None, None, None
                 )
             elif cmd == "SCROLL":
                 dx, dy = float(parts[1]), float(parts[2])
                 if dy != 0:
-                    self.rd_proxy.call_sync(
+                    self.rd_proxy.call(
                         "NotifyPointerAxis",
                         GLib.Variant('(oa{sv}ud)', (self.session_handle, {}, 0, dy)),
-                        Gio.DBusCallFlags.NONE, 1000, None
+                        Gio.DBusCallFlags.NONE, 1000, None, None, None
                     )
                 if dx != 0:
-                    self.rd_proxy.call_sync(
+                    self.rd_proxy.call(
                         "NotifyPointerAxis",
                         GLib.Variant('(oa{sv}ud)', (self.session_handle, {}, 1, dx)),
-                        Gio.DBusCallFlags.NONE, 1000, None
+                        Gio.DBusCallFlags.NONE, 1000, None, None, None
                     )
         except Exception as e:
             print(f"[Input Error] {e}", file=sys.stderr)

@@ -20,7 +20,7 @@ public class DiscoveryService : IDiscoveryService, IDisposable
     private PeerStatus _myStatus = PeerStatus.Background;
 
     public event Action<PeerIdentity>? OnPeerDiscovered;
-    private readonly HashSet<string> _knownPeerIds = new();
+    // Removed HashSet to allow continuous pulse updates for status/LastSeen tracking.
 
     public void SetStatus(PeerStatus status)
     {
@@ -72,15 +72,10 @@ public class DiscoveryService : IDiscoveryService, IDisposable
                         if (peer != null && peer.Id != _myId)
                         {
                             peer.IpAddress = result.RemoteEndPoint.Address.ToString();
-                            // Only fire event for genuinely new peers
-                            lock (_knownPeerIds)
-                            {
-                                if (_knownPeerIds.Add(peer.Id))
-                                {
-                                    FileLogger.Log("Discovery", $"PEER FOUND: {peer.Alias} (ID={peer.Id}) at {peer.IpAddress}");
-                                    OnPeerDiscovered?.Invoke(peer);
-                                }
-                            }
+                            
+                            // Pulse notification (always notify so ViewModel can update LastSeen)
+                            FileLogger.Log("Discovery", $"PEER PULSE: {peer.Alias} (ID={peer.Id}) at {peer.IpAddress} - Status: {peer.Status}");
+                            OnPeerDiscovered?.Invoke(peer);
                         }
                         else if (peer != null && peer.Id == _myId)
                         {
@@ -106,6 +101,9 @@ public class DiscoveryService : IDiscoveryService, IDisposable
         try
         {
             _broadcaster = new UdpClient();
+            _broadcaster.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+            _broadcaster.ExclusiveAddressUse = false;
+            _broadcaster.Client.Bind(new IPEndPoint(IPAddress.Any, 0));
             _broadcaster.EnableBroadcast = true;
 
             // Log network interfaces
@@ -176,6 +174,13 @@ public class DiscoveryService : IDiscoveryService, IDisposable
                 foreach (var unicast in iface.GetIPProperties().UnicastAddresses)
                 {
                     if (unicast.Address.AddressFamily != AddressFamily.InterNetwork) continue;
+
+                    // Support for interfaces without a mask (e.g. some virtual/tun devices)
+                    if (unicast.IPv4Mask == null)
+                    {
+                        FileLogger.Log("Discovery", $"  IP: {unicast.Address} (No Mask, skipping subnet broadcast)");
+                        continue;
+                    }
 
                     FileLogger.Log("Discovery", $"  IP: {unicast.Address}, Mask: {unicast.IPv4Mask}");
 

@@ -280,7 +280,7 @@ public class SignalRSignalingService : ISignalingService
                     Metadata = message.Metadata
                 };
 
-                await _hubConnection.InvokeAsync("RelayMessage", _roomId, wireMsg);
+                await _hubConnection.SendAsync("RelayMessage", _roomId, wireMsg);
             }
             catch (Exception ex)
             {
@@ -296,7 +296,7 @@ public class SignalRSignalingService : ISignalingService
             try
             {
                 _logger?.LogDebug("Sending input event: {Type}", inputEvent.Type);
-                await _hubConnection.InvokeAsync("SendInput", _roomId, inputEvent);
+                await _hubConnection.SendAsync("SendInput", _roomId, inputEvent);
             }
             catch (Exception ex)
             {

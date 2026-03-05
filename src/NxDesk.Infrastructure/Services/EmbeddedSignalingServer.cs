@@ -142,14 +142,14 @@ public static class EmbeddedSignalingServer
 public class EmbeddedHub : Hub
 {
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, HashSet<string>> _roomOccupants = new();
-    // PeerId → ConnectionId
+    // ConnectionId → RoomId
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _connectedPeers = new();
 
     public async Task JoinRoom(string roomId)
     {
         await Groups.AddToGroupAsync(Context.ConnectionId, roomId);
 
-        _connectedPeers[roomId] = Context.ConnectionId;
+        _connectedPeers[Context.ConnectionId] = roomId;
 
         var occupants = _roomOccupants.GetOrAdd(roomId, _ => new HashSet<string>());
         lock (occupants) { occupants.Add(Context.ConnectionId); }
@@ -163,7 +163,7 @@ public class EmbeddedHub : Hub
     public async Task LeaveRoom(string roomId)
     {
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, roomId);
-        _connectedPeers.TryRemove(roomId, out _);
+        _connectedPeers.TryRemove(Context.ConnectionId, out _);
 
         if (_roomOccupants.TryGetValue(roomId, out var occupants))
         {
@@ -191,20 +191,18 @@ public class EmbeddedHub : Hub
     }
 
     public Task<bool> IsPeerOnline(string peerId) =>
-        Task.FromResult(_connectedPeers.ContainsKey(peerId));
+        Task.FromResult(_connectedPeers.Values.Contains(peerId));
 
     public Task<List<string>> CheckOnlineStatus(List<string> peerIds) =>
-        Task.FromResult(peerIds.Where(id => _connectedPeers.ContainsKey(id)).ToList());
+        Task.FromResult(peerIds.Where(id => _connectedPeers.Values.Contains(id)).ToList());
 
     public Task<List<string>> GetAllOnlinePeers() =>
-        Task.FromResult(_connectedPeers.Keys.ToList());
+        Task.FromResult(_connectedPeers.Values.Distinct().ToList());
 
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
         // Cleanup PeerTracker
-        var peer = _connectedPeers.FirstOrDefault(kvp => kvp.Value == Context.ConnectionId);
-        if (!string.IsNullOrEmpty(peer.Key))
-            _connectedPeers.TryRemove(peer.Key, out _);
+        _connectedPeers.TryRemove(Context.ConnectionId, out _);
 
         // Cleanup all rooms
         foreach (var room in _roomOccupants)

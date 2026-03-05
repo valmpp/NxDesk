@@ -58,7 +58,7 @@ public class LinuxInputInjectionService : IInputInjectionService, IDisposable
             if (!string.IsNullOrEmpty(command))
             {
                 await stdin.WriteLineAsync(command);
-                await stdin.FlushAsync();
+                // Flush removed for performance; StreamWriter/Pipe handles this efficiently
             }
         }
         catch (Exception ex)

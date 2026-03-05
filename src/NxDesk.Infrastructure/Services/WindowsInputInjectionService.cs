@@ -31,8 +31,8 @@ public class WindowsInputInjectionService : IInputInjectionService
         if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             return Task.FromResult(false);
 
-        _virtualScreenWidth = GetSystemMetrics(SM_CXSCREEN);
-        _virtualScreenHeight = GetSystemMetrics(SM_CYSCREEN);
+        _virtualScreenWidth = GetSystemMetrics(SM_CXVIRTUALSCREEN);
+        _virtualScreenHeight = GetSystemMetrics(SM_CYVIRTUALSCREEN);
 
         if (_virtualScreenWidth == 0 || _virtualScreenHeight == 0)
         {
@@ -96,9 +96,13 @@ public class WindowsInputInjectionService : IInputInjectionService
         int absoluteX = _screenX + (int)(normalizedX * _screenWidth);
         int absoluteY = _screenY + (int)(normalizedY * _screenHeight);
 
+        // Map relative to the top-left of the virtual screen
+        int virtualX = GetSystemMetrics(SM_XVIRTUALSCREEN);
+        int virtualY = GetSystemMetrics(SM_YVIRTUALSCREEN);
+
         // SendInput requires coordinates in [0, 65535] range mapped to the virtual screen
-        int mappedX = (int)((absoluteX * 65535.0) / _virtualScreenWidth);
-        int mappedY = (int)((absoluteY * 65535.0) / _virtualScreenHeight);
+        int mappedX = (int)(((absoluteX - virtualX) * 65535.0) / _virtualScreenWidth);
+        int mappedY = (int)(((absoluteY - virtualY) * 65535.0) / _virtualScreenHeight);
 
         var input = new INPUT
         {
@@ -109,7 +113,7 @@ public class WindowsInputInjectionService : IInputInjectionService
                 {
                     dx = mappedX,
                     dy = mappedY,
-                    dwFlags = MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE
+                    dwFlags = MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK
                 }
             }
         };
@@ -299,6 +303,7 @@ public class WindowsInputInjectionService : IInputInjectionService
     private const uint MOUSEEVENTF_WHEEL      = 0x0800;
     private const uint MOUSEEVENTF_HWHEEL     = 0x1000;
     private const uint MOUSEEVENTF_ABSOLUTE   = 0x8000;
+    private const uint MOUSEEVENTF_VIRTUALDESK = 0x4000;
     private const int  WHEEL_DELTA            = 120;
 
     // Keyboard event flags
@@ -307,6 +312,10 @@ public class WindowsInputInjectionService : IInputInjectionService
     // GetSystemMetrics constants
     private const int SM_CXSCREEN = 0;
     private const int SM_CYSCREEN = 1;
+    private const int SM_XVIRTUALSCREEN = 76;
+    private const int SM_YVIRTUALSCREEN = 77;
+    private const int SM_CXVIRTUALSCREEN = 78;
+    private const int SM_CYVIRTUALSCREEN = 79;
 
     // MapVirtualKey mapping types
     private const uint MAPVK_VK_TO_VSC = 0;

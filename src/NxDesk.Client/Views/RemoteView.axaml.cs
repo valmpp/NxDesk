@@ -106,11 +106,15 @@ public partial class RemoteView : UserControl
     }
     private double _lastX = -1;
     private double _lastY = -1;
+    private DateTime _lastMoveTime = DateTime.MinValue;
 
     private void OnPointerMoved(object? sender, Avalonia.Input.PointerEventArgs e)
     {
         if (DataContext is MainWindowViewModel vm && vm.IsSessionActive)
         {
+            // THROTTLING: Only send mouse moves every 30ms to avoid saturating the signaling hub
+            if ((DateTime.Now - _lastMoveTime).TotalMilliseconds < 30) return;
+
             var pos = e.GetPosition(VideoImage);
             var x = pos.X / VideoImage.Bounds.Width;
             var y = pos.Y / VideoImage.Bounds.Height;
@@ -118,10 +122,11 @@ public partial class RemoteView : UserControl
             if (x >= 0 && x <= 1 && y >= 0 && y <= 1)
             {
                 // Prevent infinite mouse loop on localhost testing
-                if (Math.Abs(x - _lastX) > 0.005 || Math.Abs(y - _lastY) > 0.005)
+                if (Math.Abs(x - _lastX) > 0.002 || Math.Abs(y - _lastY) > 0.002)
                 {
                     _lastX = x;
                     _lastY = y;
+                    _lastMoveTime = DateTime.Now;
                     _ = vm.SendInput(new NxDesk.Application.DTOs.InputEventDto(
                         NxDesk.Application.DTOs.InputEventType.MouseMove,
                         X: x,

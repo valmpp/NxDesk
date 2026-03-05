@@ -124,6 +124,12 @@ public partial class MainWindowViewModel : ViewModelBase
     private string _connectedPeerIp = string.Empty;
 
     private bool _connectedPeerIsAdmin = false;
+    private readonly System.Threading.Channels.Channel<NxDesk.Application.DTOs.InputEventDto> _inputQueue = 
+        System.Threading.Channels.Channel.CreateUnbounded<NxDesk.Application.DTOs.InputEventDto>(
+            new System.Threading.Channels.UnboundedChannelOptions { SingleReader = true, SingleWriter = true });
+    private Task? _inputProcessorTask;
+    private System.Threading.CancellationTokenSource? _inputProcessorCts;
+    private bool _isSendingFrame = false;
 
     // --- Connection Type Dialog State ---
     [ObservableProperty]
@@ -542,12 +548,21 @@ public partial class MainWindowViewModel : ViewModelBase
         // 1. Cancel and dispose streaming CTS
         if (_streamingCts != null)
         {
-            Console.WriteLine("[Cleanup] Cancelling stale streaming CTS.");
-            try { _streamingCts.Cancel(); } catch { }
+            try { _streamingCts.Cancel(); _streamingCts.Dispose(); } catch { }
             _streamingCts = null;
         }
 
-        // 2. Dispose capture service (kills GStreamer process)
+        // 2. Cancel and dispose Input Processor
+        if (_inputProcessorCts != null)
+        {
+            try { _inputProcessorCts.Cancel(); _inputProcessorCts.Dispose(); } catch { }
+            _inputProcessorCts = null;
+        }
+
+        // 3. Drain input queue to avoid stale events in next session
+        while (_inputQueue.Reader.TryRead(out _)) { }
+
+        // 4. Dispose capture service (kills GStreamer process)
         try
         {
             _captureService.Dispose();
@@ -558,7 +573,7 @@ public partial class MainWindowViewModel : ViewModelBase
             Console.WriteLine($"[Cleanup] CaptureService dispose error (non-fatal): {ex.Message}");
         }
 
-        // 3. Dispose terminal service
+        // 5. Dispose terminal service
         try
         {
             _terminalService.Dispose();
@@ -570,7 +585,7 @@ public partial class MainWindowViewModel : ViewModelBase
             Console.WriteLine($"[Cleanup] TerminalService dispose error (non-fatal): {ex.Message}");
         }
 
-        // 4. Dispose input injection service
+        // 6. Dispose input injection service
         if (_inputService is IDisposable disposableInput)
         {
             try
@@ -584,7 +599,7 @@ public partial class MainWindowViewModel : ViewModelBase
             }
         }
 
-        // 5. Kill orphan GStreamer / portal_helper processes on Linux
+        // 7. Kill orphan GStreamer / portal_helper processes on Linux
         if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
                 System.Runtime.InteropServices.OSPlatform.Linux))
         {
@@ -602,7 +617,6 @@ public partial class MainWindowViewModel : ViewModelBase
                 };
                 killGst.Start();
                 killGst.WaitForExit(2000);
-                Console.WriteLine("[Cleanup] Killed orphan gst-launch processes.");
 
                 var killPortal = new System.Diagnostics.Process
                 {
@@ -616,13 +630,16 @@ public partial class MainWindowViewModel : ViewModelBase
                 };
                 killPortal.Start();
                 killPortal.WaitForExit(2000);
-                Console.WriteLine("[Cleanup] Killed orphan portal_helper processes.");
             }
-            catch { /* pkill may fail if no processes found — that's OK */ }
+            catch { }
         }
 
-        // 6. Reset sharing flag
+        // 8. Reset all flags and references
         IsSharingStarted = false;
+        _connectedPeerIsAdmin = false;
+        ConnectedPeerId = string.Empty;
+        ConnectedPeerIp = string.Empty;
+        _isSendingFrame = false;
 
         Console.WriteLine("[Cleanup] Previous session cleanup complete.");
         NxDesk.Infrastructure.Services.FileLogger.Log("Cleanup", "Previous session cleanup complete");
@@ -833,7 +850,9 @@ public partial class MainWindowViewModel : ViewModelBase
             var inputEvent = message.GetPayload<NxDesk.Application.DTOs.InputEventDto>();
             if (inputEvent != null && _inputService != null && _isSharingStarted)
             {
-                await _inputService.InjectEventAsync(inputEvent);
+                // Push to queue for background processing to avoid blocking signaling thread
+                _inputQueue.Writer.TryWrite(inputEvent);
+                EnsureInputProcessorRunning();
             }
         }
         else if (message.Type == "terminal_input")
@@ -1491,16 +1510,29 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             NxDesk.Infrastructure.Services.FileLogger.Log("Streaming", $"StreamingLoop START: x={x}, y={y}, w={width}, h={height}, idx={index}");
             StatusMessage = "Iniciando captura...";
-            bool initSuccess = _captureService.Initialize(x, y, width, height, index);
-            NxDesk.Infrastructure.Services.FileLogger.Log("Streaming", $"CaptureService.Initialize returned: {initSuccess}");
-            Console.WriteLine($"[Streaming] CaptureService.Initialize returned: {initSuccess}");
-            
+            int retryCount = 0;
+            bool initSuccess = false;
+            while (!token.IsCancellationRequested && retryCount < 5)
+            {
+                initSuccess = _captureService.Initialize(x, y, width, height, index);
+                if (initSuccess) break;
+                
+                retryCount++;
+                NxDesk.Infrastructure.Services.FileLogger.Log("Streaming", $"CaptureService.Initialize failed. Retrying... ({retryCount}/5)");
+                await Task.Delay(1000, token);
+            }
+
             if (!initSuccess)
             {
-                NxDesk.Infrastructure.Services.FileLogger.Log("Streaming", "FAILED: CaptureService.Initialize returned false — aborting StreamingLoop");
-                Console.WriteLine("[Streaming] FAILED: CaptureService.Initialize returned false — aborting StreamingLoop");
-                StatusMessage = "Error: No se pudo iniciar la captura de pantalla.";
-                AddNotification("Error", "La captura de pantalla falló. Asegúrate de tener permisos o soporte para X11/DXGI.", "Error", 10);
+                NxDesk.Infrastructure.Services.FileLogger.Log("Streaming", "FAILED: CaptureService.Initialize returned false repeatedly — aborting StreamingLoop");
+                Console.WriteLine("[Streaming] FAILED: CaptureService.Initialize returned false repeatedly — aborting StreamingLoop");
+                
+                // Show error cleanly
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => 
+                {
+                    StatusMessage = "Error: No se pudo iniciar la captura de pantalla.";
+                    AddNotification("Error", "La captura de pantalla falló. Asegúrate de tener permisos o soporte para X11/DXGI.", "Error", 10);
+                });
                 return;
             }
 
@@ -1510,11 +1542,31 @@ public partial class MainWindowViewModel : ViewModelBase
 
             while (!token.IsCancellationRequested)
             {
+                if (!_captureService.IsInitialized)
+                {
+                    NxDesk.Infrastructure.Services.FileLogger.Log("Streaming", "CaptureService lost initialization. Attempting to recover...");
+                    Console.WriteLine("[Streaming] CaptureService lost initialization. Recovering...");
+                    if (!_captureService.Initialize(x, y, width, height, index))
+                    {
+                        await Task.Delay(1000, token);
+                        continue;
+                    }
+                }
+
                 _frameCount++;
                 var captureStart = DateTime.Now;
                 var frame = _captureService.CaptureFrame();
                 if (frame != null)
                 {
+                    // DROP-FRAME LOGIC: If we are still sending the previous frame, 
+                    // skip this one to avoid building a transport backlog.
+                    if (_isSendingFrame)
+                    {
+                        if (_frameCount % 50 == 0)
+                            Console.WriteLine($"[Streaming] Frame {_frameCount} DROPPED (Congestion)");
+                        continue;
+                    }
+
                     var captureTime = (DateTime.Now - captureStart).TotalMilliseconds;
                     
                     var message = new NxDesk.Application.DTOs.SdpMessage
@@ -1532,12 +1584,27 @@ public partial class MainWindowViewModel : ViewModelBase
                         }
                     };
 
-                    var sendStart = DateTime.Now;
-                    await _signalingService.RelayMessageAsync(message);
-                    var sendTime = (DateTime.Now - sendStart).TotalMilliseconds;
-                    
-                    if (_frameCount % 50 == 0)
-                        Console.WriteLine($"[Streaming] Frame {_frameCount}: Capture={captureTime:F1}ms, Send={sendTime:F1}ms, Size={frame.Pixels.Length / 1024}KB");
+                    _isSendingFrame = true;
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            var sendStart = DateTime.Now;
+                            await _signalingService.RelayMessageAsync(message);
+                            var sendTime = (DateTime.Now - sendStart).TotalMilliseconds;
+                            
+                            if (_frameCount % 50 == 0)
+                                Console.WriteLine($"[Streaming] Frame {_frameCount}: Capture={captureTime:F1}ms, Send={sendTime:F1}ms, Size={frame.Pixels.Length / 1024}KB");
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"[Streaming] Frame Send Error: {ex.Message}");
+                        }
+                        finally
+                        {
+                            _isSendingFrame = false;
+                        }
+                    });
                 }
                 
                 // No artificial delay. CaptureFrame blocks on the GStreamer stream,
@@ -1589,7 +1656,7 @@ public partial class MainWindowViewModel : ViewModelBase
         IsScreenLocked = false;
         StatusText = "Desconectado";
         StatusMessage = "Sesión finalizada";
-        _currentRoomId = null;
+        // _currentRoomId = null; // Removed _currentRoomId nullification to preserve Host state on peer disconnect
         OnSessionClosed?.Invoke();
 
         // Dismiss any screen lock overlay
@@ -2082,12 +2149,46 @@ public partial class MainWindowViewModel : ViewModelBase
         return await _remoteTargetTcs.Task;
     }
 
-    partial void OnMyAliasChanged(string value)
+    private void EnsureInputProcessorRunning()
     {
-        if (_configService != null)
+        if (_inputProcessorTask != null && !_inputProcessorTask.IsCompleted) return;
+
+        _inputProcessorCts = new System.Threading.CancellationTokenSource();
+        var token = _inputProcessorCts.Token;
+
+        _inputProcessorTask = Task.Run(async () =>
         {
-            _configService.Alias = value;
-        }
+            try
+            {
+                while (!token.IsCancellationRequested && await _inputQueue.Reader.WaitToReadAsync(token))
+                {
+                    while (_inputQueue.Reader.TryRead(out var inputEvent))
+                    {
+                        if (token.IsCancellationRequested) break;
+
+                        // COALESCING LOGIC: If this is a MouseMove, skip ahead to the latest MouseMove in the queue
+                        if (inputEvent.Type == NxDesk.Application.DTOs.InputEventType.MouseMove)
+                        {
+                            while (_inputQueue.Reader.TryPeek(out var nextEvent) && 
+                                   nextEvent.Type == NxDesk.Application.DTOs.InputEventType.MouseMove)
+                            {
+                                _inputQueue.Reader.TryRead(out inputEvent);
+                            }
+                        }
+
+                        if (_inputService != null && _isSharingStarted)
+                        {
+                            await _inputService.InjectEventAsync(inputEvent);
+                        }
+                    }
+                }
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[InputProcessor] Fatal error: {ex.Message}");
+            }
+        }, token);
     }
 }
 

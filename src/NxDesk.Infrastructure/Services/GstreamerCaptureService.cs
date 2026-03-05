@@ -65,9 +65,9 @@ public class GstreamerCaptureService : IScreenCaptureService
 
             // 3. Start GStreamer pipeline using the Node ID
             string pipeline = $"pipewiresrc path={nodeId} do-timestamp=true ! videorate ! " +
-                             "video/x-raw,framerate=20/1 ! videoconvert ! videoscale ! " +
-                             "video/x-raw,width=1280,height=720 ! videoconvert ! " +
-                             "video/x-raw,format=I420 ! jpegenc quality=75 idct-method=ifast ! " +
+                             "video/x-raw,framerate=15/1 ! videoconvert ! videoscale ! " +
+                             "video/x-raw,width=1024,height=576 ! videoconvert ! " +
+                             "video/x-raw,format=I420 ! jpegenc quality=60 idct-method=ifast ! " +
                              "queue max-size-buffers=1 leaky=downstream ! fdsink fd=1 sync=false";
 
             Console.WriteLine($"[GStreamer] Final Pipeline: gst-launch-1.0 {pipeline}");
@@ -218,11 +218,20 @@ public class GstreamerCaptureService : IScreenCaptureService
                 }
             }
 
+            if (matchingNodeId == null)
+            {
+                FileLogger.Log("GStreamer", "Portal negotiation failed to find Node ID. Force killing portal process to allow clean retry.");
+                try { _cachedPortalProcess?.Kill(); _cachedPortalProcess?.WaitForExit(1000); } catch { }
+                _cachedPortalProcess = null;
+            }
+
             return matchingNodeId != null;
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[Portal Error] failed to launch helper: {ex.Message}");
+            try { _cachedPortalProcess?.Kill(); _cachedPortalProcess?.WaitForExit(1000); } catch { }
+            _cachedPortalProcess = null;
             return false;
         }
     }
