@@ -18,8 +18,10 @@ public class SignalRSignalingService : ISignalingService
     private string? _roomId;
 
     // Retry configuration
-    private const int MAX_RETRY_ATTEMPTS = 3;
-    private const int INITIAL_RETRY_DELAY_MS = 1000;
+    private const int MAX_RETRY_ATTEMPTS = 2;
+    private const int INITIAL_RETRY_DELAY_MS = 500;
+
+    public int CurrentRoomOccupancy { get; private set; } = 0;
 
     public event Func<SdpMessage, Task>? OnMessageReceived;
     public event Func<InputEventDto, Task>? OnInputReceived;
@@ -127,6 +129,7 @@ public class SignalRSignalingService : ISignalingService
 
         _hubConnection.On<int>("RoomOccupancyChanged", (count) =>
         {
+            CurrentRoomOccupancy = count;
             _logger?.LogInformation("Room occupancy changed: {Count}", count);
             OnRoomOccupancyChanged?.Invoke(count);
         });
@@ -197,7 +200,7 @@ public class SignalRSignalingService : ISignalingService
                         _serverUrl, attempt + 1, MAX_RETRY_ATTEMPTS);
 
                     // Connection timeout
-                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(4));
                     await _hubConnection.StartAsync(cts.Token);
 
                     FileLogger.Log("SignalR", $"Connected! State: {_hubConnection.State}");
@@ -206,9 +209,17 @@ public class SignalRSignalingService : ISignalingService
 
                 // Join room
                 FileLogger.Log("SignalR", $"Joining room: {_roomId}");
-                await _hubConnection.InvokeAsync("JoinRoom", _roomId);
-                FileLogger.Log("SignalR", $"JOINED room: {_roomId}");
-                _logger?.LogInformation("Joined room: {RoomId}", _roomId);
+                try
+                {
+                    CurrentRoomOccupancy = await _hubConnection.InvokeAsync<int>("JoinRoom", _roomId);
+                }
+                catch
+                {
+                    await _hubConnection.InvokeAsync("JoinRoom", _roomId);
+                }
+
+                FileLogger.Log("SignalR", $"JOINED room: {_roomId} (Occupants={CurrentRoomOccupancy})");
+                _logger?.LogInformation("Joined room: {RoomId} with {Occupants} occupants", _roomId, CurrentRoomOccupancy);
                 return true;
             }
             catch (OperationCanceledException)

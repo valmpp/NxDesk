@@ -145,7 +145,7 @@ public class EmbeddedHub : Hub
     // ConnectionId → RoomId
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _connectedPeers = new();
 
-    public async Task JoinRoom(string roomId)
+    public async Task<int> JoinRoom(string roomId)
     {
         await Groups.AddToGroupAsync(Context.ConnectionId, roomId);
 
@@ -158,6 +158,9 @@ public class EmbeddedHub : Hub
 
         await Clients.Group(roomId).SendAsync("RoomOccupancyChanged", occupants.Count);
         await Clients.OthersInGroup(roomId).SendAsync("ParticipantJoined", Context.ConnectionId);
+
+        return occupants.Count; // 1 si estas solo, 2 o mas si el anfitrion
+        //esta presente
     }
 
     public async Task LeaveRoom(string roomId)

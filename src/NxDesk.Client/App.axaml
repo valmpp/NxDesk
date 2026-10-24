@@ -38,6 +38,7 @@
             <controls:BoolToDoubleConverter x:Key="BoolToDoubleConverter" />
             <controls:BoolToThicknessConverter x:Key="BoolToThicknessConverter" />
             <controls:PeerStatusToBrushConverter x:Key="PeerStatusToBrushConverter" />
+            <controls:NotificationTypeToBrushConverter x:Key="NotificationTypeToBrushConverter" />
 
             <ResourceDictionary.ThemeDictionaries>
                 <ResourceDictionary x:Key="Dark">

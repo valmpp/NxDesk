@@ -1,18 +1,23 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="NxDesk.Client.Controls.ToastControl">
+             xmlns:vm="using:NxDesk.Client.ViewModels"
+             x:Class="NxDesk.Client.Controls.ToastControl"
+             x:DataType="vm:NotificationItemViewModel">
     <Border Background="{DynamicResource ThemeBackgroundSecondary}"
             CornerRadius="10"
-            Padding="12"
+            Padding="14,12"
             Margin="0,0,0,10"
             BoxShadow="0 4 12 0 #40000000"
             BorderBrush="{DynamicResource ThemeBorder}"
-            BorderThickness="1">
-        <StackPanel Orientation="Horizontal" Spacing="10">
-            <Ellipse Fill="{DynamicResource ThemePrimary}" Width="8" Height="8" VerticalAlignment="Center"/>
+            BorderThickness="1"
+            MaxWidth="400">
+        <StackPanel Orientation="Horizontal" Spacing="12">
+            <Ellipse Fill="{Binding Type, Converter={StaticResource NotificationTypeToBrushConverter}}" 
+                     Width="10" Height="10" 
+                     VerticalAlignment="Center"/>
             <StackPanel VerticalAlignment="Center">
-                <TextBlock Text="Notificación" FontWeight="Bold" Foreground="{DynamicResource ThemeText}"/>
-                <TextBlock Text="Se ha establecido la conexión correctamente." FontSize="{DynamicResource FontSizeSmall}" Foreground="{DynamicResource ThemeTextSecondary}"/>
+                <TextBlock Text="{Binding Title}" FontWeight="Bold" Foreground="{DynamicResource ThemeText}"/>
+                <TextBlock Text="{Binding Message}" FontSize="{DynamicResource FontSizeSmall}" Foreground="{DynamicResource ThemeTextSecondary}" TextWrapping="Wrap"/>
             </StackPanel>
         </StackPanel>
     </Border>

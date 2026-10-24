@@ -90,10 +90,86 @@ public partial class MainWindow : Window
 
     private void OnRoomIdKeyDown(object? sender, KeyEventArgs e)
     {
+        //BLOQUEAR Control + v, control y control X
+        if ((e.KeyModifiers & KeyModifiers.Control)  != 0 &&
+        (e.Key == Key.V ||
+         e.Key == Key.C  ||
+         e.Key == Key.X))
+        {
+            e.Handled = true;
+            return;
+        } 
+
+         //Comprueba al presionar Enteder
         if (e.Key == Key.Enter && DataContext is MainWindowViewModel vm)
         {
             vm.ConnectByIdCommand.Execute(null);
             e.Handled = true;
+            return;
         }
+        //Te permitira mantener las teclas de edicion y navegacion
+
+        if(
+            e.Key == Key.Back || 
+            e.Key == Key.Delete || 
+            e.Key == Key.Tab || 
+            e.Key == Key.Left ||
+            e.Key == Key.Right ||
+            e.Key == Key.Home ||
+            e.Key == Key.End)
+            {
+                return;
+            }
+            //Comprobar si la tecla corresponde numeros de 0 al 9
+
+            bool esNumero = e.Key == Key.OemPeriod ||
+                             e.Key == Key.Decimal;
+
+            for(int i = 0; i <= 9; i++ )
+            {
+                if(e.Key == Key.D0 + i || e.Key == Key.NumPad0 + i)
+                {
+                    esNumero = true;
+                    break;
+                }
+            }
+            if(!esNumero)
+                e.Handled = true;
+            return;
+
     }
+
+    private void OnRoomIdTextInput(object? sender, TextInputEventArgs e)
+      {
+        if (string.IsNullOrEmpty(e.Text))
+        return;
+
+        foreach (char c in e.Text)
+        {
+           if (!char.IsDigit(c) && c != '.')
+           {
+            e.Handled = true;
+            return;
+           }
+        }
+      }
+
+    private void OnRoomIdCopying(
+       object? sender, RoutedEventArgs e)
+       {
+         e.Handled = true;
+       }
+
+    private void OnRoomIdPasting(
+        object? sender, RoutedEventArgs e) 
+       {
+         e.Handled = true;
+       }
+
+    private void OnRoomIdCutting(
+        object? sender, RoutedEventArgs e)
+       {
+         e.Handled = true;
+       }
+   
 }

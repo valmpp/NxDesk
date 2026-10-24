@@ -1272,15 +1272,33 @@ public partial class MainWindowViewModel : ViewModelBase
         if (string.IsNullOrEmpty(id)) return;
 
         // Support manual IP fallback via "ID @ IP" or "ID@IP"
-        string targetId = id;
+        string rawInput = id.Trim();
+        string targetId = rawInput;
         string? manualIp = null;
         if (id.Contains('@'))
         {
             var parts = id.Split('@');
             targetId = parts[0].Trim();
             manualIp = parts[1].Trim();
-            NxDesk.Infrastructure.Services.FileLogger.Log("Connect", $"Manual IP overwrite detected: {manualIp} for ID {targetId}");
         }
+        else if (System.Net.IPAddress.TryParse(rawInput.Split(':')
+        [0].Trim(), out _) ||
+        rawInput.StartsWith("192.168.", 
+        StringComparison.OrdinalIgnoreCase) ||
+         rawInput.StartsWith("10.", 
+         StringComparison.OrdinalIgnoreCase) ||
+         rawInput.StartsWith("172.", 
+         StringComparison.OrdinalIgnoreCase) ||
+         rawInput.Equals("localhost", 
+         StringComparison.OrdinalIgnoreCase))
+         {
+            //SE DETECTA QUE EL USUARIO ESCRIBIO UNA IP DIRECTAMENTE
+            manualIp = rawInput;
+            targetId = rawInput;
+         }
+        
+
+        
 
         // Normalize: remove spaces for comparison
         string normalizedId = targetId.Replace(" ", "");
@@ -1360,7 +1378,26 @@ public partial class MainWindowViewModel : ViewModelBase
             bool connected = await _signalingService.ConnectAsync(_currentRoomId);
             if (!connected)
             {
-                throw new Exception("No se pudo establecer conexión con el servidor de señales");
+                string failTarget = !string.IsNullOrEmpty(manualIp) ? manualIp : targetId;
+                throw new Exception($"No se pudo conectar con '{failTarget}'. Asegúrate de que el equipo esté accesible y con NxDesk abierto.");
+            }
+            if (normalizedId != normalizedMyId)
+            {
+                if (_signalingService.CurrentRoomOccupancy < 2)
+                {
+                    NxDesk.Infrastructure.Services.FileLogger.Log("Connect",
+                        $"ABORT: Room '{_currentRoomId}' has no host (occupants={_signalingService.CurrentRoomOccupancy})");
+                    
+                    // Nos salimos de la sala vacía
+                    await _signalingService.LeaveRoomAsync();
+
+                    string errorTarget = !string.IsNullOrEmpty(manualIp) ?
+                        $"{targetId} en {manualIp}" :
+                        targetId;
+
+                    // Al lanzar la excepción el flujo se detiene y salta directo al bloque catch:
+                    throw new Exception($"El equipo con ID '{errorTarget}' no existe o no tiene una sesión activa abierta.");
+                }
             }
 
             NxDesk.Infrastructure.Services.FileLogger.Log("Connect", $"SUCCESS: Connected to room '{_currentRoomId}'");
@@ -1384,8 +1421,19 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             NxDesk.Infrastructure.Services.FileLogger.Log("Connect", $"FAILED: {ex.Message}");
             IsConnecting = false;
+            IsSessionActive = false;
             StatusMessage = "Error de conexión";
             AddNotification("Error", ex.Message, "Error", 7);
+
+            if (!string.IsNullOrEmpty(MyId))
+            {
+                try
+                {
+                    var localUrl = $"http://localhost:{NxDesk.Infrastructure.Services.EmbeddedSignalingServer.ActualPort}/signalinghub";
+                    _ = _signalingService.SetServerUrl(localUrl).ContinueWith(_ => _signalingService.ConnectAsync(MyId));
+                }
+                catch { }
+            }
         }
     }
 

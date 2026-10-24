@@ -54,11 +54,17 @@
 
                             <Panel VerticalAlignment="Center">
                                 <TextBox Width="280"
+                                         x:Name="RoomIdTextBox"
                                          Classes="Modern"
                                          Watermark="Ingrese ID..."
                                          VerticalContentAlignment="Center"
+                                         MaxLength="16"
                                          Padding="10,8,40,8"
                                          Text="{Binding TargetId}"
+                                         TextInput="OnRoomIdTextInput"
+                                         CopyingToClipboard="OnRoomIdCopying"
+                                         PastingFromClipboard="OnRoomIdPasting"
+                                         CuttingToClipboard="OnRoomIdCutting"
                                          KeyDown="OnRoomIdKeyDown"/>
                                 <Button HorizontalAlignment="Right"
                                         VerticalAlignment="Center"

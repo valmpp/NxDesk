@@ -57,4 +57,9 @@ public interface ISignalingService
     /// </summary>
     /// <param name="serverUrl">Full URL, e.g. "http://192.168.1.50:5000/signalinghub"</param>
     Task SetServerUrl(string serverUrl);
+
+    /// <summary>
+    /// Current number of occupants in the joined room
+    /// </summary>
+    int CurrentRoomOccupancy { get; }
 }

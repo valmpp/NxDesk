@@ -183,3 +183,21 @@ public class BoolToThicknessConverter : IValueConverter
 
     public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotImplementedException();
 }
+
+public class NotificationTypeToBrushConverter : IValueConverter
+{
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        string type = value?.ToString()?.ToLowerInvariant() ?? "";
+        return type switch
+        {
+            "error" => Avalonia.Media.Brush.Parse("#D13438"),
+            "success" => Avalonia.Media.Brush.Parse("#00CC66"),
+            "warning" => Avalonia.Media.Brush.Parse("#FFD700"),
+            _ => Avalonia.Media.Brush.Parse("#007ACC") // Info / Default
+        };
+    }
+
+    public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotImplementedException();
+}
+
