@@ -1,9 +1,0 @@
-[package]
-name = "nxdesk-file-transfer"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-nxdesk-core = { path = "../core" }
-tokio = { version = "1", features = ["full"] }
-tracing = "0.1"
