@@ -1,0 +1,32 @@
+{
+  "gitnexus-graph-guard": {
+    "enabled": true,
+    "PreToolUse": [
+      {
+        "matcher": "replace_file_content",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -Command \"Write-Host '[GitNexus Hook] Verify blast radius before editing core symbols: run impact analysis if modifying domain/contracts.' -ForegroundColor Cyan\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  },
+  "safety-gate": {
+    "enabled": true,
+    "PreToolUse": [
+      {
+        "matcher": "run_command",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -Command \"Write-Host '[Safety Gate] Prohibiting destructive or uncommitted resets.' -ForegroundColor Yellow\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "gitnexus": {
+      "command": "cmd.exe",
+      "args": [
+        "/c",
+        "pnpm",
+        "dlx",
+        "gitnexus@latest",
+        "mcp"
+      ],
+      "env": {
+        "GITNEXUS_DIR": "${workspaceFolder}/.gitnexus"
+      }
+    }
+  }
+}
