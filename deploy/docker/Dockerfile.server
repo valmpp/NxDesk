@@ -4,7 +4,7 @@
 # ==============================================================================
 
 # --- Etapa 1: Compilación ---
-FROM rust:1.78-bookworm AS builder
+FROM rust:1.85-bookworm AS builder
 
 WORKDIR /usr/src/nxdesk
 
@@ -19,8 +19,8 @@ RUN cargo build --release -p nxdesk-server
 # --- Etapa 2: Imagen Final Minimalista ---
 FROM debian:bookworm-slim
 
-# Instalar certificados CA actualizados
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+# Instalar certificados CA actualizados y netcat para healthcheck
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates netcat-openbsd && rm -rf /var/lib/apt/lists/*
 
 # Crear usuario sin privilegios
 RUN useradd -m -u 10001 -U -s /bin/sh nxdesk
@@ -35,6 +35,10 @@ COPY --from=builder /usr/src/nxdesk/target/release/nxdesk-server /usr/local/bin/
 EXPOSE 5000
 
 ENV RUST_LOG=info
+
+# Sonda de salud para orquestadores (Docker / Kube)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+  CMD nc -z 127.0.0.1 5000 || exit 1
 
 ENTRYPOINT ["/usr/local/bin/nxdesk-server"]
 CMD ["--bind", "0.0.0.0:5000"]

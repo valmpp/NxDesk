@@ -51,7 +51,10 @@ pub fn sanitize_destination_path(relative_path: &str, file_name: &str) -> Result
     let safe_str = safe_canon.to_string_lossy().to_lowercase();
 
     if !target_str.starts_with(&safe_str) && !target_str.contains("nxdesk_transfers") {
-        return Err("Ataque de Path Traversal bloqueado: intento de escritura fuera del sandbox.".to_string());
+        return Err(
+            "Ataque de Path Traversal bloqueado: intento de escritura fuera del sandbox."
+                .to_string(),
+        );
     }
 
     Ok(full_path)
@@ -60,13 +63,9 @@ pub fn sanitize_destination_path(relative_path: &str, file_name: &str) -> Result
 /// Explora y lista el contenido de un directorio local
 pub async fn list_directory_async(path_str: &str) -> ListDirectoryResponse {
     let target_path = if path_str.trim().is_empty() {
-        if let Ok(profile) = std::env::var("USERPROFILE") {
-            PathBuf::from(profile)
-        } else if let Ok(home) = std::env::var("HOME") {
-            PathBuf::from(home)
-        } else {
-            std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
-        }
+        let safe = get_safe_transfers_dir();
+        let _ = std::fs::create_dir_all(&safe);
+        safe
     } else {
         PathBuf::from(path_str)
     };
@@ -101,13 +100,13 @@ pub async fn list_directory_async(path_str: &str) -> ListDirectoryResponse {
     }
 
     // Ordenar directorios primero, luego archivos alfabéticamente
-    response.items.sort_by(|a, b| {
-        match (a.is_directory, b.is_directory) {
+    response
+        .items
+        .sort_by(|a, b| match (a.is_directory, b.is_directory) {
             (true, false) => std::cmp::Ordering::Less,
             (false, true) => std::cmp::Ordering::Greater,
             _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-        }
-    });
+        });
 
     response
 }
@@ -135,7 +134,9 @@ impl FileTransferManager {
         let dest = sanitize_destination_path(relative_path, file_name)?;
 
         if let Some(parent) = dest.parent() {
-            fs::create_dir_all(parent).await.map_err(|e| e.to_string())?;
+            fs::create_dir_all(parent)
+                .await
+                .map_err(|e| e.to_string())?;
         }
 
         // Crear/truncar el archivo destino
@@ -144,7 +145,10 @@ impl FileTransferManager {
         let mut lock = self.active_transfers.lock().await;
         lock.insert(transfer_id.to_string(), dest.clone());
 
-        info!("📁 [FileTransfer] Transferencia '{}' registrada en: {:?}", transfer_id, dest);
+        info!(
+            "📁 [FileTransfer] Transferencia '{}' registrada en: {:?}",
+            transfer_id, dest
+        );
         Ok(dest)
     }
 
@@ -167,12 +171,17 @@ impl FileTransferManager {
             .await
             .map_err(|e| e.to_string())?;
 
-        file.write_all(&chunk.data).await.map_err(|e| e.to_string())?;
+        file.write_all(&chunk.data)
+            .await
+            .map_err(|e| e.to_string())?;
 
         if chunk.is_last {
             let mut lock = self.active_transfers.lock().await;
             lock.remove(&chunk.transfer_id);
-            info!("✅ [FileTransfer] Transferencia '{}' completada con éxito.", chunk.transfer_id);
+            info!(
+                "✅ [FileTransfer] Transferencia '{}' completada con éxito.",
+                chunk.transfer_id
+            );
         }
 
         Ok(())
@@ -238,7 +247,10 @@ mod tests {
             is_last: false,
             data: b"Hello NxDesk ".to_vec(),
         };
-        manager.write_chunk(&chunk1).await.expect("chunk 1 write failed");
+        manager
+            .write_chunk(&chunk1)
+            .await
+            .expect("chunk 1 write failed");
 
         let chunk2 = FileChunk {
             transfer_id: transfer_id.to_string(),
@@ -246,7 +258,10 @@ mod tests {
             is_last: true,
             data: b"Pure Rust!".to_vec(),
         };
-        manager.write_chunk(&chunk2).await.expect("chunk 2 write failed");
+        manager
+            .write_chunk(&chunk2)
+            .await
+            .expect("chunk 2 write failed");
 
         let content = fs::read_to_string(&path).await.expect("read failed");
         assert_eq!(content, "Hello NxDesk Pure Rust!");

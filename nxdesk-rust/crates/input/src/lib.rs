@@ -38,7 +38,9 @@ impl InputInjector {
             InputEvent::MouseMove { x, y } => self.inject_mouse_move(*x, *y),
             InputEvent::MouseDown { button, .. } => self.inject_mouse_button(*button, true),
             InputEvent::MouseUp { button, .. } => self.inject_mouse_button(*button, false),
-            InputEvent::MouseWheel { delta_x, delta_y } => self.inject_mouse_wheel(*delta_x, *delta_y),
+            InputEvent::MouseWheel { delta_x, delta_y } => {
+                self.inject_mouse_wheel(*delta_x, *delta_y)
+            }
             InputEvent::KeyDown { key_code, .. } => self.inject_key(*key_code as u32, true),
             InputEvent::KeyUp { key_code, .. } => self.inject_key(*key_code as u32, false),
         }
@@ -55,8 +57,12 @@ impl InputInjector {
             let mut virtual_w = GetSystemMetrics(SM_CXVIRTUALSCREEN);
             let mut virtual_h = GetSystemMetrics(SM_CYVIRTUALSCREEN);
 
-            if virtual_w <= 0 { virtual_w = 1920; }
-            if virtual_h <= 0 { virtual_h = 1080; }
+            if virtual_w <= 0 {
+                virtual_w = 1920;
+            }
+            if virtual_h <= 0 {
+                virtual_h = 1080;
+            }
 
             let abs_x = self.screen_x + (normalized_x * self.screen_width as f32) as i32;
             let abs_y = self.screen_y + (normalized_y * self.screen_height as f32) as i32;
@@ -91,13 +97,25 @@ impl InputInjector {
 
         let flags = match button {
             MouseButton::Left => {
-                if is_down { MOUSEEVENTF_LEFTDOWN } else { MOUSEEVENTF_LEFTUP }
+                if is_down {
+                    MOUSEEVENTF_LEFTDOWN
+                } else {
+                    MOUSEEVENTF_LEFTUP
+                }
             }
             MouseButton::Right => {
-                if is_down { MOUSEEVENTF_RIGHTDOWN } else { MOUSEEVENTF_RIGHTUP }
+                if is_down {
+                    MOUSEEVENTF_RIGHTDOWN
+                } else {
+                    MOUSEEVENTF_RIGHTUP
+                }
             }
             MouseButton::Middle => {
-                if is_down { MOUSEEVENTF_MIDDLEDOWN } else { MOUSEEVENTF_MIDDLEUP }
+                if is_down {
+                    MOUSEEVENTF_MIDDLEDOWN
+                } else {
+                    MOUSEEVENTF_MIDDLEUP
+                }
             }
         };
 

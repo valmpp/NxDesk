@@ -12,7 +12,6 @@ pub struct AuthManager {
     active_tokens: Arc<RwLock<HashMap<String, SessionRole>>>,
 }
 
-
 impl AuthManager {
     pub fn new(access_password: Option<String>) -> Self {
         Self {
@@ -28,7 +27,6 @@ impl AuthManager {
         *lock = password;
     }
 
-
     /// Autentica una solicitud de un cliente remoto
     pub async fn authenticate(&self, req: &AuthRequest) -> AuthResponse {
         let expected_pw = self.access_password.read().await;
@@ -36,7 +34,7 @@ impl AuthManager {
         if let Some(ref required_pw) = *expected_pw {
             match &req.password {
                 Some(provided) if provided == required_pw => {
-                    let token = format!("tok_{}", uuid_v4_simple());
+                    let token = generate_secure_token();
                     let role = req.requested_role.unwrap_or(SessionRole::FullControl);
                     let mut tokens = self.active_tokens.write().await;
                     tokens.insert(token.clone(), role);
@@ -57,7 +55,7 @@ impl AuthManager {
             }
         } else {
             // Sin contraseña requerida, se concede el rol solicitado
-            let token = format!("tok_{}", uuid_v4_simple());
+            let token = generate_secure_token();
             let role = req.requested_role.unwrap_or(SessionRole::FullControl);
             let mut tokens = self.active_tokens.write().await;
             tokens.insert(token.clone(), role);
@@ -72,7 +70,6 @@ impl AuthManager {
     }
 
     /// Valida si un token cuenta con el rol mínimo necesario
-    #[allow(dead_code)]
     pub async fn has_role(&self, token: &str, min_role: SessionRole) -> bool {
         let tokens = self.active_tokens.read().await;
         if let Some(role) = tokens.get(token) {
@@ -96,13 +93,18 @@ impl AuthManager {
     }
 }
 
-#[allow(dead_code)]
-fn uuid_v4_simple() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
-    format!("{:x}", nanos)
+/// Generador criptográficamente seguro de tokens de sesión (CSPRNG 192-bit)
+fn generate_secure_token() -> String {
+    use rand::RngCore;
+    use std::fmt::Write;
+    let mut bytes = [0u8; 24]; // 192 bits de entropía criptográfica
+    rand::thread_rng().fill_bytes(&mut bytes);
+    let mut hex = String::with_capacity(bytes.len() * 2);
+    for b in bytes {
+        let _ = write!(hex, "{:02x}", b);
+    }
+    format!("tok_{}", hex)
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -150,4 +152,3 @@ mod tests {
         assert!(auth.authenticate(&update_req).await.success);
     }
 }
-

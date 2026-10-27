@@ -50,7 +50,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn handle_connection(mut stream: TcpStream, peer_addr: SocketAddr, state: Arc<RwLock<HubState>>) {
+async fn handle_connection(
+    mut stream: TcpStream,
+    peer_addr: SocketAddr,
+    state: Arc<RwLock<HubState>>,
+) {
     // Sonda de salud (Health Check /health) para balanceadores y monitoreo SRE
     let mut peek_buf = [0u8; 16];
     if let Ok(n) = stream.peek(&mut peek_buf).await {
@@ -69,7 +73,10 @@ async fn handle_connection(mut stream: TcpStream, peer_addr: SocketAddr, state: 
     let ws_stream = match tokio_tungstenite::accept_async(stream).await {
         Ok(ws) => ws,
         Err(e) => {
-            warn!("Error durante el apretón de manos WebSocket desde {}: {}", peer_addr, e);
+            warn!(
+                "Error durante el apretón de manos WebSocket desde {}: {}",
+                peer_addr, e
+            );
             return;
         }
     };
@@ -152,15 +159,26 @@ async fn handle_client_text(conn_id: &str, text: &str, state: &Arc<RwLock<HubSta
 
 async fn join_room(conn_id: &str, room_id: &str, state: &Arc<RwLock<HubState>>) {
     let mut s = state.write().await;
-    s.rooms.entry(room_id.to_string()).or_default().insert(conn_id.to_string());
-    s.client_room.insert(conn_id.to_string(), room_id.to_string());
-    s.peer_tracker.insert(room_id.to_string(), conn_id.to_string());
+    s.rooms
+        .entry(room_id.to_string())
+        .or_default()
+        .insert(conn_id.to_string());
+    s.client_room
+        .insert(conn_id.to_string(), room_id.to_string());
+    s.peer_tracker
+        .insert(room_id.to_string(), conn_id.to_string());
 
     let count = s.rooms.get(room_id).map(|set| set.len()).unwrap_or(0);
-    info!("🚪 Cliente {} se unió a la sala '{}' (Total: {})", conn_id, room_id, count);
+    info!(
+        "🚪 Cliente {} se unió a la sala '{}' (Total: {})",
+        conn_id, room_id, count
+    );
 
     // Notificar a todos en la sala el cambio de ocupación
-    let notify_msg = format!("{{\"Type\":\"RoomOccupancyChanged\",\"Payload\":\"{}\"}}\u{1e}", count);
+    let notify_msg = format!(
+        "{{\"Type\":\"RoomOccupancyChanged\",\"Payload\":\"{}\"}}\u{1e}",
+        count
+    );
     if let Some(members) = s.rooms.get(room_id) {
         for member_id in members {
             if let Some(tx) = s.clients.get(member_id) {
@@ -180,10 +198,16 @@ async fn leave_room(conn_id: &str, room_id: &str, state: &Arc<RwLock<HubState>>)
     };
     s.client_room.remove(conn_id);
 
-    info!("🚪 Cliente {} salió de la sala '{}' (Total: {})", conn_id, room_id, count);
+    info!(
+        "🚪 Cliente {} salió de la sala '{}' (Total: {})",
+        conn_id, room_id, count
+    );
 
     if count > 0 {
-        let notify_msg = format!("{{\"Type\":\"RoomOccupancyChanged\",\"Payload\":\"{}\"}}\u{1e}", count);
+        let notify_msg = format!(
+            "{{\"Type\":\"RoomOccupancyChanged\",\"Payload\":\"{}\"}}\u{1e}",
+            count
+        );
         if let Some(members) = s.rooms.get(room_id) {
             for member_id in members {
                 if let Some(tx) = s.clients.get(member_id) {
@@ -196,7 +220,11 @@ async fn leave_room(conn_id: &str, room_id: &str, state: &Arc<RwLock<HubState>>)
     }
 }
 
-async fn relay_message_to_room(sender_id: &str, msg: &SignalingMessage, state: &Arc<RwLock<HubState>>) {
+async fn relay_message_to_room(
+    sender_id: &str,
+    msg: &SignalingMessage,
+    state: &Arc<RwLock<HubState>>,
+) {
     let s = state.read().await;
     if let Some(room_id) = s.client_room.get(sender_id) {
         if let Some(members) = s.rooms.get(room_id) {
@@ -239,7 +267,10 @@ async fn cleanup_connection(conn_id: &str, state: &Arc<RwLock<HubState>>) {
         };
 
         if count > 0 {
-            let notify_msg = format!("{{\"Type\":\"RoomOccupancyChanged\",\"Payload\":\"{}\"}}\u{1e}", count);
+            let notify_msg = format!(
+                "{{\"Type\":\"RoomOccupancyChanged\",\"Payload\":\"{}\"}}\u{1e}",
+                count
+            );
             if let Some(members) = s.rooms.get(&room_id) {
                 for member_id in members {
                     if let Some(tx) = s.clients.get(member_id) {
@@ -255,6 +286,9 @@ async fn cleanup_connection(conn_id: &str, state: &Arc<RwLock<HubState>>) {
 
 fn uuid_v4_simple() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
-    let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
     format!("{:x}", nanos)
 }

@@ -11,3 +11,10 @@ members = [
     "apps/client",
     "apps/server"
 ]
+
+# Optimiza librerías de compresión JPEG/SIMD incluso al correr con 'cargo run' para cero delay
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3

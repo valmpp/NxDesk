@@ -1,9 +1,9 @@
+use nxdesk_core::{PeerIdentity, PeerStatus};
+use socket2::{Domain, Protocol, Socket, Type};
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-use nxdesk_core::{PeerIdentity, PeerStatus};
-use socket2::{Domain, Protocol, Socket, Type};
 use tokio::sync::{mpsc, RwLock};
 
 pub const DISCOVERY_PORT: u16 = 5001;

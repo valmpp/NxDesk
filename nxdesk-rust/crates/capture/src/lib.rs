@@ -23,9 +23,9 @@ impl CapturedFrame {
             let src_idx = i * 4;
             let dst_idx = i * 3;
             if src_idx + 2 < src_len {
-                dst[dst_idx] = src[src_idx + 2];     // R
+                dst[dst_idx] = src[src_idx + 2]; // R
                 dst[dst_idx + 1] = src[src_idx + 1]; // G
-                dst[dst_idx + 2] = src[src_idx];     // B
+                dst[dst_idx + 2] = src[src_idx]; // B
             }
         }
     }
@@ -37,6 +37,7 @@ pub struct ScreenCapturer {
     pub active_index: i32,
     pub origin_x: i32,
     pub origin_y: i32,
+    pub last_frame: Option<CapturedFrame>,
 }
 
 impl Default for ScreenCapturer {
@@ -55,9 +56,14 @@ impl ScreenCapturer {
                 active_index: 0,
                 origin_x: 0,
                 origin_y: 0,
+                last_frame: None,
             };
             let screens = capturer.get_screens();
-            if let Some(primary) = screens.iter().find(|s| s.is_primary).or_else(|| screens.first()) {
+            if let Some(primary) = screens
+                .iter()
+                .find(|s| s.is_primary)
+                .or_else(|| screens.first())
+            {
                 capturer.width = primary.width;
                 capturer.height = primary.height;
                 capturer.origin_x = primary.x;
@@ -74,6 +80,7 @@ impl ScreenCapturer {
                 active_index: 0,
                 origin_x: 0,
                 origin_y: 0,
+                last_frame: None,
             }
         }
     }
@@ -87,9 +94,9 @@ impl ScreenCapturer {
         let mut screens = Vec::new();
         #[cfg(windows)]
         {
+            use windows_sys::Win32::Foundation::*;
             use windows_sys::Win32::Graphics::Gdi::*;
             use windows_sys::Win32::UI::WindowsAndMessaging::*;
-            use windows_sys::Win32::Foundation::*;
 
             unsafe extern "system" fn enum_proc(
                 hmonitor: HMONITOR,
@@ -179,21 +186,55 @@ impl ScreenCapturer {
         }
     }
 
-    /// Captura un fotograma instantáneo de la pantalla
+    /// Genera un fotograma de reserva cuando Windows se bloquea o salta un diálogo de seguridad UAC
+    #[allow(clippy::chunks_exact_to_as_chunks)]
+    pub fn generate_standby_frame(&self) -> CapturedFrame {
+        let pixel_count = (self.width * self.height) as usize;
+        let mut data = vec![0u8; pixel_count * 4];
+        // Fondo azul noche seguro (BGRA: B=35, G=20, R=12, A=255)
+        for chunk in data.chunks_exact_mut(4) {
+            chunk[0] = 35;
+            chunk[1] = 20;
+            chunk[2] = 12;
+            chunk[3] = 255;
+        }
+        CapturedFrame {
+            width: self.width,
+            height: self.height,
+            data,
+        }
+    }
+
+    /// Captura un fotograma instantáneo de la pantalla con resistencia a bloqueos de Windows y UAC
     pub fn capture_frame(&mut self) -> Result<CapturedFrame, String> {
         #[cfg(windows)]
         {
             use windows_sys::Win32::Graphics::Gdi::*;
+            use windows_sys::Win32::System::StationsAndDesktops::*;
             use windows_sys::Win32::UI::WindowsAndMessaging::*;
 
             unsafe {
-                let hdc_screen = GetDC(0);
+                let mut hdc_screen = GetDC(0);
                 if hdc_screen == 0 {
-                    return Err("No se pudo obtener el contexto de dispositivo (HDC) de la pantalla".to_string());
+                    // Solo si GetDC falla, intentar reasociar al input desktop activo (Winlogon o UAC)
+                    let hdesk = OpenInputDesktop(0, 0, DESKTOP_READOBJECTS | DESKTOP_WRITEOBJECTS);
+                    if hdesk != 0 {
+                        let _ = SetThreadDesktop(hdesk);
+                        CloseDesktop(hdesk);
+                        hdc_screen = GetDC(0);
+                    }
+                }
+
+                if hdc_screen == 0 {
+                    if let Some(ref last) = self.last_frame {
+                        return Ok(last.clone());
+                    }
+                    return Ok(self.generate_standby_frame());
                 }
 
                 let hdc_mem = CreateCompatibleDC(hdc_screen);
-                let h_bitmap = CreateCompatibleBitmap(hdc_screen, self.width as i32, self.height as i32);
+                let h_bitmap =
+                    CreateCompatibleBitmap(hdc_screen, self.width as i32, self.height as i32);
                 let old_bitmap = SelectObject(hdc_mem, h_bitmap);
 
                 // Copiar la pantalla a memoria de mapa de bits (BitBlt)
@@ -210,11 +251,21 @@ impl ScreenCapturer {
                 );
 
                 if bitblt_ok == 0 {
+                    let hdesk = OpenInputDesktop(0, 0, DESKTOP_READOBJECTS | DESKTOP_WRITEOBJECTS);
+                    if hdesk != 0 {
+                        let _ = SetThreadDesktop(hdesk);
+                        CloseDesktop(hdesk);
+                    }
                     SelectObject(hdc_mem, old_bitmap);
                     DeleteObject(h_bitmap);
                     DeleteDC(hdc_mem);
                     ReleaseDC(0, hdc_screen);
-                    return Err("Falló la llamada a BitBlt al capturar la pantalla".to_string());
+
+                    // Si BitBlt falló debido a bloqueo o cuadro UAC, mantener último frame en lugar de pantalla negra
+                    if let Some(ref last) = self.last_frame {
+                        return Ok(last.clone());
+                    }
+                    return Ok(self.generate_standby_frame());
                 }
 
                 // Dibujar el cursor de Windows sobre el bitmap para que se vea en el streaming
@@ -223,7 +274,11 @@ impl ScreenCapturer {
                 if GetCursorInfo(&mut cursor_info) != 0 && (cursor_info.flags & 1) != 0 {
                     let rel_x = cursor_info.ptScreenPos.x - self.origin_x;
                     let rel_y = cursor_info.ptScreenPos.y - self.origin_y;
-                    if rel_x >= 0 && rel_x < self.width as i32 && rel_y >= 0 && rel_y < self.height as i32 {
+                    if rel_x >= 0
+                        && rel_x < self.width as i32
+                        && rel_y >= 0
+                        && rel_y < self.height as i32
+                    {
                         let mut icon_info = ICONINFO {
                             fIcon: 0,
                             xHotspot: 0,
@@ -243,8 +298,12 @@ impl ScreenCapturer {
                                 0,
                                 3, // DI_NORMAL
                             );
-                            if icon_info.hbmMask != 0 { DeleteObject(icon_info.hbmMask); }
-                            if icon_info.hbmColor != 0 { DeleteObject(icon_info.hbmColor); }
+                            if icon_info.hbmMask != 0 {
+                                DeleteObject(icon_info.hbmMask);
+                            }
+                            if icon_info.hbmColor != 0 {
+                                DeleteObject(icon_info.hbmColor);
+                            }
                         }
                     }
                 }
@@ -263,7 +322,12 @@ impl ScreenCapturer {
                         biClrUsed: 0,
                         biClrImportant: 0,
                     },
-                    bmiColors: [RGBQUAD { rgbBlue: 0, rgbGreen: 0, rgbRed: 0, rgbReserved: 0 }],
+                    bmiColors: [RGBQUAD {
+                        rgbBlue: 0,
+                        rgbGreen: 0,
+                        rgbRed: 0,
+                        rgbReserved: 0,
+                    }],
                 };
 
                 let mut buffer = vec![0u8; (self.width * self.height * 4) as usize];
@@ -284,14 +348,19 @@ impl ScreenCapturer {
                 ReleaseDC(0, hdc_screen);
 
                 if lines_copied == 0 {
-                    return Err("Error al volcar mapa de bits con GetDIBits".to_string());
+                    if let Some(ref last) = self.last_frame {
+                        return Ok(last.clone());
+                    }
+                    return Ok(self.generate_standby_frame());
                 }
 
-                Ok(CapturedFrame {
+                let frame = CapturedFrame {
                     width: self.width,
                     height: self.height,
                     data: buffer,
-                })
+                };
+                self.last_frame = Some(frame.clone());
+                Ok(frame)
             }
         }
         #[cfg(not(windows))]
@@ -337,7 +406,10 @@ mod tests {
         let screens = capturer.get_screens();
         assert!(!screens.is_empty());
         for s in &screens {
-            println!("Detectada: {} -> {}x{} en ({}, {}) Primary={}", s.name, s.width, s.height, s.x, s.y, s.is_primary);
+            println!(
+                "Detectada: {} -> {}x{} en ({}, {}) Primary={}",
+                s.name, s.width, s.height, s.x, s.y, s.is_primary
+            );
         }
     }
 }

@@ -10,12 +10,41 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use tokio::sync::{broadcast, Mutex, RwLock};
 
+use std::net::IpAddr;
+use std::time::{Duration, Instant};
+
+/// Limitador de tasa en memoria por IP para mitigar fuerza bruta y saturación
+#[derive(Clone, Default)]
+pub struct InMemoryRateLimiter {
+    attempts: Arc<Mutex<HashMap<IpAddr, (u32, Instant)>>>,
+}
+
+impl InMemoryRateLimiter {
+    pub async fn check(&self, ip: IpAddr, max_attempts: u32, window: Duration) -> bool {
+        let mut map = self.attempts.lock().await;
+        let now = Instant::now();
+        if map.len() > 1000 {
+            map.retain(|_, (_, start)| now.duration_since(*start) < window);
+        }
+        let entry = map.entry(ip).or_insert((0, now));
+        if now.duration_since(entry.1) > window {
+            *entry = (1, now);
+            true
+        } else if entry.0 < max_attempts {
+            entry.0 += 1;
+            true
+        } else {
+            false
+        }
+    }
+}
+
 /// Estado global del cliente NxDesk
 #[derive(Clone)]
 pub struct AppState {
     pub config: Arc<RwLock<AppConfig>>,
-    #[allow(dead_code)]
     pub auth: AuthManager,
+    pub rate_limiter: Arc<InMemoryRateLimiter>,
     pub input_injector: Arc<Mutex<InputInjector>>,
     pub capturer: Arc<Mutex<ScreenCapturer>>,
     pub file_manager: Arc<FileTransferManager>,
@@ -48,6 +77,7 @@ impl AppState {
         Self {
             config: Arc::new(RwLock::new(config)),
             auth,
+            rate_limiter: Arc::new(InMemoryRateLimiter::default()),
             input_injector: Arc::new(Mutex::new(injector)),
             capturer: Arc::new(Mutex::new(capturer)),
             file_manager: Arc::new(FileTransferManager::new()),
@@ -85,7 +115,9 @@ impl AppState {
     }
 
     pub fn decrement_connected_viewers(&self) -> usize {
-        self.connected_viewers.fetch_sub(1, Ordering::SeqCst).saturating_sub(1)
+        self.connected_viewers
+            .fetch_sub(1, Ordering::SeqCst)
+            .saturating_sub(1)
     }
 
     pub fn get_connected_viewers(&self) -> usize {
@@ -101,7 +133,8 @@ impl AppState {
     }
 
     pub fn set_signaling_connected(&self, connected: bool) {
-        self.is_signaling_connected.store(connected, Ordering::SeqCst);
+        self.is_signaling_connected
+            .store(connected, Ordering::SeqCst);
     }
 
     pub fn is_signaling_connected(&self) -> bool {
@@ -129,7 +162,12 @@ impl AppState {
         let mut capturer = self.capturer.lock().await;
         let screen = capturer.select_screen(index)?;
         let mut injector = self.input_injector.lock().await;
-        injector.set_screen_bounds(screen.x, screen.y, screen.width as i32, screen.height as i32);
+        injector.set_screen_bounds(
+            screen.x,
+            screen.y,
+            screen.width as i32,
+            screen.height as i32,
+        );
 
         // Limpiar inmediatamente el fotograma antiguo en memoria para evitar ver el monitor anterior
         {

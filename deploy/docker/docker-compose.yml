@@ -21,6 +21,11 @@ services:
       - nxdesk-net
     ports:
       - "127.0.0.1:5000:5000"
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "5000"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
 
   caddy-proxy:
     image: caddy:2-alpine
@@ -40,7 +45,8 @@ services:
     networks:
       - nxdesk-net
     depends_on:
-      - nxdesk-server
+      nxdesk-server:
+        condition: service_healthy
 
 networks:
   nxdesk-net:

@@ -1,18 +1,23 @@
 use crate::state::AppState;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
-use axum::extract::{Query, State};
+use axum::extract::{ConnectInfo, Query, State};
 use axum::response::{Html, IntoResponse, Json};
 use axum::routing::{get, post};
 use axum::Router;
 use futures_util::{SinkExt, StreamExt};
-use nxdesk_core::{AuthRequest, AuthResponse, InputEvent, ListDirectoryResponse, ScreenInfoDto, SignalingMessage};
+use nxdesk_core::{
+    AuthRequest, AuthResponse, InputEvent, ListDirectoryResponse, ScreenInfoDto, SessionRole,
+    SignalingMessage,
+};
 use nxdesk_file_transfer::list_directory_async;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
-pub async fn start_web_server(state: AppState) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+pub async fn start_web_server(
+    state: AppState,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let initial_port = {
         let cfg = state.config.read().await;
         cfg.web_port
@@ -35,7 +40,7 @@ pub async fn start_web_server(state: AppState) -> Result<(), Box<dyn std::error:
         .route("/ws/stream", get(ws_handler))
         .with_state(state.clone());
 
-    // Auto-incremento de puerto si está ocupado (evita colisiones AddrInUse en pruebas locales)
+    // Detección y notificación explícita de colisión de puertos
     let mut bound_port = initial_port;
     let mut listener_opt = None;
 
@@ -52,8 +57,23 @@ pub async fn start_web_server(state: AppState) -> Result<(), Box<dyn std::error:
     }
 
     let listener = listener_opt.ok_or_else(|| {
-        format!("No se pudo enlazar ningún puerto web entre {} y {}", initial_port, initial_port + 50)
+        format!(
+            "No se pudo enlazar ningún puerto web entre {} y {}",
+            initial_port,
+            initial_port + 50
+        )
     })?;
+
+    if bound_port != initial_port {
+        tracing::warn!(
+            "⚠️  [COLISIÓN DE PUERTO] El puerto original {} estaba ocupado por otro proceso.",
+            initial_port
+        );
+        tracing::warn!(
+            "⚠️  NxDesk Dashboard se reubicó automáticamente en: http://localhost:{}",
+            bound_port
+        );
+    }
 
     // Actualizar el puerto asignado en la configuración
     {
@@ -65,10 +85,21 @@ pub async fn start_web_server(state: AppState) -> Result<(), Box<dyn std::error:
     info!("   ✨  NxDesk Web Dashboard (Pure Rust UI)        ");
     info!("   Acceso Local: http://localhost:{}", bound_port);
     info!("   Acceso Red:   http://0.0.0.0:{}", bound_port);
+    if bound_port != initial_port {
+        info!(
+            "   (Puerto original {} ocupado por otro proceso)",
+            initial_port
+        );
+    }
     info!("==================================================");
 
     tokio::spawn(async move {
-        if let Err(e) = axum::serve(listener, app).await {
+        if let Err(e) = axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<SocketAddr>(),
+        )
+        .await
+        {
             error!("Error en servidor web NxDesk: {}", e);
         }
     });
@@ -80,6 +111,7 @@ pub async fn start_web_server(state: AppState) -> Result<(), Box<dyn std::error:
 struct StatusResponse {
     device_id: String,
     device_alias: String,
+    web_port: u16,
     signaling_connected: bool,
     discovered_peers_count: usize,
     connected_viewers_count: usize,
@@ -104,6 +136,7 @@ async fn get_status(State(state): State<AppState>) -> Json<StatusResponse> {
     Json(StatusResponse {
         device_id: cfg.device_id.clone(),
         device_alias: cfg.device_alias.clone(),
+        web_port: cfg.web_port,
         signaling_connected: state.is_signaling_connected(),
         discovered_peers_count: peers_count,
         connected_viewers_count: viewers,
@@ -123,18 +156,65 @@ async fn get_peers(State(state): State<AppState>) -> Json<Vec<nxdesk_core::PeerI
 #[derive(Deserialize)]
 struct FilesQuery {
     path: Option<String>,
+    token: Option<String>,
 }
 
-async fn get_files(Query(query): Query<FilesQuery>) -> Json<ListDirectoryResponse> {
+async fn get_files(
+    State(state): State<AppState>,
+    Query(query): Query<FilesQuery>,
+) -> Json<ListDirectoryResponse> {
+    let cfg = state.config.read().await;
+    if cfg.access_password.is_some() {
+        let token = query.token.as_deref().unwrap_or_default();
+        if !state.auth.has_role(token, SessionRole::FullControl).await
+            && !state.auth.has_role(token, SessionRole::Administrator).await
+        {
+            return Json(ListDirectoryResponse {
+                current_path: String::new(),
+                items: Vec::new(),
+                error: Some("Acceso denegado: se requiere autorización de anfitrión o control total para explorar archivos.".to_string()),
+            });
+        }
+    }
+    drop(cfg);
+
     let path = query.path.unwrap_or_default();
+    if path.contains("..") {
+        return Json(ListDirectoryResponse {
+            current_path: path,
+            items: Vec::new(),
+            error: Some(
+                "Ataque de Path Traversal bloqueado: secuencias '..' prohibidas.".to_string(),
+            ),
+        });
+    }
+
     let resp = list_directory_async(&path).await;
     Json(resp)
 }
 
 async fn post_auth(
     State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Json(payload): Json<AuthRequest>,
 ) -> Json<AuthResponse> {
+    // Rate limit: máximo 5 intentos por cada 10 segundos por dirección IP
+    if !state
+        .rate_limiter
+        .check(addr.ip(), 5, std::time::Duration::from_secs(10))
+        .await
+    {
+        return Json(AuthResponse {
+            success: false,
+            error_message: Some(
+                "Demasiados intentos de autenticación. Bloqueado temporalmente por seguridad."
+                    .to_string(),
+            ),
+            session_token: None,
+            granted_role: SessionRole::ViewOnly,
+        });
+    }
+
     let resp = state.auth.authenticate(&payload).await;
     Json(resp)
 }
@@ -185,7 +265,7 @@ struct ConnectResponse {
     target: String,
 }
 
-/// Conecta el cliente a una sesión remota (ID AnyDesk o IP directa)
+/// Conecta el cliente a una sesión remota (ID NxDesk o IP directa)
 async fn post_connect(
     State(state): State<AppState>,
     Json(payload): Json<ConnectPayload>,
@@ -203,7 +283,10 @@ async fn post_connect(
         match client.join_room(&target).await {
             Ok(_) => {
                 state.set_active_remote_peer(Some(target.clone())).await;
-                info!("🚀 [Web Connect] Conectado exitosamente a la sala del equipo remoto '{}'", target);
+                info!(
+                    "🚀 [NxDesk Connect] Conectado exitosamente a la sala del equipo remoto '{}'",
+                    target
+                );
                 Json(ConnectResponse {
                     success: true,
                     message: format!("Conectado exitosamente a la sala remota '{}'", target),
@@ -211,9 +294,15 @@ async fn post_connect(
                 })
             }
             Err(e) => {
+                // Fallback automático para conexión directa LAN si el objetivo es IP o no hay sala central
+                state.set_active_remote_peer(Some(target.clone())).await;
+                info!("🌐 [NxDesk Connect] Conexión configurada en modo directo LAN a '{}' (Aviso de sala: {})", target, e);
                 Json(ConnectResponse {
-                    success: false,
-                    message: format!("Error al unirse a la sala remota: {}", e),
+                    success: true,
+                    message: format!(
+                        "Objetivo configurado para conexión directa LAN al nodo '{}'",
+                        target
+                    ),
                     target,
                 })
             }
@@ -229,9 +318,7 @@ async fn post_connect(
 }
 
 /// Finaliza la sesión remota activa y vuelve al modo anfitrión local
-async fn post_disconnect(
-    State(state): State<AppState>,
-) -> Json<ConnectResponse> {
+async fn post_disconnect(State(state): State<AppState>) -> Json<ConnectResponse> {
     let prev = state.get_active_remote_peer().await;
     state.set_active_remote_peer(None).await;
     info!("🔌 [Web Disconnect] Desconectado de sesión remota.");
@@ -261,24 +348,20 @@ struct HostCredentialsResponse {
     host_password: Option<String>,
 }
 
-/// Endpoint seguro: solo entrega la clave al anfitrión local
+/// Endpoint seguro: solo entrega la clave al anfitrión local validado por socket loopback
 async fn get_host_credentials(
     State(state): State<AppState>,
-    headers: axum::http::HeaderMap,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
 ) -> Json<HostCredentialsResponse> {
-    let host_header = headers
-        .get("host")
-        .and_then(|h| h.to_str().ok())
-        .unwrap_or_default();
-
-    let is_localhost = host_header.starts_with("localhost")
-        || host_header.starts_with("127.0.0.1")
-        || host_header.starts_with("[::1]");
-
+    let is_localhost = addr.ip().is_loopback();
     let cfg = state.config.read().await;
     Json(HostCredentialsResponse {
         is_localhost,
-        host_password: if is_localhost { cfg.access_password.clone() } else { None },
+        host_password: if is_localhost {
+            cfg.access_password.clone()
+        } else {
+            None
+        },
     })
 }
 
@@ -291,7 +374,16 @@ async fn post_terminal_auth(
 
     if enable {
         let cfg = state.config.read().await;
-        let expected_pw = cfg.access_password.as_deref().unwrap_or("NxDeskAdmin");
+        let expected_pw = match cfg.access_password.as_deref() {
+            Some(pw) => pw,
+            None => {
+                return Json(TerminalAuthResponse {
+                    success: false,
+                    allowed: false,
+                    message: "Desbloqueo denegado: El anfitrión no ha configurado una contraseña administrativa (--password=<clave>). Por seguridad, la terminal permanece bloqueada.".to_string(),
+                });
+            }
+        };
         let provided = payload.password.as_deref().unwrap_or_default();
         if provided != expected_pw {
             return Json(TerminalAuthResponse {
@@ -309,7 +401,9 @@ async fn post_terminal_auth(
         "🔒 Terminal Remota bloqueada (VUL-01 activa)."
     };
     info!("🛡️ [Terminal Auth] {}", msg);
-    let _ = state.terminal_broadcast_tx.send(format!("\r\n📢 [NxDesk Seguridad] {}\r\n\r\n", msg));
+    let _ = state
+        .terminal_broadcast_tx
+        .send(format!("\r\n📢 [NxDesk Seguridad] {}\r\n\r\n", msg));
 
     Json(TerminalAuthResponse {
         success: true,
@@ -318,35 +412,92 @@ async fn post_terminal_auth(
     })
 }
 
-async fn ws_handler(
-    ws: WebSocketUpgrade,
-    State(state): State<AppState>,
-) -> impl IntoResponse {
-    ws.on_upgrade(|socket| handle_web_socket(socket, state))
+#[derive(Deserialize, Default)]
+struct WsQuery {
+    token: Option<String>,
 }
 
-async fn handle_web_socket(socket: WebSocket, state: AppState) {
+async fn ws_handler(
+    ws: WebSocketUpgrade,
+    Query(query): Query<WsQuery>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    State(state): State<AppState>,
+) -> impl IntoResponse {
+    // Rate limit: máximo 20 conexiones WebSocket cada 10 segundos por dirección IP
+    if !state
+        .rate_limiter
+        .check(addr.ip(), 20, std::time::Duration::from_secs(10))
+        .await
+    {
+        return axum::http::StatusCode::TOO_MANY_REQUESTS.into_response();
+    }
+
+    let initial_token = query.token;
+    ws.on_upgrade(move |socket| handle_web_socket(socket, state, addr, initial_token))
+        .into_response()
+}
+
+async fn handle_web_socket(
+    socket: WebSocket,
+    state: AppState,
+    client_addr: SocketAddr,
+    initial_token: Option<String>,
+) {
     state.increment_connected_viewers();
     let v_count = state.get_connected_viewers();
-    info!("👥 [Web] Nuevo visor web conectado. Espectadores activos: {}", v_count);
+    info!(
+        "👥 [Web] Nuevo visor web conectado desde {}. Espectadores activos: {}",
+        client_addr, v_count
+    );
+
+    let is_loopback = client_addr.ip().is_loopback();
+    let access_password_required = {
+        let cfg = state.config.read().await;
+        cfg.access_password.is_some()
+    };
+
+    let initial_auth = if !access_password_required || is_loopback {
+        true
+    } else if let Some(ref tok) = initial_token {
+        state.auth.has_role(tok, SessionRole::FullControl).await
+            || state.auth.has_role(tok, SessionRole::Administrator).await
+    } else {
+        false
+    };
+
+    let is_authorized = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(initial_auth));
+    let is_authorized_clone = is_authorized.clone();
 
     let (mut ws_sender, mut ws_receiver) = socket.split();
     let mut frame_rx = state.frame_broadcast_tx.subscribe();
     let mut term_rx = state.terminal_broadcast_tx.subscribe();
 
-    // Enviar último fotograma si existe
-    if let Some(initial_frame) = state.latest_jpeg_frame.read().await.clone() {
-        let _ = ws_sender.send(Message::Binary(initial_frame.into())).await;
+    // Enviar último fotograma si cuenta con autorización
+    if initial_auth {
+        if let Some(initial_frame) = state.latest_jpeg_frame.read().await.clone() {
+            let _ = ws_sender.send(Message::Binary(initial_frame.into())).await;
+        }
+    } else {
+        let auth_req_msg = serde_json::json!({
+            "type": "auth_required",
+            "message": "Autenticación requerida para visualizar y controlar la pantalla remota."
+        });
+        let _ = ws_sender
+            .send(Message::Text(auth_req_msg.to_string().into()))
+            .await;
     }
 
     // Tarea para enviar fotogramas y mensajes al cliente web
+    let is_auth_send = is_authorized.clone();
     let send_task = tokio::spawn(async move {
         loop {
             tokio::select! {
                 frame_res = frame_rx.recv() => {
                     match frame_res {
                         Ok(frame_bytes) => {
-                            if ws_sender.send(Message::Binary(frame_bytes.into())).await.is_err() {
+                            if is_auth_send.load(std::sync::atomic::Ordering::Relaxed)
+                                && ws_sender.send(Message::Binary(frame_bytes.into())).await.is_err()
+                            {
                                 break;
                             }
                         }
@@ -357,9 +508,11 @@ async fn handle_web_socket(socket: WebSocket, state: AppState) {
                 term_res = term_rx.recv() => {
                     match term_res {
                         Ok(term_msg) => {
-                            let json = format!("{{\"type\":\"terminal\",\"data\":{}}}", serde_json::to_string(&term_msg).unwrap_or_default());
-                            if ws_sender.send(Message::Text(json.into())).await.is_err() {
-                                break;
+                            if is_auth_send.load(std::sync::atomic::Ordering::Relaxed) {
+                                let json = format!("{{\"type\":\"terminal\",\"data\":{}}}", serde_json::to_string(&term_msg).unwrap_or_default());
+                                if ws_sender.send(Message::Text(json.into())).await.is_err() {
+                                    break;
+                                }
                             }
                         }
                         Err(_) => break,
@@ -375,11 +528,50 @@ async fn handle_web_socket(socket: WebSocket, state: AppState) {
         while let Some(Ok(msg)) = ws_receiver.next().await {
             match msg {
                 Message::Text(text) => {
+                    // Validar si es mensaje de autenticación dinámica en caliente
+                    if let Ok(val) = serde_json::from_str::<serde_json::Value>(&text) {
+                        if val.get("type").and_then(|v| v.as_str()) == Some("auth") {
+                            if let Some(token) = val.get("token").and_then(|v| v.as_str()) {
+                                if state_clone
+                                    .auth
+                                    .has_role(token, SessionRole::FullControl)
+                                    .await
+                                    || state_clone
+                                        .auth
+                                        .has_role(token, SessionRole::Administrator)
+                                        .await
+                                {
+                                    is_authorized_clone
+                                        .store(true, std::sync::atomic::Ordering::Relaxed);
+                                    info!("🔐 [Web Auth] Cliente {} autenticado exitosamente por WebSocket.", client_addr);
+                                    if let Some(initial_frame) =
+                                        state_clone.latest_jpeg_frame.read().await.clone()
+                                    {
+                                        let _ = state_clone.frame_broadcast_tx.send(initial_frame);
+                                    }
+                                }
+                            }
+                            continue;
+                        }
+                    }
+
                     if let Ok(evt) = serde_json::from_str::<InputEvent>(&text) {
-                        let injector = state_clone.input_injector.lock().await;
-                        injector.inject(&evt);
+                        // Verificación estricta de autorización para inyección de periféricos (SEC-02)
+                        if is_authorized_clone.load(std::sync::atomic::Ordering::Relaxed) {
+                            let injector = state_clone.input_injector.lock().await;
+                            injector.inject(&evt);
+                        } else {
+                            warn!("🛡️ [Seguridad] Entrada de ratón/teclado denegada desde {}: cliente sin rol de Control Remoto autenticado.", client_addr);
+                        }
                     } else if let Ok(val) = serde_json::from_str::<serde_json::Value>(&text) {
                         if let Some(cmd) = val.get("terminal_cmd").and_then(|v| v.as_str()) {
+                            if !is_authorized_clone.load(std::sync::atomic::Ordering::Relaxed) {
+                                let warn_msg = "\r\n⚠️ [Seguridad] Comando de terminal rechazado: cliente no autenticado.\r\n";
+                                let _ =
+                                    state_clone.terminal_broadcast_tx.send(warn_msg.to_string());
+                                continue;
+                            }
+
                             let remote_peer = state_clone.get_active_remote_peer().await;
                             let sig_client = state_clone.get_signaling_client().await;
 
@@ -387,14 +579,19 @@ async fn handle_web_socket(socket: WebSocket, state: AppState) {
                                 info!("📡 [Web Terminal] Reenviando comando '{}' a equipo remoto vía Señalización.", cmd);
                                 let sig_msg = SignalingMessage::new("terminal_cmd", cmd);
                                 if let Err(e) = signaling.send_message(&sig_msg).await {
-                                    let err_msg = format!("\r\n❌ Error al enviar comando al host remoto: {}\r\n", e);
+                                    let err_msg = format!(
+                                        "\r\n❌ Error al enviar comando al host remoto: {}\r\n",
+                                        e
+                                    );
                                     let _ = state_clone.terminal_broadcast_tx.send(err_msg);
                                 }
                             } else {
                                 let allow = state_clone.is_remote_terminal_allowed().await;
                                 if allow {
                                     if !state_clone.terminal_session.is_running() {
-                                        if let Ok(mut rx) = state_clone.terminal_session.start().await {
+                                        if let Ok(mut rx) =
+                                            state_clone.terminal_session.start().await
+                                        {
                                             let term_tx = state_clone.terminal_broadcast_tx.clone();
                                             tokio::spawn(async move {
                                                 while let Some(chunk) = rx.recv().await {
@@ -403,18 +600,28 @@ async fn handle_web_socket(socket: WebSocket, state: AppState) {
                                             });
                                         }
                                     }
-                                    if let Err(e) = state_clone.terminal_session.write_input(cmd).await {
-                                        let err_msg = format!("\r\n❌ Error al escribir en terminal local: {}\r\n", e);
+                                    if let Err(e) =
+                                        state_clone.terminal_session.write_input(cmd).await
+                                    {
+                                        let err_msg = format!(
+                                            "\r\n❌ Error al escribir en terminal local: {}\r\n",
+                                            e
+                                        );
                                         let _ = state_clone.terminal_broadcast_tx.send(err_msg);
                                     }
                                 } else {
                                     let warn_msg = "\r\n⚠️ [VUL-01: Terminal Bloqueada] La ejecución de comandos remotos requiere autorización.\r\nPara autorizar la terminal, presione el botón '🔓 Desbloquear' e ingrese la clave maestra del anfitrión.\r\n\r\n";
-                                    let _ = state_clone.terminal_broadcast_tx.send(warn_msg.to_string());
+                                    let _ = state_clone
+                                        .terminal_broadcast_tx
+                                        .send(warn_msg.to_string());
                                 }
                             }
-                        } else if let Some(idx) = val.get("select_screen").and_then(|v| v.as_i64()) {
-                            info!("🖥️ [Web] Cambiando a monitor index: {}", idx);
-                            let _ = state_clone.select_screen(idx as i32).await;
+                        } else if let Some(idx) = val.get("select_screen").and_then(|v| v.as_i64())
+                        {
+                            if is_authorized_clone.load(std::sync::atomic::Ordering::Relaxed) {
+                                info!("🖥️ [Web] Cambiando a monitor index: {}", idx);
+                                let _ = state_clone.select_screen(idx as i32).await;
+                            }
                         }
                     }
                 }
@@ -431,12 +638,18 @@ async fn handle_web_socket(socket: WebSocket, state: AppState) {
 
     state.decrement_connected_viewers();
     let v_rem = state.get_connected_viewers();
-    info!("👥 [Web] Visor web desconectado. Espectadores restantes: {}", v_rem);
+    info!(
+        "👥 [Web] Visor web desconectado. Espectadores restantes: {}",
+        v_rem
+    );
 }
 
-async fn serve_index(State(state): State<AppState>) -> ([(axum::http::HeaderName, &'static str); 2], Html<String>) {
+async fn serve_index(
+    State(state): State<AppState>,
+) -> ([(axum::http::HeaderName, &'static str); 2], Html<String>) {
     let cfg = state.config.read().await;
-    let html = format!(r#"<!DOCTYPE html>
+    let html = format!(
+        r#"<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
@@ -563,12 +776,16 @@ async fn serve_index(State(state): State<AppState>) -> ([(axum::http::HeaderName
             position: relative;
             overflow: hidden;
             display: flex;
+            min-height: 0;
+            height: calc(100vh - 65px);
         }}
         .view-panel {{
             display: none;
             width: 100%;
             height: 100%;
             flex-direction: column;
+            min-height: 0;
+            overflow: hidden;
         }}
         .view-panel.active {{
             display: flex;
@@ -793,14 +1010,36 @@ async fn serve_index(State(state): State<AppState>) -> ([(axum::http::HeaderName
             font-size: 0.9rem;
             display: flex;
             flex-direction: column;
+            min-height: 0;
+            height: 100%;
+            overflow: hidden;
         }}
         .terminal-output {{
             flex: 1;
-            overflow-y: auto;
+            overflow-y: scroll;
+            overflow-x: hidden;
             white-space: pre-wrap;
+            word-break: break-all;
             color: #10b981;
             line-height: 1.5;
             padding-bottom: 8px;
+            min-height: 0;
+            scroll-behavior: smooth;
+        }}
+        .terminal-output::-webkit-scrollbar {{
+            width: 10px;
+        }}
+        .terminal-output::-webkit-scrollbar-track {{
+            background: #0b0f19;
+            border-radius: 4px;
+        }}
+        .terminal-output::-webkit-scrollbar-thumb {{
+            background: #374151;
+            border-radius: 4px;
+            border: 2px solid #0b0f19;
+        }}
+        .terminal-output::-webkit-scrollbar-thumb:hover {{
+            background: #60a5fa;
         }}
         .terminal-input-bar {{
             display: flex;
@@ -847,17 +1086,46 @@ async fn serve_index(State(state): State<AppState>) -> ([(axum::http::HeaderName
         }}
         .card-title {{ font-size: 1.05rem; font-weight: 600; color: #fff; }}
         .card-meta {{ font-size: 0.85rem; color: var(--text-muted); }}
+
+        /* Explorador de Archivos Interactivo */
+        .file-row {{
+            padding: 9px 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-radius: 6px;
+            transition: background 0.15s ease;
+        }}
+        .file-row:hover {{
+            background: rgba(255, 255, 255, 0.05);
+        }}
+        .file-row-dir {{
+            cursor: pointer;
+        }}
+        .file-row-dir:hover {{
+            background: rgba(99, 102, 241, 0.15);
+        }}
+        .file-row-dir .file-name {{
+            color: #60a5fa;
+            font-weight: 500;
+        }}
+        .file-meta {{
+            color: var(--text-muted);
+            font-size: 0.82rem;
+            font-family: monospace;
+        }}
     </style>
 </head>
 <body>
     <header>
         <div class="brand">
-            ⚡ NxDesk <span>v0.1.0</span> <span class="badge">PURE RUST</span>
+            ⚡ NxDesk <span>v1.0.0</span> <span class="badge">PURE RUST</span>
         </div>
 
-        <!-- Buscador AnyDesk: Permite ingresar ID o IP remota para conectarse -->
+        <!-- Buscador NxDesk: Permite ingresar ID o IP remota para conectarse -->
         <div class="search-container">
-            <input type="text" id="target-search-input" placeholder="🔍 Conectar a ID o IP remota (ej. 111-222-333 o 192.168.1.50:5050)...">
+            <input type="text" id="target-search-input" placeholder="🔍 Conectar a ID NxDesk o IP remota (ej. 111-222-333 o 192.168.1.50:8080)...">
             <button class="btn btn-primary" onclick="connectTargetInput()">⚡ Conectar</button>
         </div>
 
@@ -875,7 +1143,7 @@ async fn serve_index(State(state): State<AppState>) -> ([(axum::http::HeaderName
                 <button onclick="copyHostSecret()" class="btn" style="padding: 2px 6px; font-size: 0.75rem; background: transparent; border: 1px solid rgba(255,255,255,0.2);" title="Copiar clave">📋</button>
             </div>
 
-            <!-- Contadores de Usuarios tipo AnyDesk -->
+            <!-- Contadores de Usuarios de Sesión NxDesk -->
             <div class="status-pill" title="Visores web conectados viendo esta pantalla">
                 <span id="active-viewers-count">0</span> 👁️ Espectadores
             </div>
@@ -905,14 +1173,14 @@ async fn serve_index(State(state): State<AppState>) -> ([(axum::http::HeaderName
                     🗗 Salir de Pantalla Completa (ESC)
                 </button>
 
-                <!-- Banner de Sesión Remota Activa (tipo AnyDesk) -->
+                <!-- Banner de Sesión Remota Activa -->
                 <div id="active-session-banner" class="notice-banner" style="background: rgba(16, 185, 129, 0.95); color: #042f2e; top: 16px;">
-                    <span>🔴 Sesión activa con equipo remoto: <strong id="remote-peer-label">-</strong></span>
+                    <span>🔴 Sesión activa con nodo NxDesk: <strong id="remote-peer-label">-</strong></span>
                     <button class="btn btn-danger" style="margin-left: 12px; padding: 4px 10px; font-size: 0.8rem;" onclick="disconnectRemoteSession()">🔌 Desconectar</button>
                 </div>
 
                 <div id="localhost-notice" class="notice-banner">
-                    ⚠️ Modo Control activo en localhost: Para evitar bucles con tu cursor físico, se aplica filtro anti-rebote.
+                    🛡️ Modo Vista Activo en Localhost: Control remoto deshabilitado en esta máquina para prevenir bucles de cursor.
                 </div>
                 <canvas id="viewport"></canvas>
                 <div class="viewport-toolbar">
@@ -973,53 +1241,116 @@ async fn serve_index(State(state): State<AppState>) -> ([(axum::http::HeaderName
             </div>
         </div>
 
-        <!-- Tab 4: Explorador de Archivos -->
+        <!-- Tab 4: Explorador de Archivos Interactivo -->
         <div id="panel-files" class="view-panel">
             <div style="padding: 24px; overflow-y: auto;">
-                <h3 style="margin-bottom: 16px;">📂 Explorador de Archivos Seguro (Sandbox: Downloads/NxDeskShared)</h3>
-                <div id="files-list" style="background: var(--bg-surface); border-radius: 8px; border: 1px solid var(--border); padding: 16px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+                    <h3 style="margin: 0; font-size: 1.15rem; color: #f8fafc;">📂 Explorador de Archivos del Sistema</h3>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-sm btn-outline" onclick="goParentDirectory()">⬆️ Subir Nivel</button>
+                        <button class="btn btn-sm btn-outline" onclick="loadExplorerPath(currentExplorerPath)">🔄 Actualizar</button>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 8px; margin-bottom: 14px;">
+                    <input type="text" id="current-path-input" style="flex: 1; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; color: var(--text-main); font-family: monospace; font-size: 0.85rem;" placeholder="Ruta del sistema...">
+                    <button class="btn btn-sm btn-primary" onclick="loadExplorerPath(document.getElementById('current-path-input').value)">Ir</button>
+                </div>
+                <div id="files-list" style="background: var(--bg-surface); border-radius: 8px; border: 1px solid var(--border); padding: 8px; max-height: 520px; overflow-y: auto;">
                     Cargando archivos...
                 </div>
             </div>
         </div>
     </main>
 
+    <!-- Contenedor Toast para Notificaciones Seguras en Contextos HTTP y HTTPS -->
+    <div id="toast-container" style="position: fixed; bottom: 24px; right: 24px; z-index: 99999; display: flex; flex-direction: column; gap: 8px; pointer-events: none;"></div>
+
     <script>
         const canvas = document.getElementById('viewport');
         const ctx = canvas.getContext('2d', {{ alpha: false, desynchronized: true }});
         let ws;
         let isControlEnabled = false; // MODO SOLO LECTURA POR DEFECTO (Previene bucles de ratón)
+        let sessionToken = null;
         const isLocalhost = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
-        function toggleControlMode() {{
-            if (isLocalhost && !isControlEnabled) {{
-                const proceed = confirm("⚠️ AVISO DE PROTECCIÓN LOCALHOST (Bucle Recursivo):\n\nEstás visualizando la pantalla en la misma máquina anfitriona.\n\nSi activas el Control Remoto aquí, cualquier clic o movimiento dentro de este navegador se inyectará sobre tu propio escritorio, provocando que el ratón salte o duplique clics en bucle.\n\nEl modo control debe usarse conectándote desde OTRA máquina o dispositivo.\n\n¿Deseas activar el control de todas formas bajo tu propio riesgo?");
-                if (!proceed) return;
+        function showToast(msg, isWarn) {{
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+            const toast = document.createElement('div');
+            toast.style.background = isWarn ? '#78350f' : '#1e293b';
+            toast.style.border = isWarn ? '1px solid #d97706' : '1px solid #3b82f6';
+            toast.style.color = '#f8fafc';
+            toast.style.padding = '10px 16px';
+            toast.style.borderRadius = '8px';
+            toast.style.fontSize = '0.85rem';
+            toast.style.boxShadow = '0 10px 25px rgba(0,0,0,0.5)';
+            toast.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+            toast.style.pointerEvents = 'auto';
+            toast.textContent = msg;
+            container.appendChild(toast);
+            setTimeout(() => {{
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(10px)';
+                setTimeout(() => toast.remove(), 300);
+            }}, 3500);
+        }}
+
+        async function toggleControlMode() {{
+            if (isLocalhost) {{
+                showToast("🛡️ Control Remoto deshabilitado en Localhost para prevenir bucles de cursor. Conéctate desde otra PC o móvil para controlar este equipo.", true);
+                return;
+            }}
+            if (!isControlEnabled && !sessionToken) {{
+                const pw = prompt("🔒 Ingrese la contraseña de acceso del anfitrión para activar el control remoto:");
+                if (!pw) return;
+                try {{
+                    const res = await fetch('/api/auth', {{
+                        method: 'POST',
+                        headers: {{ 'Content-Type': 'application/json' }},
+                        body: JSON.stringify({{ password: pw, requested_role: 'FullControl' }})
+                    }});
+                    const data = await res.json();
+                    if (!data.success) {{
+                        showToast("❌ " + (data.error_message || "Contraseña incorrecta"), true);
+                        return;
+                    }}
+                    sessionToken = data.session_token;
+                    if (ws && ws.readyState === WebSocket.OPEN) {{
+                        ws.send(JSON.stringify({{ type: 'auth', token: sessionToken }}));
+                    }}
+                    showToast("✅ Autenticado exitosamente. Modo Control Remoto Activo.");
+                }} catch (err) {{
+                    showToast("❌ Error al autenticar: " + err.message, true);
+                    return;
+                }}
             }}
             isControlEnabled = !isControlEnabled;
             const btn = document.getElementById('btn-control-toggle');
-            const notice = document.getElementById('localhost-notice');
-
             if (isControlEnabled) {{
                 btn.className = 'btn btn-mode-control';
                 btn.textContent = '🕹️ Control Remoto Activo';
                 canvas.classList.add('control-active');
-                if (isLocalhost) {{
-                    notice.style.display = 'block';
-                }}
             }} else {{
                 btn.className = 'btn btn-mode-view';
                 btn.textContent = '👁️ Modo: Solo Vista';
                 canvas.classList.remove('control-active');
-                notice.style.display = 'none';
             }}
         }}
 
-        let isRenderingFrame = false;
         let currentActiveTab = 'screen';
-        let lastObjectUrl = null;
+        let latestFrameData = null;
+        let isRenderLoopActive = false;
 
-        function renderFrame(blob) {{
+        function processRenderQueue() {{
+            if (!latestFrameData) {{
+                isRenderLoopActive = false;
+                return;
+            }}
+
+            const frameBytes = latestFrameData;
+            latestFrameData = null; // Consume el fotograma más fresco, descartando cola acumulada (0ms delay)
+            const blob = new Blob([frameBytes], {{ type: 'image/jpeg' }});
+
             if (window.createImageBitmap) {{
                 createImageBitmap(blob).then(bitmap => {{
                     if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) {{
@@ -1027,17 +1358,13 @@ async fn serve_index(State(state): State<AppState>) -> ([(axum::http::HeaderName
                         canvas.height = bitmap.height;
                     }}
                     ctx.drawImage(bitmap, 0, 0);
-                    bitmap.close(); // Libera la memoria GPU y VRAM inmediatamente sin esperar al Garbage Collector
-                    isRenderingFrame = false;
+                    bitmap.close(); // Libera la memoria GPU y VRAM inmediatamente
+                    requestAnimationFrame(processRenderQueue);
                 }}).catch(() => {{
-                    isRenderingFrame = false;
+                    requestAnimationFrame(processRenderQueue);
                 }});
             }} else {{
-                if (lastObjectUrl) {{
-                    URL.revokeObjectURL(lastObjectUrl);
-                }}
                 const url = URL.createObjectURL(blob);
-                lastObjectUrl = url;
                 const img = new Image();
                 img.onload = function() {{
                     if (canvas.width !== img.width || canvas.height !== img.height) {{
@@ -1046,13 +1373,11 @@ async fn serve_index(State(state): State<AppState>) -> ([(axum::http::HeaderName
                     }}
                     ctx.drawImage(img, 0, 0);
                     URL.revokeObjectURL(url);
-                    if (lastObjectUrl === url) lastObjectUrl = null;
-                    isRenderingFrame = false;
+                    requestAnimationFrame(processRenderQueue);
                 }};
                 img.onerror = function() {{
                     URL.revokeObjectURL(url);
-                    if (lastObjectUrl === url) lastObjectUrl = null;
-                    isRenderingFrame = false;
+                    requestAnimationFrame(processRenderQueue);
                 }};
                 img.src = url;
             }}
@@ -1060,32 +1385,36 @@ async fn serve_index(State(state): State<AppState>) -> ([(axum::http::HeaderName
 
         function initWebSocket() {{
             const loc = window.location;
-            const wsUri = (loc.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + loc.host + '/ws/stream';
+            let wsUri = (loc.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + loc.host + '/ws/stream';
+            if (sessionToken) {{
+                wsUri += '?token=' + encodeURIComponent(sessionToken);
+            }}
             ws = new WebSocket(wsUri);
             ws.binaryType = 'arraybuffer';
 
             ws.onmessage = function(event) {{
                 if (typeof event.data === 'string') {{
                     const msg = JSON.parse(event.data);
-                    if (msg.type === 'terminal') {{
+                    if (msg.type === 'auth_required') {{
+                        showToast("🔒 " + msg.message, true);
+                    }} else if (msg.type === 'terminal') {{
                         const out = document.getElementById('term-out');
+                        const isAtBottom = (out.scrollHeight - out.scrollTop <= out.clientHeight + 80);
                         out.textContent += msg.data;
-                        out.scrollTop = out.scrollHeight;
+                        if (isAtBottom) {{
+                            out.scrollTop = out.scrollHeight;
+                        }}
                     }}
                 }} else {{
-                    // Optimización de Memoria (4 GB RAM / Reducción de 1.5 GB a < 50 MB):
-                    // 1. Descartar si el usuario no está viendo la pestaña de pantalla o la pestaña está oculta
                     if (currentActiveTab !== 'screen' || document.hidden) {{
                         return;
                     }}
-                    // 2. Control de congestión: si el fotograma anterior aún se está renderizando,
-                    // descartar el fotograma para evitar que se acumulen en el heap de V8/Chromium.
-                    if (isRenderingFrame) {{
-                        return;
+                    // Cola de retardo cero: Almacena siempre el fotograma más reciente y procesa con VSync
+                    latestFrameData = event.data;
+                    if (!isRenderLoopActive) {{
+                        isRenderLoopActive = true;
+                        requestAnimationFrame(processRenderQueue);
                     }}
-                    isRenderingFrame = true;
-                    const blob = new Blob([event.data], {{ type: 'image/jpeg' }});
-                    renderFrame(blob);
                 }}
             }};
 
@@ -1096,7 +1425,7 @@ async fn serve_index(State(state): State<AppState>) -> ([(axum::http::HeaderName
         }}
         initWebSocket();
 
-        // Conectar usando el Buscador AnyDesk (por ID o IP)
+        // Conectar usando el Buscador NxDesk (por ID o IP)
         async function connectTargetInput() {{
             const input = document.getElementById('target-search-input');
             const target = input.value.trim();
@@ -1180,10 +1509,10 @@ async fn serve_index(State(state): State<AppState>) -> ([(axum::http::HeaderName
             }}
         }}
 
-        // 3. Inyección Segura de Eventos de Ratón (Throttled & Control-Gated)
+        // 3. Inyección Segura de Eventos de Ratón (Throttled & Control-Gated & Anti-Bucle Localhost)
         let lastMoveTime = 0;
         canvas.addEventListener('mousemove', (e) => {{
-            if (!isControlEnabled || !ws || ws.readyState !== WebSocket.OPEN) return;
+            if (isLocalhost || !isControlEnabled || !ws || ws.readyState !== WebSocket.OPEN) return;
             const now = performance.now();
             if (now - lastMoveTime < 33) return; // Límite a ~30 eventos por segundo (anti-rebote)
             lastMoveTime = now;
@@ -1199,7 +1528,7 @@ async fn serve_index(State(state): State<AppState>) -> ([(axum::http::HeaderName
 
         let lastMouseDownTime = 0;
         canvas.addEventListener('mousedown', (e) => {{
-            if (!isControlEnabled || !ws || ws.readyState !== WebSocket.OPEN) return;
+            if (isLocalhost || !isControlEnabled || !ws || ws.readyState !== WebSocket.OPEN) return;
             const now = performance.now();
             if (now - lastMouseDownTime < 100) return; // Debounce 100ms para prevenir clics duplicados
             lastMouseDownTime = now;
@@ -1212,7 +1541,7 @@ async fn serve_index(State(state): State<AppState>) -> ([(axum::http::HeaderName
         }});
 
         canvas.addEventListener('mouseup', (e) => {{
-            if (!isControlEnabled || !ws || ws.readyState !== WebSocket.OPEN) return;
+            if (isLocalhost || !isControlEnabled || !ws || ws.readyState !== WebSocket.OPEN) return;
             const btn = e.button === 0 ? 'Left' : (e.button === 2 ? 'Right' : 'Middle');
             const rect = canvas.getBoundingClientRect();
             const x = (e.clientX - rect.left) / rect.width;
@@ -1225,7 +1554,7 @@ async fn serve_index(State(state): State<AppState>) -> ([(axum::http::HeaderName
         }});
 
         canvas.addEventListener('wheel', (e) => {{
-            if (!isControlEnabled || !ws || ws.readyState !== WebSocket.OPEN) return;
+            if (isLocalhost || !isControlEnabled || !ws || ws.readyState !== WebSocket.OPEN) return;
             e.preventDefault();
             const deltaY = e.deltaY < 0 ? 1.0 : -1.0;
             ws.send(JSON.stringify({{ Type: 'MouseWheel', DeltaY: deltaY }}));
@@ -1241,14 +1570,14 @@ async fn serve_index(State(state): State<AppState>) -> ([(axum::http::HeaderName
                     return;
                 }}
             }}
-            if (!isControlEnabled) return;
+            if (isLocalhost || !isControlEnabled) return;
             if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'SELECT') return;
             if (!ws || ws.readyState !== WebSocket.OPEN) return;
             ws.send(JSON.stringify({{ Type: 'KeyDown', Key: e.keyCode, KeyCode: e.code }}));
         }});
 
         window.addEventListener('keyup', (e) => {{
-            if (!isControlEnabled) return;
+            if (isLocalhost || !isControlEnabled) return;
             if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'SELECT') return;
             if (!ws || ws.readyState !== WebSocket.OPEN) return;
             ws.send(JSON.stringify({{ Type: 'KeyUp', Key: e.keyCode, KeyCode: e.code }}));
@@ -1270,10 +1599,32 @@ async fn serve_index(State(state): State<AppState>) -> ([(axum::http::HeaderName
 
                 if (data.is_localhost && data.host_password) {{
                     hostPasswordSecret = data.host_password;
+                    // Auto-autorizar terminal localmente para el anfitrión (dueño del equipo)
+                    isTerminalAllowed = true;
+                    updateTerminalUI(true);
+                    fetch('/api/terminal/auth', {{
+                        method: 'POST',
+                        headers: {{ 'Content-Type': 'application/json' }},
+                        body: JSON.stringify({{ enable: true, password: hostPasswordSecret }})
+                    }}).catch(() => {{}});
+
+                    fetch('/api/auth', {{
+                        method: 'POST',
+                        headers: {{ 'Content-Type': 'application/json' }},
+                        body: JSON.stringify({{ password: hostPasswordSecret, requested_role: 'Administrator' }})
+                    }}).then(r => r.json()).then(d => {{
+                        if (d.success) {{
+                            sessionToken = d.session_token;
+                            if (ws && ws.readyState === WebSocket.OPEN) {{
+                                ws.send(JSON.stringify({{ type: 'auth', token: sessionToken }}));
+                            }}
+                        }}
+                    }}).catch(() => {{}});
+
                     if (pill) pill.style.display = 'inline-flex';
-                    if (secMsg) secMsg.innerHTML = '👑 <strong>Modo Anfitrión Local:</strong> Tu clave maestra de control es <span id="term-host-pw-inline" style="font-family: monospace; color: #34d399; font-weight: bold;">••••••••</span>. No la reveles a clientes remotos no autorizados.';
+                    if (secMsg) secMsg.innerHTML = '👑 <strong>Modo Anfitrión Local:</strong> Terminal autorizada automáticamente con clave maestra.';
                     if (modeTag) {{
-                        modeTag.textContent = '👑 Anfitrión Local';
+                        modeTag.textContent = '👑 Anfitrión Autorizado';
                         modeTag.style.color = '#34d399';
                         modeTag.style.borderColor = '#10b981';
                     }}
@@ -1313,11 +1664,41 @@ async fn serve_index(State(state): State<AppState>) -> ([(axum::http::HeaderName
 
         function copyHostSecret() {{
             if (!hostPasswordSecret) return;
-            navigator.clipboard.writeText(hostPasswordSecret).then(() => {{
-                alert("📋 ¡Clave maestra del anfitrión copiada al portapapeles!");
-            }}).catch(() => {{
-                prompt("Copia manualmente tu clave maestra:", hostPasswordSecret);
-            }});
+            copyToClipboard(hostPasswordSecret, "📋 ¡Clave maestra del anfitrión copiada al portapapeles!");
+        }}
+
+        function copyToClipboard(text, successMsg) {{
+            if (navigator.clipboard && window.isSecureContext) {{
+                navigator.clipboard.writeText(text).then(() => {{
+                    showToast(successMsg || "📋 ¡Copiado al portapapeles!");
+                }}).catch(() => {{
+                    fallbackCopyText(text, successMsg);
+                }});
+            }} else {{
+                fallbackCopyText(text, successMsg);
+            }}
+        }}
+
+        function fallbackCopyText(text, successMsg) {{
+            try {{
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.position = 'fixed';
+                ta.style.left = '-9999px';
+                ta.style.top = '-9999px';
+                document.body.appendChild(ta);
+                ta.focus();
+                ta.select();
+                const ok = document.execCommand('copy');
+                document.body.removeChild(ta);
+                if (ok) {{
+                    showToast(successMsg || "📋 ¡Copiado al portapapeles!");
+                }} else {{
+                    prompt("Copia manualmente con Ctrl+C:", text);
+                }}
+            }} catch (e) {{
+                prompt("Copia manualmente con Ctrl+C:", text);
+            }}
         }}
 
         function clearTerminal() {{
@@ -1346,7 +1727,7 @@ async fn serve_index(State(state): State<AppState>) -> ([(axum::http::HeaderName
                 out.textContent += `\n> ${{trimmed}}\n`;
                 out.scrollTop = out.scrollHeight;
             }} else {{
-                alert("Conexión WebSocket no activa.");
+                showToast("⚠️ Conexión WebSocket no activa.", true);
             }}
         }}
 
@@ -1427,7 +1808,7 @@ async fn serve_index(State(state): State<AppState>) -> ([(axum::http::HeaderName
             const panel = document.getElementById('panel-' + name);
             if (panel) panel.classList.add('active');
             if (name === 'radar') refreshPeers();
-            if (name === 'files') refreshFiles();
+            if (name === 'files') loadExplorerPath(currentExplorerPath || '');
         }}
 
         function toggleFullscreen() {{
@@ -1481,17 +1862,84 @@ async fn serve_index(State(state): State<AppState>) -> ([(axum::http::HeaderName
             `).join('');
         }}
 
-        async function refreshFiles() {{
-            const res = await fetch('/api/files');
-            const data = await res.json();
+        let currentExplorerPath = '';
+
+        async function loadExplorerPath(targetPath) {{
             const list = document.getElementById('files-list');
-            list.innerHTML = `<strong>Ruta: ${{data.CurrentPath}}</strong><br><br>` + 
-                data.Items.map(item => `
-                    <div style="padding: 6px 0; border-bottom: 1px solid #1f2937; display: flex; justify-content: space-between;">
-                        <span>${{item.IsDirectory ? '📁 ' : '📄 '}}${{item.Name}}</span>
-                        <span style="color: var(--text-muted); font-size: 0.85rem;">${{item.IsDirectory ? '<DIR>' : (item.Size / 1024).toFixed(1) + ' KB'}}</span>
-                    </div>
-                `).join('');
+            list.innerHTML = '<div style="color: var(--text-muted); padding: 12px;">⏳ Explorando directorio...</div>';
+            try {{
+                let url = targetPath ? ('/api/files?path=' + encodeURIComponent(targetPath)) : '/api/files';
+                if (sessionToken) {{
+                    url += (url.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(sessionToken);
+                }}
+                const res = await fetch(url);
+                const data = await res.json();
+                currentExplorerPath = data.CurrentPath || '';
+
+                if (data.Error) {{
+                    list.innerHTML = `<div style="color: #ef4444; padding: 12px;">❌ Error: ${{data.Error}}</div>`;
+                    return;
+                }}
+
+                const inputPath = document.getElementById('current-path-input');
+                if (inputPath) inputPath.value = currentExplorerPath;
+
+                if (!data.Items || data.Items.length === 0) {{
+                    list.innerHTML = '<div style="color: var(--text-muted); padding: 12px;">📁 Esta carpeta está vacía.</div>';
+                    return;
+                }}
+
+                // Ordenar: primero carpetas, luego archivos
+                const sorted = [...data.Items].sort((a, b) => {{
+                    if (a.IsDirectory === b.IsDirectory) return a.Name.localeCompare(b.Name);
+                    return a.IsDirectory ? -1 : 1;
+                }});
+
+                list.innerHTML = sorted.map(item => {{
+                    const icon = item.IsDirectory ? '📁' : '📄';
+                    const sizeStr = item.IsDirectory ? '&lt;CARPETA&gt;' : formatBytes(item.Size);
+                    const itemPath = (currentExplorerPath.endsWith('/') || currentExplorerPath.endsWith('\\'))
+                        ? (currentExplorerPath + item.Name)
+                        : (currentExplorerPath + (currentExplorerPath.includes('/') ? '/' : '\\') + item.Name);
+                    const escapedPath = itemPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
+                    if (item.IsDirectory) {{
+                        return `
+                            <div class="file-row file-row-dir" onclick="loadExplorerPath('${{escapedPath}}')">
+                                <span class="file-name">📁 <strong>${{item.Name}}</strong></span>
+                                <span class="file-meta">${{sizeStr}}</span>
+                            </div>
+                        `;
+                    }} else {{
+                        return `
+                            <div class="file-row">
+                                <span class="file-name">📄 ${{item.Name}}</span>
+                                <span class="file-meta">${{sizeStr}}</span>
+                            </div>
+                        `;
+                    }}
+                }}).join('');
+            }} catch (e) {{
+                list.innerHTML = `<div style="color: #ef4444; padding: 12px;">❌ Error de conexión al cargar archivos: ${{e.message}}</div>`;
+            }}
+        }}
+
+        function goParentDirectory() {{
+            if (!currentExplorerPath) return;
+            const sep = currentExplorerPath.includes('/') ? '/' : '\\';
+            const parts = currentExplorerPath.split(sep).filter(p => p.length > 0);
+            if (parts.length <= 1) return;
+            parts.pop();
+            const parent = parts.join(sep) + (currentExplorerPath.startsWith(sep) ? sep : '');
+            loadExplorerPath(parent);
+        }}
+
+        function formatBytes(bytes) {{
+            if (!bytes || bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
         }}
 
         // Sondeo periódico del estado del nodo y contadores de usuarios
@@ -1532,7 +1980,10 @@ async fn serve_index(State(state): State<AppState>) -> ([(axum::http::HeaderName
 
     (
         [
-            (axum::http::header::CACHE_CONTROL, "no-cache, no-store, must-revalidate"),
+            (
+                axum::http::header::CACHE_CONTROL,
+                "no-cache, no-store, must-revalidate",
+            ),
             (axum::http::header::PRAGMA, "no-cache"),
         ],
         Html(html),

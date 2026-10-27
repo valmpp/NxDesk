@@ -18,9 +18,14 @@ const DANGEROUS_PATTERNS: &[&str] = &[
 ];
 
 /// Valida un comando contra la política de seguridad VUL-01
-pub fn validate_terminal_command(cmd: &str, is_admin_verified: bool) -> Result<String, &'static str> {
+pub fn validate_terminal_command(
+    cmd: &str,
+    is_admin_verified: bool,
+) -> Result<String, &'static str> {
     if !is_admin_verified {
-        return Err("Acceso denegado: el usuario no cuenta con privilegios de administrador autenticados.");
+        return Err(
+            "Acceso denegado: el usuario no cuenta con privilegios de administrador autenticados.",
+        );
     }
 
     let trimmed = cmd.trim();
@@ -211,7 +216,10 @@ mod tests {
         assert!(session.is_running());
 
         // Enviar un comando de prueba simple
-        session.write_input("echo test_output").await.expect("Write failed");
+        session
+            .write_input("echo test_output")
+            .await
+            .expect("Write failed");
 
         // Leer salida con timeout
         let read_result = tokio::time::timeout(std::time::Duration::from_secs(2), rx.recv()).await;

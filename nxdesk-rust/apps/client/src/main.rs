@@ -15,7 +15,7 @@ use tracing_subscriber::FmtSubscriber;
 /// Función de hash de muestreo ultrarrápido (64-bit FNV) para detectar cambios en la pantalla
 fn fast_frame_hash(data: &[u8]) -> u64 {
     let mut hash: u64 = 0xcbf29ce484222325;
-    let step = 64;
+    let step = 32;
     let mut i = 0;
     while i < data.len() {
         hash = hash.wrapping_mul(0x100000001b3);
@@ -77,7 +77,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let host_password = if let Some(ref pw) = config.access_password {
         pw.clone()
     } else {
-        let rand_val = (std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos() % 900000 + 100000) as u32;
+        let rand_val = (std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+            % 900000
+            + 100000) as u32;
         format!("NX-{}", rand_val)
     };
     config.access_password = Some(host_password.clone());
@@ -85,7 +90,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     info!("📌 ID de Dispositivo: {}", config.device_id);
     info!("💻 Alias del Nodo:    {}", config.device_alias);
     info!("🌐 Servidor Señales:  {}", config.signaling_server_url);
-    info!("🛡️ Terminal Remota:   {}", if config.allow_remote_terminal { "Habilitada (VUL-01 Verificada)" } else { "Bloqueada por Seguridad" });
+    info!(
+        "🛡️ Terminal Remota:   {}",
+        if config.allow_remote_terminal {
+            "Habilitada (VUL-01 Verificada)"
+        } else {
+            "Bloqueada por Seguridad"
+        }
+    );
     info!("==================================================");
     info!("   🔐  CLAVE MAESTRA ANFITRIÓN: [{}]", host_password);
     info!("   (Úsala para autorizar el uso de terminal remota)");
@@ -154,8 +166,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     let current_hash = fast_frame_hash(&frame.data);
                     if current_hash == last_frame_hash {
                         unchanged_count += 1;
-                        // Si la pantalla no cambia, emitir solo 1 fotograma de refresco por segundo (cada 30 ticks)
-                        if unchanged_count < 30 {
+                        // Si la pantalla no cambia, emitir fotograma de refresco cada 10 ticks (~300ms) para máxima reactividad
+                        if unchanged_count < 10 {
                             continue;
                         }
                     }
@@ -165,7 +177,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     // Convertir BGRA de Windows GDI a RGB reutilizando buffer en memoria (cero asignaciones)
                     frame.to_rgb_into(&mut rgb_buffer);
                     jpeg_bytes.clear();
-                    let mut encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg_bytes, 60);
+                    let mut encoder =
+                        image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg_bytes, 60);
                     if let Err(e) = encoder.encode(
                         &rgb_buffer,
                         frame.width,
@@ -198,8 +211,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     }
                 }
                 Err(e) => {
-                    static LAST_ERR: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-                    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs();
+                    static LAST_ERR: std::sync::atomic::AtomicU64 =
+                        std::sync::atomic::AtomicU64::new(0);
+                    let now = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs();
                     let last = LAST_ERR.load(std::sync::atomic::Ordering::Relaxed);
                     if now - last > 5 {
                         LAST_ERR.store(now, std::sync::atomic::Ordering::Relaxed);
@@ -216,10 +233,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let sig_url = config.signaling_server_url.clone();
 
     let sig_result = if explicit_server || connect_target.is_some() {
-        SignalingClient::connect(&sig_url).await.map_err(|e| e.to_string())
+        SignalingClient::connect(&sig_url)
+            .await
+            .map_err(|e| e.to_string())
     } else {
         // En modo local por defecto (Web Dashboard), probar conexión rápida sin bloquear ni emitir warnings
-        match tokio::time::timeout(Duration::from_millis(300), SignalingClient::connect(&sig_url)).await {
+        match tokio::time::timeout(
+            Duration::from_millis(300),
+            SignalingClient::connect(&sig_url),
+        )
+        .await
+        {
             Ok(Ok(pair)) => Ok(pair),
             _ => Err("standalone_local".to_string()),
         }
@@ -237,7 +261,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
             // Unirse a la sala propia
             let _ = client_arc.join_room(&my_id).await;
-            info!("🏠 Registrado en sala de anfitrión '{}'. Listo para recibir pares.", my_id);
+            info!(
+                "🏠 Registrado en sala de anfitrión '{}'. Listo para recibir pares.",
+                my_id
+            );
 
             // Conectar a par objetivo si se especificó por CLI
             if let Some(target) = connect_target {
@@ -255,36 +282,40 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                             let injector = state_events.input_injector.lock().await;
                             injector.inject(&input_evt);
                         }
-                        SignalingEvent::Message(msg) => {
-                            match msg.msg_type.as_str() {
-                                "terminal_cmd" => {
-                                    handle_incoming_terminal_cmd(&state_events, &msg.payload).await;
-                                }
-                                "file_chunk" => {
-                                    if let Ok(chunk) = serde_json::from_str::<nxdesk_core::FileChunk>(&msg.payload) {
-                                        let _ = state_events.file_manager.write_chunk(&chunk).await;
-                                    }
-                                }
-                                "select_screen" => {
-                                    if let Ok(idx) = msg.payload.parse::<i32>() {
-                                        info!("🖥️ [Señalización] Conmutando a monitor {} solicitado por par remoto.", idx);
-                                        let _ = state_events.select_screen(idx).await;
-                                    }
-                                }
-                                "frame" => {
-                                    if let Some(bytes) = msg.byte_data {
-                                        {
-                                            let mut latest = state_events.latest_jpeg_frame.write().await;
-                                            *latest = Some(bytes.clone());
-                                        }
-                                        let _ = state_events.frame_broadcast_tx.send(bytes);
-                                    }
-                                }
-                                other => {
-                                    info!("Mensaje de señalización recibido [{}]: {}", other, msg.payload);
+                        SignalingEvent::Message(msg) => match msg.msg_type.as_str() {
+                            "terminal_cmd" => {
+                                handle_incoming_terminal_cmd(&state_events, &msg.payload).await;
+                            }
+                            "file_chunk" => {
+                                if let Ok(chunk) =
+                                    serde_json::from_str::<nxdesk_core::FileChunk>(&msg.payload)
+                                {
+                                    let _ = state_events.file_manager.write_chunk(&chunk).await;
                                 }
                             }
-                        }
+                            "select_screen" => {
+                                if let Ok(idx) = msg.payload.parse::<i32>() {
+                                    info!("🖥️ [Señalización] Conmutando a monitor {} solicitado por par remoto.", idx);
+                                    let _ = state_events.select_screen(idx).await;
+                                }
+                            }
+                            "frame" => {
+                                if let Some(bytes) = msg.byte_data {
+                                    {
+                                        let mut latest =
+                                            state_events.latest_jpeg_frame.write().await;
+                                        *latest = Some(bytes.clone());
+                                    }
+                                    let _ = state_events.frame_broadcast_tx.send(bytes);
+                                }
+                            }
+                            other => {
+                                info!(
+                                    "Mensaje de señalización recibido [{}]: {}",
+                                    other, msg.payload
+                                );
+                            }
+                        },
                         SignalingEvent::RoomOccupancy(count) => {
                             state_events.set_room_occupancy(count);
                             info!("👥 Participantes activos en la sala: {}", count);
@@ -299,11 +330,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             });
         }
         Err(e) if e == "standalone_local" => {
-            info!("🌐 Modo Web Dashboard Autónomo (LAN / Web UI directa en http://localhost:{}).", config.web_port);
+            info!(
+                "🌐 Modo Web Dashboard Autónomo (LAN / Web UI directa en http://localhost:{}).",
+                config.web_port
+            );
             info!("ℹ️  (Para enlace multi-nodo vía servidor central, ejecute 'cargo run -p nxdesk-server').");
         }
         Err(e) => {
-            warn!("Servidor de señalización no disponible en {}: {}. Operando en modo LAN Dashboard.", sig_url, e);
+            warn!(
+                "Servidor de señalización no disponible en {}: {}. Operando en modo LAN Dashboard.",
+                sig_url, e
+            );
         }
     }
 
