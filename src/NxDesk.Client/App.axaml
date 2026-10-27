@@ -1,0 +1,62 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="NxDesk.Client.App"
+             xmlns:local="using:NxDesk.Client"
+             xmlns:controls="clr-namespace:NxDesk.Client.Controls"
+             RequestedThemeVariant="Default">
+             <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
+
+    <TrayIcon.Icons>
+        <TrayIcons>
+            <TrayIcon Icon="/Assets/icon.png" 
+                      ToolTipText="NxDesk - Remote Desktop"
+                      Clicked="TrayIcon_OnClicked">
+                <TrayIcon.Menu>
+                    <NativeMenu>
+                        <NativeMenuItem Header="Abrir NxDesk" Click="ToggleWindow_Click" />
+                        <NativeMenuItemSeparator />
+                        <NativeMenuItem Header="Salir" Click="Exit_Click" />
+                    </NativeMenu>
+                </TrayIcon.Menu>
+            </TrayIcon>
+        </TrayIcons>
+    </TrayIcon.Icons>
+
+    <Application.DataTemplates>
+        <local:ViewLocator/>
+    </Application.DataTemplates>
+  
+    <Application.Resources>
+        <ResourceDictionary>
+            <controls:BoolToControlTextConverter x:Key="BoolToControlTextConverter"/>
+            <controls:RemoteControlBrushConverter x:Key="RemoteControlBrushConverter"/>
+            <controls:ScreenSelectionConverter x:Key="ScreenSelectionConverter"/>
+            <controls:NullToBoolConverter x:Key="NullToBoolConverter" />
+            <controls:InverseBoolConverter x:Key="InverseBoolConverter" />
+            <controls:BoolToGridLengthConverter x:Key="BoolToGridLengthConverter" />
+            <controls:BoolToPathDataConverter x:Key="BoolToPathDataConverter" />
+            <controls:BoolToDoubleConverter x:Key="BoolToDoubleConverter" />
+            <controls:BoolToThicknessConverter x:Key="BoolToThicknessConverter" />
+            <controls:PeerStatusToBrushConverter x:Key="PeerStatusToBrushConverter" />
+            <controls:NotificationTypeToBrushConverter x:Key="NotificationTypeToBrushConverter" />
+
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Dark">
+                    <ResourceDictionary.MergedDictionaries>
+                        <ResourceInclude Source="/Styles/Dark.axaml" />
+                    </ResourceDictionary.MergedDictionaries>
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Light">
+                    <ResourceDictionary.MergedDictionaries>
+                        <ResourceInclude Source="/Styles/Light.axaml" />
+                    </ResourceDictionary.MergedDictionaries>
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+
+    <Application.Styles>
+        <FluentTheme />
+        <StyleInclude Source="/Styles/Styles.axaml" />
+    </Application.Styles>
+</Application>

@@ -1,0 +1,63 @@
+# .NET
+bin/
+obj/
+publish/
+*.user
+*.suo
+*.sln.docstates
+
+# Rust & Cargo
+target/
+**/target/
+nxdesk-rust/target/
+
+# Executables, Libraries & Native Binaries (Supply-Chain Risk Prevention)
+*.exe
+*.dll
+*.so
+*.dylib
+*.pdb
+*.lib
+*.a
+
+# Archives & Compressed Bundles & Media
+*.zip
+*.rar
+*.7z
+*.tar.gz
+*.tgz
+*.mp4
+dist/
+release/
+
+# IDE & Editors
+.idea/
+.vs/
+.vscode/
+*.swp
+*~
+
+# NxDesk runtime & logs
+nxdesk.log
+*.log
+portal_restore_token.txt
+
+# OS
+.DS_Store
+Thumbs.db
+
+# NuGet
+*.nupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+
+# Python venv
+.venv/
+__pycache__/
+*.pyc
+
+# Local IDE & Agent configurations (Keep local, exclude from remote repo)
+.agents/
+AGENTS.md
+GEMINI.md
+

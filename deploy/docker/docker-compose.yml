@@ -1,0 +1,51 @@
+version: '3.8'
+
+# ==============================================================================
+# NxDesk Stack: Servidor de Señalización + Caddy Reverse Proxy TLS Automático
+# ==============================================================================
+# Uso en producción:
+# 1. Configura tu dominio en Caddyfile (o variable DOMAIN)
+# 2. docker compose up -d
+# ==============================================================================
+
+services:
+  nxdesk-server:
+    build:
+      context: ../../
+      dockerfile: deploy/docker/Dockerfile.server
+    container_name: nxdesk-signaling-server
+    restart: always
+    environment:
+      - RUST_LOG=info
+    networks:
+      - nxdesk-net
+    ports:
+      - "127.0.0.1:5000:5000"
+
+  caddy-proxy:
+    image: caddy:2-alpine
+    container_name: nxdesk-caddy-proxy
+    restart: always
+    environment:
+      - NXDESK_DOMAIN=${NXDESK_DOMAIN:-localhost}
+      - SIGNALING_UPSTREAM=nxdesk-server:5000
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp" # HTTP/3 QUIC
+    volumes:
+      - ../caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - nxdesk-net
+    depends_on:
+      - nxdesk-server
+
+networks:
+  nxdesk-net:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:

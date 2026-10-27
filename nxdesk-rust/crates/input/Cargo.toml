@@ -1,0 +1,13 @@
+[package]
+name = "nxdesk-input"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+nxdesk-core = { path = "../core" }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.52", features = [
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_WindowsAndMessaging"
+] }

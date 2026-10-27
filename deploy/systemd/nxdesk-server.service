@@ -1,0 +1,45 @@
+[Unit]
+Description=NxDesk Multi-Room Signaling Server (Rust)
+Documentation=https://github.com/valmpp/NxDesk
+After=network.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=nxdesk
+Group=nxdesk
+WorkingDirectory=/opt/nxdesk
+ExecStart=/opt/nxdesk/nxdesk-server --bind 0.0.0.0:5000
+
+# Políticas de reinicio automático ante caídas
+Restart=always
+RestartSec=5s
+RestartPreventExitStatus=0
+
+# Descriptores de archivo elevados para soportar miles de conexiones concurrentes
+LimitNOFILE=65536
+
+# Variables de entorno
+Environment=RUST_LOG=info
+Environment=RUST_BACKTRACE=1
+
+# Registro centralizado en journald
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=nxdesk-server
+
+# Blindaje de Seguridad y Sandboxing de Proceso (Linux Kernel Hardening)
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,45 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    
+    <!-- Tema Claro - Moderno Blanco con Acentos Azul -->
+    <Color x:Key="ThemePrimaryColor">#2563EB</Color>
+    <Color x:Key="ThemeAccentColor">#3B82F6</Color>
+    
+    <!-- Fondos - Escala de blancos/grises muy claros -->
+    <SolidColorBrush x:Key="ThemeBackground" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="ThemeBackgroundSecondary" Color="#F8FAFC"/>
+    <SolidColorBrush x:Key="ThemeBackgroundTertiary" Color="#F1F5F9"/>
+    <SolidColorBrush x:Key="ThemeBackgroundDark" Color="#E2E8F0"/>
+    <SolidColorBrush x:Key="ThemeOverlayBackground" Color="#CCFFFFFF"/>
+    
+    <!-- Superficies - Cards y elementos elevados -->
+    <SolidColorBrush x:Key="ThemeSurface" Color="#F8FAFC"/>
+    <SolidColorBrush x:Key="ThemeSurfaceHover" Color="#E2E8F0"/>
+    <SolidColorBrush x:Key="ThemeSurfaceActive" Color="#CBD5E1"/>
+    
+    <!-- Bordes - Sutiles y elegantes -->
+    <SolidColorBrush x:Key="ThemeBorder" Color="#E2E8F0"/>
+    <SolidColorBrush x:Key="ThemeBorderLight" Color="#CBD5E1"/>
+    
+    <!-- Texto - Alta legibilidad -->
+    <SolidColorBrush x:Key="ThemeText" Color="#0F172A"/>
+    <SolidColorBrush x:Key="ThemeTextSecondary" Color="#334155"/>
+    <SolidColorBrush x:Key="ThemeTextMuted" Color="#64748B"/>
+    <SolidColorBrush x:Key="ThemeTextDisabled" Color="#94A3B8"/>
+    
+    <!-- Primarios - Azul vibrante moderno -->
+    <SolidColorBrush x:Key="ThemePrimary" Color="#2563EB"/>
+    <SolidColorBrush x:Key="ThemePrimaryHover" Color="#3B82F6"/>
+    <SolidColorBrush x:Key="ThemePrimaryActive" Color="#1D4ED8"/>
+    <SolidColorBrush x:Key="ThemePrimaryTransparent" Color="#402563EB"/>
+    
+    <!-- Estados -->
+    <SolidColorBrush x:Key="ThemeSuccess" Color="#16A34A"/>
+    <SolidColorBrush x:Key="ThemeError" Color="#DC2626"/>
+    <SolidColorBrush x:Key="ThemeWarning" Color="#F59E0B"/>
+    <SolidColorBrush x:Key="ThemeInfo" Color="#0EA5E9"/>
+    
+    <!-- Sombras -->
+    <Color x:Key="ThemeShadowColor">#94A3B8</Color>
+
+</ResourceDictionary>

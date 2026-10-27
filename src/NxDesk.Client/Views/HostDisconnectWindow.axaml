@@ -1,0 +1,166 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:NxDesk.Client.ViewModels"
+        x:Class="NxDesk.Client.Views.HostDisconnectWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="NxDesk - Sesión Activa"
+        Width="360" Height="280"
+        SystemDecorations="BorderOnly"
+        Topmost="True"
+        WindowStartupLocation="CenterScreen"
+        Background="Transparent"
+        TransparencyLevelHint="Transparent"
+        ShowInTaskbar="True"
+        CanResize="False">
+
+    <Border Background="{DynamicResource ThemeBackground}"
+            BorderBrush="{DynamicResource ThemeBorder}"
+            BorderThickness="1"
+            CornerRadius="16"
+            Margin="4"
+            BoxShadow="{DynamicResource ThemePremiumShadow}">
+        
+        <StackPanel>
+            
+            <!-- Title Bar -->
+            <Border Background="{DynamicResource ThemeBackgroundDark}" CornerRadius="16,16,0,0" Padding="16,10">
+                <Grid ColumnDefinitions="Auto, *, Auto">
+                    <!-- Live indicator -->
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
+                        <Panel Width="8" Height="8" VerticalAlignment="Center">
+                            <Ellipse Fill="{DynamicResource ThemeError}" Width="8" Height="8">
+                                <Ellipse.Styles>
+                                    <Style Selector="Ellipse">
+                                        <Style.Animations>
+                                            <Animation Duration="0:0:1.2" IterationCount="Infinite" PlaybackDirection="Alternate">
+                                                <KeyFrame Cue="0%">
+                                                    <Setter Property="Opacity" Value="0.3"/>
+                                                </KeyFrame>
+                                                <KeyFrame Cue="100%">
+                                                    <Setter Property="Opacity" Value="1.0"/>
+                                                </KeyFrame>
+                                            </Animation>
+                                        </Style.Animations>
+                                    </Style>
+                                </Ellipse.Styles>
+                            </Ellipse>
+                        </Panel>
+                        <TextBlock Text="Sesión Activa" 
+                                   Foreground="{DynamicResource ThemeTextMuted}" 
+                                   FontSize="12" 
+                                   FontWeight="SemiBold"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                    
+                    <!-- Connection Duration (centered) -->
+                    <TextBlock Grid.Column="1" 
+                               Text="{Binding ConnectionDuration}" 
+                               Foreground="{DynamicResource ThemeTextDisabled}"
+                               FontSize="12"
+                               FontFamily="Consolas, monospace"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"/>
+
+                    <!-- Minimize -->
+                    <Button Grid.Column="2" 
+                            Content="—"
+                            Click="Minimize_Click"
+                            Background="Transparent"
+                            Foreground="{DynamicResource ThemeTextDisabled}"
+                            FontSize="14"
+                            Padding="8,2"
+                            CornerRadius="4"
+                            VerticalAlignment="Center"
+                            Cursor="Hand"
+                            ToolTip.Tip="Minimizar">
+                        <Button.Styles>
+                            <Style Selector="Button:pointerover">
+                                <Setter Property="Background" Value="{DynamicResource ThemeSurface}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource ThemeTextSecondary}"/>
+                            </Style>
+                        </Button.Styles>
+                    </Button>
+                </Grid>
+            </Border>
+            
+            <!-- Main Content -->
+            <StackPanel Margin="20,16,20,20">
+                
+                <!-- Profile Section -->
+                <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,0,0,16">
+                    
+                    <!-- Avatar Circle -->
+                    <Border Width="56" Height="56" 
+                            CornerRadius="28"
+                            ClipToBounds="True">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                                <GradientStop Color="#4E9CFF" Offset="0"/>
+                                <GradientStop Color="#0066FF" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <!-- User Icon -->
+                        <Viewbox Width="28" Height="28" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <Path Fill="White" 
+                                  Data="M12,4A4,4 0 0,1 16,8A4,4 0 0,1 12,12A4,4 0 0,1 8,8A4,4 0 0,1 12,4M12,14C16.42,14 20,15.79 20,18V20H4V18C4,15.79 7.58,14 12,14Z"/>
+                        </Viewbox>
+                    </Border>
+                    
+                    <!-- Peer Info -->
+                    <StackPanel VerticalAlignment="Center" Spacing="3">
+                        <!-- PC Name (Alias) -->
+                        <TextBlock Text="{Binding ConnectedPeerAlias, FallbackValue='Esperando conexión...'}" 
+                                   Foreground="{DynamicResource ThemeText}" 
+                                   FontSize="16" 
+                                   FontWeight="Bold"/>
+                        
+                        
+                        <!-- IP Address (Admin Only) -->
+                        <TextBlock Foreground="{DynamicResource ThemeTextDisabled}" 
+                                   FontSize="11"
+                                   IsVisible="{Binding IsAdmin}">
+                            <TextBlock.Text>
+                                <MultiBinding StringFormat="IP: {0}">
+                                    <Binding Path="ConnectedPeerIp"/>
+                                </MultiBinding>
+                            </TextBlock.Text>
+                        </TextBlock>
+                    </StackPanel>
+                </StackPanel>
+                
+                <!-- Connection Duration Display -->
+                <Border Background="{DynamicResource ThemeBackgroundDark}" 
+                        CornerRadius="10" 
+                        Padding="14,10" 
+                        Margin="0,0,0,16">
+                    <Grid ColumnDefinitions="Auto, *, Auto">
+                        <TextBlock Grid.Column="0" 
+                                   Text="⏱  Tiempo conectado" 
+                                   Foreground="{DynamicResource ThemeTextMuted}" 
+                                   FontSize="12"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="2" 
+                                   Text="{Binding ConnectionDuration}" 
+                                   Foreground="{DynamicResource ThemePrimaryHover}" 
+                                   FontSize="18" 
+                                   FontWeight="Bold"
+                                   FontFamily="Consolas, monospace"
+                                   VerticalAlignment="Center"/>
+                    </Grid>
+                </Border>
+                
+                <!-- Disconnect Button (uses the theme's Disconnect style) -->
+                <Button Content="Finalizar conexión"
+                        Command="{Binding HostDisconnectCommand}"
+                        Classes="Disconnect"
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Center"
+                        Padding="0,10"
+                        FontSize="14"
+                        FontWeight="Bold"
+                        CornerRadius="10"/>
+                
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>

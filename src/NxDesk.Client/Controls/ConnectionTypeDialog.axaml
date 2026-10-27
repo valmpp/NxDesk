@@ -1,0 +1,152 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:NxDesk.Client.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="500" d:DesignHeight="400"
+             x:Class="NxDesk.Client.Controls.ConnectionTypeDialog"
+             x:DataType="vm:MainWindowViewModel">
+
+    <!-- Semi-transparent backdrop -->
+    <Border Background="#CC000000">
+        <Border Background="{DynamicResource ThemeBackground}"
+                CornerRadius="20"
+                MaxWidth="460"
+                MaxHeight="400"
+                Padding="30"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                BoxShadow="0 20 60 0 #80000000">
+            <StackPanel Spacing="20">
+
+                <!-- Header -->
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Tipo de Conexión"
+                               Foreground="{DynamicResource ThemeText}"
+                               FontSize="{DynamicResource FontSizeTitle}"
+                               FontWeight="Bold"
+                               HorizontalAlignment="Center"/>
+                    <TextBlock Text="{Binding PendingPeerAlias, StringFormat='Conectar a: {0}'}"
+                               Foreground="{DynamicResource ThemeTextSecondary}"
+                               FontSize="{DynamicResource AppFontSize}"
+                               HorizontalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- Connection Options -->
+                <StackPanel Spacing="12">
+                    <!-- Option 1: View Only (Default) -->
+                    <Border Name="ViewOnlyOption"
+                            Classes="ConnectionOptionCard"
+                            Classes.selected="{Binding !IsControlModeSelected}"
+                            CornerRadius="12"
+                            Padding="16"
+                            Cursor="Hand"
+                            PointerPressed="ViewOnly_Click">
+                        <Grid ColumnDefinitions="Auto, *, Auto">
+                            <!-- Eye Icon -->
+                            <Border Background="{DynamicResource ThemePrimaryTransparent}"
+                                    CornerRadius="10"
+                                    Width="44" Height="44"
+                                    VerticalAlignment="Center">
+                                <Path Data="M12,9A3,3 0 0,0 9,12A3,3 0 0,0 12,15A3,3 0 0,0 15,12A3,3 0 0,0 12,9M12,17A5,5 0 0,1 7,12A5,5 0 0,1 12,7A5,5 0 0,1 17,12A5,5 0 0,1 12,17M12,4.5C7,4.5 2.73,7.61 1,12C2.73,16.39 7,19.5 12,19.5C17,19.5 21.27,16.39 23,12C21.27,7.61 17,4.5 12,4.5Z"
+                                      Fill="{DynamicResource ThemePrimary}"
+                                      Stretch="Uniform"
+                                      Width="22" Height="22"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center">
+                                <TextBlock Text="Vista sin manipular"
+                                           Foreground="{DynamicResource ThemeText}"
+                                           FontSize="{DynamicResource FontSizeLarge}"
+                                           FontWeight="SemiBold"/>
+                                <TextBlock Text="Solo observar el escritorio remoto"
+                                           Foreground="{DynamicResource ThemeTextSecondary}"
+                                           FontSize="{DynamicResource FontSizeSmall}"/>
+                            </StackPanel>
+                            <!-- Check icon -->
+                            <Path Grid.Column="2"
+                                  Data="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"
+                                  Fill="{DynamicResource ThemePrimary}"
+                                  Stretch="Uniform"
+                                  Width="18" Height="18"
+                                  VerticalAlignment="Center"
+                                  IsVisible="{Binding !IsControlModeSelected}"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Option 2: View with Control -->
+                    <Border Name="ControlOption"
+                            Classes="ConnectionOptionCard"
+                            Classes.selected="{Binding IsControlModeSelected}"
+                            IsVisible="{Binding IsAdmin}"
+                            CornerRadius="12"
+                            Padding="16"
+                            Cursor="Hand"
+                            PointerPressed="Control_Click">
+                        <Grid ColumnDefinitions="Auto, *, Auto">
+                            <!-- Cursor Icon -->
+                            <Border Background="{DynamicResource ThemePrimaryTransparent}"
+                                    CornerRadius="10"
+                                    Width="44" Height="44"
+                                    VerticalAlignment="Center">
+                                <Path Data="M13.64,21.97C13.14,22.21 12.54,22 12.31,21.5L10.13,16.76L7.62,18.78C7.45,18.92 7.24,19 7,19A1,1 0 0,1 6,18V3A1,1 0 0,1 7,2C7.24,2 7.47,2.09 7.64,2.23L7.65,2.22L19.14,11.86C19.57,12.22 19.31,12.92 18.77,12.92L14.78,12.92L16.95,17.65C17.18,18.15 16.97,18.75 16.47,18.97L13.64,21.97Z"
+                                      Fill="{DynamicResource ThemePrimary}"
+                                      Stretch="Uniform"
+                                      Width="22" Height="22"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel Grid.Column="1" Margin="14,0,0,0" VerticalAlignment="Center">
+                                <TextBlock Text="Vista con manipulación"
+                                           Foreground="{DynamicResource ThemeText}"
+                                           FontSize="{DynamicResource FontSizeLarge}"
+                                           FontWeight="SemiBold"/>
+                                <TextBlock Text="Controlar el escritorio remoto"
+                                           Foreground="{DynamicResource ThemeTextSecondary}"
+                                           FontSize="{DynamicResource FontSizeSmall}"/>
+                            </StackPanel>
+                            <!-- Check icon -->
+                            <Path Grid.Column="2"
+                                  Data="M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z"
+                                  Fill="{DynamicResource ThemePrimary}"
+                                  Stretch="Uniform"
+                                  Width="18" Height="18"
+                                  VerticalAlignment="Center"
+                                  IsVisible="{Binding IsControlModeSelected}"/>
+                        </Grid>
+                    </Border>
+                </StackPanel>
+
+                <!-- Action Buttons -->
+                <Grid ColumnDefinitions="*, Auto, Auto" Margin="0,8,0,0">
+                    <Button Grid.Column="1"
+                            Content="Cancelar"
+                            Background="Transparent"
+                            Foreground="{DynamicResource ThemeTextSecondary}"
+                            BorderThickness="0"
+                            Padding="20,10"
+                            FontSize="{DynamicResource AppFontSize}"
+                            Cursor="Hand"
+                            Command="{Binding CancelConnectionDialogCommand}"
+                            Margin="0,0,10,0"/>
+                    <Button Grid.Column="2"
+                            Classes="Modern"
+                            Padding="24,10"
+                            Command="{Binding ConfirmConnectionCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Path Data="M12,4l-1.41,1.41L16.17,11H4v2h12.17l-5.58,5.59L12,20l8-8L12,4z"
+                                  Fill="White"
+                                  Stretch="Uniform"
+                                  Width="14" Height="14"
+                                  VerticalAlignment="Center"/>
+                            <TextBlock Text="Conectar"
+                                       FontWeight="SemiBold"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </Grid>
+            </StackPanel>
+        </Border>
+    </Border>
+</UserControl>

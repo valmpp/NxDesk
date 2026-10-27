@@ -1,0 +1,167 @@
+name: Production CI/CD & Automated Release
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      publish_release:
+        description: 'Publicar Release en GitHub'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  # --------------------------------------------------------------------------
+  # 1. Validación de Calidad y Pruebas
+  # --------------------------------------------------------------------------
+  test-and-lint:
+    name: Lint & Unit Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    steps:
+      - name: Checkout del Repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar Rust Toolchain Estable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache de Dependencias Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: nxdesk-rust
+
+      - name: Verificar Formato y Linter
+        working-directory: nxdesk-rust
+        run: |
+          cargo check --workspace
+          cargo clippy --workspace -- -D warnings
+
+      - name: Ejecutar Pruebas Unitarias
+        working-directory: nxdesk-rust
+        run: cargo test --workspace
+
+  # --------------------------------------------------------------------------
+  # 2. Compilación de Binarios de Producción para Windows
+  # --------------------------------------------------------------------------
+  build-windows:
+    name: Build Release Windows (x64)
+    needs: test-and-lint
+    runs-on: windows-latest
+    steps:
+      - name: Checkout del Repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar Rust Toolchain Estable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache de Dependencias Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: nxdesk-rust
+
+      - name: Compilar Workspace en Modo Release
+        working-directory: nxdesk-rust
+        run: cargo build --release --workspace
+
+      - name: Empaquetar Binarios para Distribución
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist/windows-x64
+          Copy-Item nxdesk-rust/target/release/nxdesk-client.exe dist/windows-x64/
+          Copy-Item nxdesk-rust/target/release/nxdesk-server.exe dist/windows-x64/
+          if (Test-Path deploy/windows/install-service-nssm.ps1) {
+              Copy-Item deploy/windows/*.ps1 dist/windows-x64/
+          }
+          if (Test-Path README.md) {
+              Copy-Item README.md dist/windows-x64/
+          }
+          Compress-Archive -Path dist/windows-x64/* -DestinationPath dist/nxdesk-windows-x64.zip -Force
+
+      - name: Subir Artefacto Windows
+        uses: actions/upload-artifact@v4
+        with:
+          name: nxdesk-windows-x64
+          path: dist/nxdesk-windows-x64.zip
+          retention-days: 14
+
+  # --------------------------------------------------------------------------
+  # 3. Compilación de Servidor de Señalización para Linux
+  # --------------------------------------------------------------------------
+  build-linux:
+    name: Build Release Linux (x64)
+    needs: test-and-lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del Repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar Rust Toolchain Estable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache de Dependencias Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: nxdesk-rust
+
+      - name: Compilar Servidor de Señalización en Linux
+        working-directory: nxdesk-rust
+        run: cargo build --release -p nxdesk-server
+
+      - name: Empaquetar Binario Linux
+        run: |
+          mkdir -p dist/linux-x64
+          cp nxdesk-rust/target/release/nxdesk-server dist/linux-x64/
+          cp -r deploy/caddy dist/linux-x64/ 2>/dev/null || true
+          cp -r deploy/systemd dist/linux-x64/ 2>/dev/null || true
+          tar -czvf dist/nxdesk-server-linux-x64.tar.gz -C dist/linux-x64 .
+
+      - name: Subir Artefacto Linux
+        uses: actions/upload-artifact@v4
+        with:
+          name: nxdesk-server-linux-x64
+          path: dist/nxdesk-server-linux-x64.tar.gz
+          retention-days: 14
+
+  # --------------------------------------------------------------------------
+  # 4. Publicar Release Oficial en GitHub (al etiquetar con tag v* o manual)
+  # --------------------------------------------------------------------------
+  publish-release:
+    name: Publicar GitHub Release
+    needs: [build-windows, build-linux]
+    if: startsWith(github.ref, 'refs/tags/v') || github.event.inputs.publish_release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar Artefactos Windows
+        uses: actions/download-artifact@v4
+        with:
+          name: nxdesk-windows-x64
+          path: artifacts/
+
+      - name: Descargar Artefactos Linux
+        uses: actions/download-artifact@v4
+        with:
+          name: nxdesk-server-linux-x64
+          path: artifacts/
+
+      - name: Crear Release en GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/nxdesk-windows-x64.zip
+            artifacts/nxdesk-server-linux-x64.tar.gz
+          generate_release_notes: true
+          draft: false
+          prerelease: false

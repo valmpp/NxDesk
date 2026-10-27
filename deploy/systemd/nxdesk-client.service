@@ -1,0 +1,30 @@
+[Unit]
+Description=NxDesk Host Screen Sharing & Web Dashboard Daemon
+Documentation=https://github.com/valmpp/NxDesk
+After=network.target network-online.target graphical.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=nxdesk
+Group=nxdesk
+WorkingDirectory=/opt/nxdesk
+# Se ejecuta con autocompartición y puerto web configurable
+ExecStart=/opt/nxdesk/nxdesk-client --share --web-port 8080 --server ws://127.0.0.1:5000/signalinghub
+
+# Reinicio automático en caso de fallo
+Restart=always
+RestartSec=5s
+
+# Descriptores de archivos y logging
+LimitNOFILE=32768
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=nxdesk-client
+
+# Sandboxing
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

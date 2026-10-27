@@ -1,0 +1,70 @@
+# ==============================================================================
+# NxDesk Caddy Configuration (Producción con TLS / HTTPS / WSS Automático)
+# ==============================================================================
+# Caddy gestiona automáticamente certificados SSL/TLS con Let's Encrypt / ZeroSSL,
+# renovación periódica, redirección forzada de HTTP -> HTTPS y WebSockets (WSS).
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# OPCIÓN A: Monodominio (Rutas unificadas para Web Dashboard y Señalización)
+# ------------------------------------------------------------------------------
+# Configuración dinámica: soporta variable NXDESK_DOMAIN o localhost por defecto
+{$NXDESK_DOMAIN:localhost} {
+    # Compresión gzip y zstd para respuestas HTTP
+    encode zstd gzip
+
+    # Encabezados de seguridad recomendados para producción
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
+    # 1. Enrutamiento del Hub de Señalización WebSocket (nxdesk-server :5000)
+    @signaling {
+        path /signalinghub*
+    }
+    reverse_proxy @signaling {$SIGNALING_UPSTREAM:127.0.0.1:5000} {
+        # Optimización de buffer para tráfico en tiempo real sin retardo
+        flush_interval -1
+    }
+
+    # 2. Sonda de salud para balanceadores y monitoreo (Health Check)
+    @health {
+        path /health*
+    }
+    reverse_proxy @health {$SIGNALING_UPSTREAM:127.0.0.1:5000}
+
+    # 3. Enrutamiento del Web Dashboard y Stream WebSocket (nxdesk-client :8080)
+    reverse_proxy {$WEB_UPSTREAM:127.0.0.1:8080} {
+        flush_interval -1
+    }
+
+    # Registro de accesos estructurado en formato JSON
+    log {
+        output file /var/log/caddy/nxdesk_access.log {
+            roll_size 50mb
+            roll_keep 5
+        }
+    }
+}
+
+# ------------------------------------------------------------------------------
+# OPCIÓN B: Subdominios Dedicados (Opcional, descomentar si prefieres subdominios)
+# ------------------------------------------------------------------------------
+#
+# # Panel Web y Streaming del Host (https://remote.tu-dominio.com)
+# remote.tu-dominio.com {
+#     reverse_proxy 127.0.0.1:8080 {
+#         flush_interval -1
+#     }
+# }
+#
+# # Servidor de Señalización Multi-Sala (wss://signal.tu-dominio.com)
+# signal.tu-dominio.com {
+#     reverse_proxy 127.0.0.1:5000 {
+#         flush_interval -1
+#     }
+# }

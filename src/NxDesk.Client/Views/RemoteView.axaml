@@ -1,0 +1,73 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:local="clr-namespace:NxDesk.Client.Controls"
+             xmlns:vm="using:NxDesk.Client.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="1020" d:DesignHeight="691"
+             x:Class="NxDesk.Client.Views.RemoteView"
+             x:DataType="vm:MainWindowViewModel">
+    <UserControl.Resources>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <!-- Video Panel -->
+        <Border Grid.Column="0"
+                Background="#121212" ClipToBounds="True" 
+                PointerMoved="OnPointerMoved"
+                PointerPressed="OnPointerPressed"
+                PointerReleased="OnPointerReleased"
+                PointerWheelChanged="OnPointerWheelChanged"
+                Focusable="True"
+                KeyDown="OnKeyDown">
+            <Panel Background="Transparent">
+                <Image Name="VideoImage"
+                       Stretch="Uniform"
+                       Cursor="Arrow"/>
+                
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center"
+                            IsVisible="{Binding Source, ElementName=VideoImage, Converter={StaticResource NullToBoolConverter}}">
+                    <ProgressBar IsIndeterminate="True" Width="200" Margin="0,0,0,20" Foreground="#007ACC"/>
+                    <TextBlock Text="Esperando señal del Host..." 
+                               FontSize="18" FontWeight="SemiBold"
+                               HorizontalAlignment="Center" Foreground="White"/>
+                    <TextBlock Text="Acepta el diálogo de GNOME en el Host si es necesario." 
+                               FontSize="13" 
+                               HorizontalAlignment="Center" Foreground="#AAAAAA" Margin="0,10,0,0"/>
+                </StackPanel>
+
+                <!-- Read-Only Overlay -->
+                <Border Background="#80000000" IsVisible="{Binding !IsRemoteControlEnabled}" 
+                        VerticalAlignment="Top" HorizontalAlignment="Right" 
+                        Margin="20" Padding="12,6" CornerRadius="20"
+                        BorderBrush="#40FFFFFF" BorderThickness="1">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Path Data="M12,17C10.89,17 10,16.1 10,15C10,13.89 10.89,13 12,13A2,2 0 0,1 14,15A2,2 0 0,1 12,17M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6A2,2 0 0,1 4,20V10C4,8.89 4.89,8 6,8H7V6A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,3A3,3 0 0,0 9,6V8H15V6A3,3 0 0,0 12,3Z" 
+                              Fill="#FFCC00" Width="14" Height="14" Stretch="Uniform"/>
+                        <TextBlock Text="SÓLO LECTURA" Foreground="White" FontSize="11" FontWeight="Bold" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Screen Locked Indicator -->
+                <Border Background="#80D32F2F" IsVisible="{Binding IsScreenLocked}" 
+                        VerticalAlignment="Top" HorizontalAlignment="Right" 
+                        Margin="20,50,20,0" Padding="12,6" CornerRadius="20"
+                        BorderBrush="#40FFFFFF" BorderThickness="1">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Path Data="M21,21H3V3H21V21M19,13H13V19H19V13M11,19V13H5V19H11M19,5H13V11H19V5M11,11V5H5V11H11Z" 
+                              Fill="#FF5252" Width="14" Height="14" Stretch="Uniform"/>
+                        <TextBlock Text="BLOQUEADA" Foreground="White" FontSize="11" FontWeight="Bold" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+            </Panel>
+        </Border>
+
+        <!-- Terminal Panel -->
+        <local:TerminalPanelControl Grid.Column="1"
+                                     IsVisible="{Binding IsTerminalVisible}"/>
+    </Grid>
+</UserControl>

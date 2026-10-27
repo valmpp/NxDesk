@@ -1,0 +1,333 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:NxDesk.Client.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:converters="clr-namespace:NxDesk.Client.Converters"
+        mc:Ignorable="d" d:DesignWidth="850" d:DesignHeight="600"
+        x:Class="NxDesk.Client.Views.SettingsWindow"
+        x:DataType="vm:SettingsViewModel"
+        Title="Configuración"
+        Width="850" Height="600"
+        WindowStartupLocation="CenterOwner"
+        TransparencyLevelHint="Transparent"
+        Background="Transparent"
+        SystemDecorations="None"
+        ExtendClientAreaToDecorationsHint="True">
+
+    <Window.Resources>
+        <converters:EqualsIntConverter x:Key="EqualsIntConverter"/>
+    </Window.Resources>
+
+    <Border Name="MainBorder" 
+            CornerRadius="24" 
+            Background="{DynamicResource ThemeBackground}" 
+            Margin="12"
+            BoxShadow="{DynamicResource ThemePremiumShadow}"
+            BorderBrush="{DynamicResource ThemeBorder}"
+            BorderThickness="1">
+        
+        <Grid ColumnDefinitions="240, *" RowDefinitions="*">
+            
+
+            <!-- Sidebar (Premium Glassmorphism) -->
+            <Border Grid.Column="0" 
+                    Background="{DynamicResource ThemeBackgroundSecondary}" 
+                    CornerRadius="24,0,0,24" 
+                    BorderBrush="{DynamicResource ThemeBorder}"
+                    BorderThickness="0,0,1,0">
+                <Grid RowDefinitions="Auto, *">
+                    <!-- Sidebar Header -->
+                    <StackPanel Margin="28,45,28,35">
+                        <TextBlock Text="{DynamicResource S_Settings_Title}" 
+                                   FontSize="11" 
+                                   FontWeight="SemiBold" 
+                                   LetterSpacing="2" 
+                                   Foreground="{DynamicResource ThemeTextMuted}"
+                                   Opacity="0.6"/>
+                        <TextBlock Text="{DynamicResource S_Settings_Preferences}" 
+                                   FontSize="{DynamicResource FontSizeTitle}" 
+                                   FontWeight="Bold" 
+                                   Foreground="{DynamicResource ThemeText}"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
+                                   Margin="0,8,0,0"/>
+                    </StackPanel>
+
+                    <!-- Navigation Items -->
+                    <ListBox Name="TabList" Grid.Row="1" Background="Transparent" BorderThickness="0" SelectedIndex="0" Margin="15,0">
+                        <ListBox.Styles>
+                            <Style Selector="ListBoxItem">
+                                <Setter Property="Padding" Value="16,14"/>
+                                <Setter Property="CornerRadius" Value="14"/>
+                                <Setter Property="Margin" Value="0,3"/>
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="Cursor" Value="Hand"/>
+                            </Style>
+                            <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
+                                <Setter Property="Background" Value="{DynamicResource ThemePrimaryGradient}"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Style>
+                            <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
+                                <Setter Property="Opacity" Value="0.8"/>
+                            </Style>
+                        </ListBox.Styles>
+                        
+                        <ListBoxItem>
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <TextBlock Text="🎨" FontSize="16"/>
+                                <TextBlock Text="{DynamicResource S_Settings_Appearance}" VerticalAlignment="Center" FontWeight="Medium"/>
+                            </StackPanel>
+                        </ListBoxItem>
+                        <ListBoxItem IsEnabled="False" Opacity="0.4">
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <TextBlock Text="🕒" FontSize="16"/>
+                                <TextBlock Text="{DynamicResource S_Settings_Session}" VerticalAlignment="Center" FontWeight="Medium"/>
+                            </StackPanel>
+                        </ListBoxItem>
+                        <ListBoxItem IsEnabled="False" Opacity="0.4">
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <TextBlock Text="🛡️" FontSize="16"/>
+                                <TextBlock Text="{DynamicResource S_Settings_Security}" VerticalAlignment="Center" FontWeight="Medium"/>
+                            </StackPanel>
+                        </ListBoxItem>
+                    </ListBox>
+
+
+                </Grid>
+            </Border>
+
+            <!-- Main Content Area -->
+            <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
+                <Panel Margin="50,50,50,50">
+                    
+                    <!-- Appearance Panel -->
+                    <StackPanel IsVisible="{Binding #TabList.SelectedIndex, Converter={StaticResource EqualsIntConverter}, ConverterParameter=0}" Spacing="40">
+                        <StackPanel>
+                            <TextBlock Text="{DynamicResource S_Settings_Appearance}" 
+                                       FontSize="28" 
+                                       FontWeight="Bold" 
+                                       Foreground="{DynamicResource ThemeText}"/>
+                            <TextBlock Text="Personaliza el aspecto de tu aplicación" 
+                                       FontSize="15" 
+                                       Foreground="{DynamicResource ThemeTextMuted}" 
+                                       Opacity="0.8"
+                                       Margin="0,8,0,0"/>
+                        </StackPanel>
+
+                        <!-- Theme Selection -->
+                        <Border Background="{DynamicResource ThemeBackgroundSecondary}" 
+                                CornerRadius="18" 
+                                Padding="28" 
+                                BoxShadow="{DynamicResource ThemeSubtleShadow}">
+                            <DockPanel LastChildFill="False">
+                                <StackPanel>
+                                    <TextBlock Text="{DynamicResource S_Settings_ThemeDark}" 
+                                               FontWeight="SemiBold" 
+                                               FontSize="17" 
+                                               Foreground="{DynamicResource ThemeText}"/>
+                                    <TextBlock Text="{DynamicResource S_Settings_ThemeDesc}" 
+                                               FontSize="14" 
+                                               Foreground="{DynamicResource ThemeTextMuted}" 
+                                               Opacity="0.8"
+                                               Margin="0,6,0,0"/>
+                                </StackPanel>
+                                <ToggleSwitch DockPanel.Dock="Right" 
+                                              IsChecked="{Binding IsDarkTheme}" 
+                                              OnContent="" 
+                                              OffContent="" 
+                                              VerticalAlignment="Center"/>
+                            </DockPanel>
+                        </Border>
+
+                        <!-- Language Selection -->
+                        <Border Background="{DynamicResource ThemeBackgroundSecondary}" CornerRadius="20" Padding="25" BoxShadow="{DynamicResource ThemeSubtleShadow}">
+                            <DockPanel LastChildFill="False">
+                                <StackPanel>
+                                    <TextBlock Text="{DynamicResource S_Settings_Language}" FontWeight="SemiBold" FontSize="{DynamicResource FontSizeLarge}" Foreground="{DynamicResource ThemeText}"/>
+                                    <TextBlock Text="{DynamicResource S_Settings_LanguageDesc}" FontSize="{DynamicResource FontSizeSmall}" Foreground="{DynamicResource ThemeTextMuted}" Margin="0,4,0,0"/>
+                                </StackPanel>
+                                <ComboBox DockPanel.Dock="Right" Width="170" Height="40" VerticalAlignment="Center" 
+                                          ItemsSource="{Binding Languages}" 
+                                          SelectedIndex="{Binding SelectedLanguageIndex}"
+                                          CornerRadius="20"
+                                          BorderThickness="1"
+                                          BorderBrush="{DynamicResource ThemeBorder}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding}" VerticalAlignment="Center" FontSize="13"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </DockPanel>
+                        </Border>
+
+                        <!-- Font Size Selection -->
+                        <Border Background="{DynamicResource ThemeBackgroundSecondary}" CornerRadius="20" Padding="25" BoxShadow="{DynamicResource ThemeSubtleShadow}">
+                            <DockPanel LastChildFill="False">
+                                <StackPanel>
+                                    <TextBlock Text="{DynamicResource S_Settings_FontSize}" FontWeight="SemiBold" FontSize="{DynamicResource FontSizeLarge}" Foreground="{DynamicResource ThemeText}"/>
+                                    <TextBlock Text="{DynamicResource S_Settings_FontSizeDesc}" FontSize="{DynamicResource FontSizeSmall}" Foreground="{DynamicResource ThemeTextMuted}" Margin="0,4,0,0"/>
+                                </StackPanel>
+                                <ComboBox DockPanel.Dock="Right" Width="170" Height="40" VerticalAlignment="Center"
+                                          ItemsSource="{Binding FontSizes}"
+                                          SelectedIndex="{Binding SelectedFontSizeIndex}"
+                                          CornerRadius="20"
+                                          BorderThickness="1"
+                                          BorderBrush="{DynamicResource ThemeBorder}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding}" VerticalAlignment="Center" FontSize="13"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </DockPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- Session Panel -->
+                    <StackPanel IsVisible="{Binding #TabList.SelectedIndex, Converter={StaticResource EqualsIntConverter}, ConverterParameter=1}" Spacing="35">
+                        <StackPanel>
+                            <TextBlock Text="{DynamicResource S_Settings_Session}" FontSize="{DynamicResource FontSizeTitle}" FontWeight="Bold" Foreground="{DynamicResource ThemeText}"/>
+                            <TextBlock Text="{DynamicResource S_Settings_Session_Desc}" FontSize="{DynamicResource FontSizeNormal}" Foreground="{DynamicResource ThemeTextMuted}" Margin="0,5,0,0"/>
+                        </StackPanel>
+
+                        <Border Background="{DynamicResource ThemeBackgroundSecondary}" CornerRadius="20" Padding="25" BoxShadow="{DynamicResource ThemeSubtleShadow}">
+                            <StackPanel Spacing="20">
+                                <DockPanel LastChildFill="False">
+                                    <TextBlock Text="{DynamicResource S_Settings_History}" FontWeight="SemiBold" FontSize="{DynamicResource FontSizeLarge}" Foreground="{DynamicResource ThemeText}"/>
+                                    <Button DockPanel.Dock="Right" Classes="ModernIcon" ToolTip.Tip="{DynamicResource S_Settings_Clear}">
+                                        <Path Data="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z" 
+                                              Fill="{DynamicResource ThemeError}" 
+                                              Stretch="Uniform" 
+                                              Width="16" Height="16"/>
+                                    </Button>
+                                </DockPanel>
+
+                                <StackPanel Spacing="12">
+                                    <!-- History Detail Item 1 -->
+                                    <Border Background="{DynamicResource ThemeBackground}" CornerRadius="16" Padding="15">
+                                        <Grid ColumnDefinitions="Auto, *, Auto">
+                                            <!-- Icon -->
+                                            <Border Grid.Column="0" Width="42" Height="42" CornerRadius="12" Background="{DynamicResource ThemeBackgroundSecondary}" Margin="0,0,15,0">
+                                                <Path Data="M21,16H3V4H21M21,2H3C1.89,2 1,2.89 1,4V16A2,2 0 0,0 3,18H10V20H8V22H16V20H14V18H21A2,2 0 0,0 23,16V4C23,2.89 22.11,2 21,2Z" 
+                                                      Fill="{DynamicResource ThemePrimary}" 
+                                                      Stretch="Uniform" 
+                                                      Width="20" Height="20"
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+
+                                            <!-- Info -->
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="3">
+                                                <TextBlock Text="Oficina Central" FontWeight="SemiBold" FontSize="{DynamicResource AppFontSize}" Foreground="{DynamicResource ThemeText}"/>
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <TextBlock Text="ID: 451 092 110" FontSize="{DynamicResource FontSizeSmall}" Foreground="{DynamicResource ThemeTextMuted}"/>
+                                                    <Border Background="{DynamicResource ThemeSuccess}" CornerRadius="4" Padding="6,1" Opacity="0.2">
+                                                        <TextBlock Text="Online" FontSize="10" Foreground="{DynamicResource ThemeSuccess}" FontWeight="Bold"/>
+                                                    </Border>
+                                                </StackPanel>
+                                            </StackPanel>
+
+                                            <!-- Date -->
+                                            <TextBlock Grid.Column="2" Text="{DynamicResource S_Settings_Today}" VerticalAlignment="Center" FontSize="{DynamicResource FontSizeSmall}" Foreground="{DynamicResource ThemeTextMuted}" Opacity="0.7"/>
+                                        </Grid>
+                                    </Border>
+                                    
+                                    <!-- History Detail Item 2 -->
+                                    <Border Background="{DynamicResource ThemeBackground}" CornerRadius="16" Padding="15">
+                                        <Grid ColumnDefinitions="Auto, *, Auto">
+                                            <!-- Icon -->
+                                            <Border Grid.Column="0" Width="42" Height="42" CornerRadius="12" Background="{DynamicResource ThemeBackgroundSecondary}" Margin="0,0,15,0">
+                                                <Path Data="M4,6H20V16H4M20,18A2,2 0 0,0 22,16V6C22,4.89 21.1,4 20,4H4C2.89,4 2,4.89 2,6V16A2,2 0 0,0 4,18H0V20H24V18H20Z" 
+                                                      Fill="{DynamicResource ThemeTextMuted}" 
+                                                      Stretch="Uniform" 
+                                                      Width="20" Height="20"
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+
+                                            <!-- Info -->
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="3">
+                                                <TextBlock Text="Laptop de Juan" FontWeight="SemiBold" FontSize="{DynamicResource AppFontSize}" Foreground="{DynamicResource ThemeText}"/>
+                                                <TextBlock Text="ID: 102 883 001" FontSize="{DynamicResource FontSizeSmall}" Foreground="{DynamicResource ThemeTextMuted}"/>
+                                            </StackPanel>
+
+                                            <!-- Date -->
+                                            <TextBlock Grid.Column="2" Text="{DynamicResource S_Settings_Yesterday}" VerticalAlignment="Center" FontSize="{DynamicResource FontSizeSmall}" Foreground="{DynamicResource ThemeTextMuted}" Opacity="0.7"/>
+                                        </Grid>
+                                    </Border>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- Security Panel -->
+                    <StackPanel IsVisible="{Binding #TabList.SelectedIndex, Converter={StaticResource EqualsIntConverter}, ConverterParameter=2}" Spacing="35">
+                        <StackPanel>
+                            <TextBlock Text="{DynamicResource S_Settings_Security}" FontSize="{DynamicResource FontSizeTitle}" FontWeight="Bold" Foreground="{DynamicResource ThemeText}"/>
+                            <TextBlock Text="{DynamicResource S_Settings_Security_Desc}" FontSize="{DynamicResource FontSizeNormal}" Foreground="{DynamicResource ThemeTextMuted}" Margin="0,5,0,0"/>
+                        </StackPanel>
+
+                        <Border Background="{DynamicResource ThemeBackgroundSecondary}" CornerRadius="20" Padding="25" BoxShadow="{DynamicResource ThemeSubtleShadow}">
+                            <StackPanel Spacing="20">
+                                <TextBlock Text="{DynamicResource S_Settings_Password}" FontWeight="SemiBold" FontSize="{DynamicResource FontSizeLarge}" Foreground="{DynamicResource ThemeText}"/>
+                                <TextBlock Text="{DynamicResource S_Settings_Password_Desc}" 
+                                           FontSize="{DynamicResource FontSizeSmall}" Foreground="{DynamicResource ThemeTextMuted}" TextWrapping="Wrap"/>
+                                
+                                <Grid ColumnDefinitions="*, Auto" Margin="0,10,0,0">
+                                    <TextBox PasswordChar="*" VerticalContentAlignment="Center" Height="45" 
+                                             Background="{DynamicResource ThemeBackground}" 
+                                             BorderBrush="{DynamicResource ThemeBorder}"
+                                             CornerRadius="12" Padding="15,0"
+                                             Watermark="{DynamicResource S_Settings_Password_Watermark}"/>
+                                    <Button Grid.Column="1" Classes="ModernIcon" Margin="15,0,0,0" Height="45" Width="45" ToolTip.Tip="{DynamicResource S_Settings_Save}">
+                                        <Path Data="M15,9H5V5H15M12,19A3,3 0 0,1 9,16A3,3 0 0,1 12,13A3,3 0 0,1 15,16A3,3 0 0,1 12,19M17,3H5C3.89,3 3,3.9 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V7L17,3Z"
+                                              Fill="{DynamicResource ThemePrimary}"
+                                              Stretch="Uniform"
+                                              Width="20" Height="20"/>
+                                    </Button>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                        
+                        <Border Background="{DynamicResource ThemeBackgroundSecondary}" CornerRadius="20" Padding="25" BoxShadow="{DynamicResource ThemeSubtleShadow}">
+                            <DockPanel LastChildFill="False">
+                                <StackPanel>
+                                    <TextBlock Text="{DynamicResource S_Settings_Confirmation}" FontWeight="SemiBold" FontSize="{DynamicResource FontSizeLarge}" Foreground="{DynamicResource ThemeText}"/>
+                                    <TextBlock Text="{DynamicResource S_Settings_AlwaysAsk}" FontSize="{DynamicResource FontSizeSmall}" Foreground="{DynamicResource ThemeTextMuted}" Margin="0,4,0,0"/>
+                                </StackPanel>
+                                <ToggleSwitch DockPanel.Dock="Right" IsChecked="True" OnContent="" OffContent="" VerticalAlignment="Center"/>
+                            </DockPanel>
+                        </Border>
+                    </StackPanel>
+                </Panel>
+            </ScrollViewer>
+
+            <!-- Close Button (Top-Right Corner) - Moved to end for Z-Index -->
+            <Button Grid.Column="1" 
+                    Click="OnCloseClick" 
+                    HorizontalAlignment="Right" 
+                    VerticalAlignment="Top" 
+                    Margin="0,20,20,0"
+                    Width="36" 
+                    Height="36"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    CornerRadius="18"
+                    Cursor="Hand">
+                <Button.Styles>
+                    <Style Selector="Button:pointerover">
+                        <Setter Property="Background" Value="{DynamicResource ThemeBackgroundTertiary}"/>
+                    </Style>
+                    <Style Selector="Button:pressed">
+                        <Setter Property="Opacity" Value="0.7"/>
+                    </Style>
+                </Button.Styles>
+                <TextBlock Text="✕" 
+                           FontSize="18" 
+                           FontWeight="Medium" 
+                           Foreground="{DynamicResource ThemeTextMuted}" 
+                           HorizontalAlignment="Center" 
+                           VerticalAlignment="Center"
+                           IsHitTestVisible="False"/>
+            </Button>
+        </Grid>
+    </Border>
+</Window>

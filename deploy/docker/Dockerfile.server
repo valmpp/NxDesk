@@ -1,0 +1,40 @@
+# ==============================================================================
+# Dockerfile Multi-Stage para nxdesk-server (Rust)
+# Imagen ultra-ligera (~20 MB) para despliegues de señalización en producción
+# ==============================================================================
+
+# --- Etapa 1: Compilación ---
+FROM rust:1.78-bookworm AS builder
+
+WORKDIR /usr/src/nxdesk
+
+# Copiar manifiestos y código fuente
+COPY nxdesk-rust/Cargo.toml nxdesk-rust/Cargo.lock ./
+COPY nxdesk-rust/crates ./crates/
+COPY nxdesk-rust/apps ./apps/
+
+# Compilar binario release de nxdesk-server
+RUN cargo build --release -p nxdesk-server
+
+# --- Etapa 2: Imagen Final Minimalista ---
+FROM debian:bookworm-slim
+
+# Instalar certificados CA actualizados
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+
+# Crear usuario sin privilegios
+RUN useradd -m -u 10001 -U -s /bin/sh nxdesk
+
+USER nxdesk
+WORKDIR /home/nxdesk
+
+# Copiar binario compilado desde el builder
+COPY --from=builder /usr/src/nxdesk/target/release/nxdesk-server /usr/local/bin/nxdesk-server
+
+# Exponer puerto de señalización WebSocket
+EXPOSE 5000
+
+ENV RUST_LOG=info
+
+ENTRYPOINT ["/usr/local/bin/nxdesk-server"]
+CMD ["--bind", "0.0.0.0:5000"]
