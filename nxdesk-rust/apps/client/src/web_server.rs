@@ -1182,6 +1182,20 @@ async fn serve_index(
                 <div id="localhost-notice" class="notice-banner">
                     🛡️ Modo Vista Activo en Localhost: Control remoto deshabilitado en esta máquina para prevenir bucles de cursor.
                 </div>
+
+                <!-- Modal de Desbloqueo de Sesión para Clientes Externos -->
+                <div id="auth-overlay" style="display: none; position: absolute; inset: 0; background: rgba(10, 14, 23, 0.94); backdrop-filter: blur(8px); z-index: 90; flex-direction: column; align-items: center; justify-content: center; padding: 20px;">
+                    <div style="background: #1e293b; border: 1px solid #334155; border-radius: 14px; padding: 2.2rem; max-width: 440px; width: 100%; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.6);">
+                        <div style="font-size: 2.4rem; margin-bottom: 0.5rem;">🔐</div>
+                        <h3 style="color: #f8fafc; font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem;">Transmisión Protegida</h3>
+                        <p style="color: #94a3b8; font-size: 0.9rem; line-height: 1.5; margin-bottom: 1.5rem;">Introduce la clave del anfitrión para desbloquear la transmisión en vivo de este equipo:</p>
+                        <form onsubmit="submitAuthForm(event)" style="display: flex; flex-direction: column; gap: 12px;">
+                            <input type="password" id="auth-password-input" placeholder="Contraseña de anfitrión..." required style="background: #0f172a; border: 1px solid #475569; border-radius: 8px; padding: 12px 14px; color: #f8fafc; font-size: 1rem; outline: none; text-align: center;">
+                            <button type="submit" id="btn-auth-submit" class="btn btn-primary" style="padding: 12px; font-weight: 600; font-size: 0.95rem;">🔓 Desbloquear y Ver Pantalla</button>
+                        </form>
+                    </div>
+                </div>
+
                 <canvas id="viewport"></canvas>
                 <div class="viewport-toolbar">
                     <!-- Selector de Doble Pantalla / Monitores -->
@@ -1295,34 +1309,53 @@ async fn serve_index(
             }}, 3500);
         }}
 
+        async function submitAuthForm(e) {{
+            if (e && e.preventDefault) e.preventDefault();
+            const pwInput = document.getElementById('auth-password-input');
+            const pw = pwInput.value.trim();
+            if (!pw) return;
+            const btn = document.getElementById('btn-auth-submit');
+            btn.textContent = 'Verificando...';
+            btn.disabled = true;
+
+            try {{
+                const res = await fetch('/api/auth', {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{ password: pw, requested_role: 'FullControl' }})
+                }});
+                const data = await res.json();
+                if (!data.success) {{
+                    showToast("❌ " + (data.error_message || "Contraseña incorrecta"), true);
+                    btn.textContent = '🔓 Desbloquear y Ver Pantalla';
+                    btn.disabled = false;
+                    return;
+                }}
+                sessionToken = data.session_token;
+                document.getElementById('auth-overlay').style.display = 'none';
+                if (ws && ws.readyState === WebSocket.OPEN) {{
+                    ws.send(JSON.stringify({{ type: 'auth', token: sessionToken }}));
+                }}
+                showToast("✅ Transmisión desbloqueada exitosamente.");
+            }} catch (err) {{
+                showToast("❌ Error al autenticar: " + err.message, true);
+                btn.textContent = '🔓 Desbloquear y Ver Pantalla';
+                btn.disabled = false;
+            }}
+        }}
+
         async function toggleControlMode() {{
             if (isLocalhost) {{
                 showToast("🛡️ Control Remoto deshabilitado en Localhost para prevenir bucles de cursor. Conéctate desde otra PC o móvil para controlar este equipo.", true);
                 return;
             }}
             if (!isControlEnabled && !sessionToken) {{
-                const pw = prompt("🔒 Ingrese la contraseña de acceso del anfitrión para activar el control remoto:");
-                if (!pw) return;
-                try {{
-                    const res = await fetch('/api/auth', {{
-                        method: 'POST',
-                        headers: {{ 'Content-Type': 'application/json' }},
-                        body: JSON.stringify({{ password: pw, requested_role: 'FullControl' }})
-                    }});
-                    const data = await res.json();
-                    if (!data.success) {{
-                        showToast("❌ " + (data.error_message || "Contraseña incorrecta"), true);
-                        return;
-                    }}
-                    sessionToken = data.session_token;
-                    if (ws && ws.readyState === WebSocket.OPEN) {{
-                        ws.send(JSON.stringify({{ type: 'auth', token: sessionToken }}));
-                    }}
-                    showToast("✅ Autenticado exitosamente. Modo Control Remoto Activo.");
-                }} catch (err) {{
-                    showToast("❌ Error al autenticar: " + err.message, true);
-                    return;
-                }}
+                document.getElementById('auth-overlay').style.display = 'flex';
+                setTimeout(() => {{
+                    const inp = document.getElementById('auth-password-input');
+                    if (inp) inp.focus();
+                }}, 100);
+                return;
             }}
             isControlEnabled = !isControlEnabled;
             const btn = document.getElementById('btn-control-toggle');
@@ -1396,7 +1429,18 @@ async fn serve_index(
                 if (typeof event.data === 'string') {{
                     const msg = JSON.parse(event.data);
                     if (msg.type === 'auth_required') {{
-                        showToast("🔒 " + msg.message, true);
+                        document.getElementById('auth-overlay').style.display = 'flex';
+                        const urlParams = new URLSearchParams(window.location.search);
+                        const urlPwd = urlParams.get('pwd') || urlParams.get('password');
+                        if (urlPwd) {{
+                            document.getElementById('auth-password-input').value = urlPwd;
+                            setTimeout(() => submitAuthForm(new Event('submit')), 100);
+                        }} else {{
+                            setTimeout(() => {{
+                                const inp = document.getElementById('auth-password-input');
+                                if (inp) inp.focus();
+                            }}, 100);
+                        }}
                     }} else if (msg.type === 'terminal') {{
                         const out = document.getElementById('term-out');
                         const isAtBottom = (out.scrollHeight - out.scrollTop <= out.clientHeight + 80);
