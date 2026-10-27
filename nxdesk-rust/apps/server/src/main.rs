@@ -55,17 +55,73 @@ async fn handle_connection(
     peer_addr: SocketAddr,
     state: Arc<RwLock<HubState>>,
 ) {
-    // Sonda de salud (Health Check /health) para balanceadores y monitoreo SRE
-    let mut peek_buf = [0u8; 16];
+    // Inspección de encabezados HTTP: /health, navegación web o WebSocket
+    let mut peek_buf = [0u8; 512];
     if let Ok(n) = stream.peek(&mut peek_buf).await {
-        if n >= 4 && &peek_buf[0..4] == b"GET " {
+        if n >= 4
+            && (&peek_buf[0..4] == b"GET "
+                || &peek_buf[0..5] == b"HEAD"
+                || &peek_buf[0..5] == b"POST")
+        {
             let peek_str = String::from_utf8_lossy(&peek_buf[0..n]);
-            if peek_str.starts_with("GET /health") {
+            let is_websocket = peek_str.to_lowercase().contains("upgrade: websocket");
+
+            if !is_websocket {
                 use tokio::io::AsyncWriteExt;
-                let response = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n{\"status\":\"healthy\",\"service\":\"nxdesk-server\"}";
-                let _ = stream.write_all(response.as_bytes()).await;
-                let _ = stream.flush().await;
-                return;
+                if peek_str.starts_with("GET /health") {
+                    let body = "{\"status\":\"healthy\",\"service\":\"nxdesk-server\"}";
+                    let response = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                        body.len(),
+                        body
+                    );
+                    let _ = stream.write_all(response.as_bytes()).await;
+                    let _ = stream.flush().await;
+                    return;
+                } else {
+                    // Respuesta amigable para navegadores web que acceden a http://localhost:5000
+                    let html = r#"<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NxDesk — Servidor de Señalización</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; padding: 1rem; }
+        .card { background: #1e293b; border: 1px solid #334155; border-radius: 14px; padding: 2.5rem; max-width: 560px; box-shadow: 0 15px 35px rgba(0,0,0,0.5); text-align: center; }
+        .badge { display: inline-flex; align-items: center; gap: 6px; padding: 0.35rem 0.85rem; border-radius: 9999px; font-size: 0.875rem; font-weight: 600; background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.3); margin-bottom: 1.25rem; }
+        .dot { width: 8px; height: 8px; background: #10b981; border-radius: 50%; box-shadow: 0 0 8px #10b981; }
+        h1 { margin: 0 0 0.75rem 0; font-size: 1.6rem; color: #ffffff; }
+        p { color: #94a3b8; font-size: 0.95rem; line-height: 1.6; margin-bottom: 1.5rem; }
+        .info-box { background: #0f172a; border-radius: 8px; padding: 1.2rem; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.88rem; text-align: left; color: #38bdf8; margin-bottom: 1.75rem; border: 1px solid #334155; line-height: 1.8; }
+        .btn { display: inline-block; background: #3b82f6; color: #ffffff; padding: 0.85rem 1.75rem; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 0.95rem; box-shadow: 0 4px 14px rgba(59,130,246,0.35); transition: all 0.2s; }
+        .btn:hover { background: #2563eb; transform: translateY(-1px); }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <span class="badge"><span class="dot"></span> Servidor Activo y Operacional</span>
+        <h1>🌐 NxDesk Signaling Server</h1>
+        <p>Este nodo es el <strong>Servidor Central de Señalización WebSocket</strong> para coordinar salas, intercambiar ofertas y atravesar redes WAN.</p>
+        <div class="info-box">
+            📡 Protocolo: WebSocket (RFC 6455)<br>
+            🔗 Endpoint: ws://&lt;IP_SERVIDOR&gt;:5000/signalinghub<br>
+            🩺 Sonda SRE: /health (HTTP 200 OK)
+        </div>
+        <p>Para ver la pantalla remota y controlar el equipo mediante el <strong>Panel Web</strong>, accede al puerto <strong>8080</strong> del cliente:</p>
+        <a href="http://localhost:8080" class="btn">Abrir Panel Web (Puerto 8080)</a>
+    </div>
+</body>
+</html>"#;
+                    let response = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                        html.len(),
+                        html
+                    );
+                    let _ = stream.write_all(response.as_bytes()).await;
+                    let _ = stream.flush().await;
+                    return;
+                }
             }
         }
     }
