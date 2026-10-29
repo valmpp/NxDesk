@@ -24,8 +24,8 @@ struct HubState {
     clients: HashMap<String, ClientHandle>,
     // peerId -> connectionId
     peer_tracker: HashMap<String, String>,
-    // connectionId -> roomId
-    client_room: HashMap<String, String>,
+    // connectionId -> Set de roomIds a los que pertenece
+    client_rooms: HashMap<String, HashSet<String>>,
     // connectionId -> PeerIdentity (presencia de pares en línea)
     online_peers: HashMap<String, nxdesk_core::PeerIdentity>,
 }
@@ -395,27 +395,42 @@ async fn join_room(conn_id: &str, room_id: &str, state: &Arc<RwLock<HubState>>) 
     }
 
     let mut s = state.write().await;
-    let current_count = s.rooms.get(trimmed).map(|m| m.len()).unwrap_or(0);
-    if current_count >= 5 {
+    let HubState {
+        ref mut rooms,
+        ref clients,
+        ref mut client_rooms,
+        ref mut peer_tracker,
+        ..
+    } = *s;
+
+    // 1. Limpieza proactiva de sockets desconectados en la sala
+    if let Some(members) = rooms.get_mut(trimmed) {
+        members.retain(|mid| clients.contains_key(mid));
+    }
+
+    let active_count = rooms.get(trimmed).map(|m| m.len()).unwrap_or(0);
+    if active_count >= 20 {
         warn!(
-            "⛔ [Seguridad] Sala '{}' alcanzó el cupo máximo de 5 conexiones. Rechazando a {}",
+            "⛔ [Seguridad] Sala '{}' alcanzó el cupo máximo de 20 conexiones activas. Rechazando a {}",
             trimmed, conn_id
         );
         return;
     }
 
-    s.rooms
+    rooms
         .entry(trimmed.to_string())
         .or_default()
         .insert(conn_id.to_string());
-    s.client_room
-        .insert(conn_id.to_string(), trimmed.to_string());
-    s.peer_tracker
+    client_rooms
+        .entry(conn_id.to_string())
+        .or_default()
+        .insert(trimmed.to_string());
+    peer_tracker
         .insert(trimmed.to_string(), conn_id.to_string());
 
-    let count = s.rooms.get(trimmed).map(|set| set.len()).unwrap_or(0);
+    let count = rooms.get(trimmed).map(|set| set.len()).unwrap_or(0);
     info!(
-        "🚪 Cliente {} se unió a la sala '{}' (Total: {})",
+        "🚪 Cliente {} se unió a la sala '{}' (Total activos: {})",
         conn_id, trimmed, count
     );
 
@@ -424,9 +439,9 @@ async fn join_room(conn_id: &str, room_id: &str, state: &Arc<RwLock<HubState>>) 
         "{{\"Type\":\"RoomOccupancyChanged\",\"Payload\":\"{}\"}}\u{1e}",
         count
     );
-    if let Some(members) = s.rooms.get(room_id) {
+    if let Some(members) = rooms.get(trimmed) {
         for member_id in members {
-            if let Some(client) = s.clients.get(member_id) {
+            if let Some(client) = clients.get(member_id) {
                 let _ = client.control_tx.send(Message::Text(notify_msg.clone()));
             }
         }
@@ -435,16 +450,26 @@ async fn join_room(conn_id: &str, room_id: &str, state: &Arc<RwLock<HubState>>) 
 
 async fn leave_room(conn_id: &str, room_id: &str, state: &Arc<RwLock<HubState>>) {
     let mut s = state.write().await;
-    let count = if let Some(members) = s.rooms.get_mut(room_id) {
+    let HubState {
+        ref mut rooms,
+        ref clients,
+        ref mut client_rooms,
+        ..
+    } = *s;
+
+    if let Some(r_set) = client_rooms.get_mut(conn_id) {
+        r_set.remove(room_id);
+    }
+    let count = if let Some(members) = rooms.get_mut(room_id) {
         members.remove(conn_id);
+        members.retain(|mid| clients.contains_key(mid));
         members.len()
     } else {
         0
     };
-    s.client_room.remove(conn_id);
 
     info!(
-        "🚪 Cliente {} salió de la sala '{}' (Total: {})",
+        "🚪 Cliente {} salió de la sala '{}' (Total activos: {})",
         conn_id, room_id, count
     );
 
@@ -453,15 +478,15 @@ async fn leave_room(conn_id: &str, room_id: &str, state: &Arc<RwLock<HubState>>)
             "{{\"Type\":\"RoomOccupancyChanged\",\"Payload\":\"{}\"}}\u{1e}",
             count
         );
-        if let Some(members) = s.rooms.get(room_id) {
+        if let Some(members) = rooms.get(room_id) {
             for member_id in members {
-                if let Some(client) = s.clients.get(member_id) {
+                if let Some(client) = clients.get(member_id) {
                     let _ = client.control_tx.send(Message::Text(notify_msg.clone()));
                 }
             }
         }
     } else {
-        s.rooms.remove(room_id);
+        rooms.remove(room_id);
     }
 }
 
@@ -471,15 +496,21 @@ async fn relay_message_to_room(
     state: &Arc<RwLock<HubState>>,
 ) {
     let s = state.read().await;
-    if let Some(room_id) = s.client_room.get(sender_id) {
-        if let Some(members) = s.rooms.get(room_id) {
-            let json_str = format!("{}\u{1e}", serde_json::to_string(msg).unwrap_or_default());
-            for member_id in members {
-                if member_id != sender_id {
-                    if let Some(client) = s.clients.get(member_id) {
-                        let _ = client.control_tx.send(Message::Text(json_str.clone()));
+    if let Some(rooms) = s.client_rooms.get(sender_id) {
+        let json_str = format!("{}\u{1e}", serde_json::to_string(msg).unwrap_or_default());
+        let mut recipients = HashSet::new();
+        for room_id in rooms {
+            if let Some(members) = s.rooms.get(room_id) {
+                for member_id in members {
+                    if member_id != sender_id {
+                        recipients.insert(member_id.clone());
                     }
                 }
+            }
+        }
+        for member_id in recipients {
+            if let Some(client) = s.clients.get(&member_id) {
+                let _ = client.control_tx.send(Message::Text(json_str.clone()));
             }
         }
     }
@@ -487,14 +518,20 @@ async fn relay_message_to_room(
 
 async fn relay_binary_to_room(sender_id: &str, data: Vec<u8>, state: &Arc<RwLock<HubState>>) {
     let s = state.read().await;
-    if let Some(room_id) = s.client_room.get(sender_id) {
-        if let Some(members) = s.rooms.get(room_id) {
-            for member_id in members {
-                if member_id != sender_id {
-                    if let Some(client) = s.clients.get(member_id) {
-                        let _ = client.video_tx.send(Some(data.clone()));
+    if let Some(rooms) = s.client_rooms.get(sender_id) {
+        let mut recipients = HashSet::new();
+        for room_id in rooms {
+            if let Some(members) = s.rooms.get(room_id) {
+                for member_id in members {
+                    if member_id != sender_id {
+                        recipients.insert(member_id.clone());
                     }
                 }
+            }
+        }
+        for member_id in recipients {
+            if let Some(client) = s.clients.get(&member_id) {
+                let _ = client.video_tx.send(Some(data.clone()));
             }
         }
     }
@@ -515,30 +552,47 @@ async fn cleanup_connection(conn_id: &str, state: &Arc<RwLock<HubState>>) {
             let _ = client.control_tx.send(Message::Text(formatted.clone()));
         }
     }
-    if let Some(room_id) = s.client_room.remove(conn_id) {
-        let count = if let Some(members) = s.rooms.get_mut(&room_id) {
-            members.remove(conn_id);
-            members.len()
-        } else {
-            0
-        };
 
-        if count > 0 {
-            let notify_msg = format!(
-                "{{\"Type\":\"RoomOccupancyChanged\",\"Payload\":\"{}\"}}\u{1e}",
-                count
-            );
-            if let Some(members) = s.rooms.get(&room_id) {
-                for member_id in members {
-                    if let Some(client) = s.clients.get(member_id) {
-                        let _ = client.control_tx.send(Message::Text(notify_msg.clone()));
+    let HubState {
+        ref mut rooms,
+        ref clients,
+        ref mut client_rooms,
+        ..
+    } = *s;
+
+    if let Some(r_set) = client_rooms.remove(conn_id) {
+        for room_id in r_set {
+            let count = if let Some(members) = rooms.get_mut(&room_id) {
+                members.remove(conn_id);
+                members.retain(|mid| clients.contains_key(mid));
+                members.len()
+            } else {
+                0
+            };
+
+            if count > 0 {
+                let notify_msg = format!(
+                    "{{\"Type\":\"RoomOccupancyChanged\",\"Payload\":\"{}\"}}\u{1e}",
+                    count
+                );
+                if let Some(members) = rooms.get(&room_id) {
+                    for member_id in members {
+                        if let Some(client) = clients.get(member_id) {
+                            let _ = client.control_tx.send(Message::Text(notify_msg.clone()));
+                        }
                     }
                 }
+            } else {
+                rooms.remove(&room_id);
             }
-        } else {
-            s.rooms.remove(&room_id);
         }
     }
+
+    // Limpieza de seguridad en todo rooms para eliminar cualquier referencia residual
+    for members in rooms.values_mut() {
+        members.remove(conn_id);
+    }
+    rooms.retain(|_, members| !members.is_empty());
 }
 
 fn uuid_v4_simple() -> String {
