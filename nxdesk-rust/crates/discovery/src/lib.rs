@@ -59,7 +59,7 @@ impl DiscoveryService {
         listener_socket.set_broadcast(true)?;
         listener_socket.set_nonblocking(true)?;
 
-        let listen_addr: SocketAddr = format!("0.0.0.0:{}", DISCOVERY_PORT).parse().unwrap();
+        let listen_addr = SocketAddr::from(([0, 0, 0, 0], DISCOVERY_PORT));
         listener_socket.bind(&listen_addr.into())?;
 
         let std_listener: std::net::UdpSocket = listener_socket.into();
@@ -71,7 +71,7 @@ impl DiscoveryService {
         broadcaster_socket.set_broadcast(true)?;
         broadcaster_socket.set_nonblocking(true)?;
 
-        let bind_zero: SocketAddr = "0.0.0.0:0".parse().unwrap();
+        let bind_zero = SocketAddr::from(([0, 0, 0, 0], 0));
         broadcaster_socket.bind(&bind_zero.into())?;
 
         let std_broadcaster: std::net::UdpSocket = broadcaster_socket.into();
@@ -112,9 +112,7 @@ impl DiscoveryService {
         let my_status = Arc::clone(&self.my_status);
 
         tokio::spawn(async move {
-            let broadcast_target: SocketAddr = format!("255.255.255.255:{}", DISCOVERY_PORT)
-                .parse()
-                .unwrap();
+            let broadcast_target = SocketAddr::from(([255, 255, 255, 255], DISCOVERY_PORT));
 
             // Pequeña espera inicial
             tokio::time::sleep(Duration::from_millis(500)).await;

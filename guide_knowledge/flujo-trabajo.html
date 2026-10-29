@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Dev Team · Flujo de trabajo y Git</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#F7F6F3;--surface:#FFFFFF;--surface2:#F0EDE8;
+  --border:#E2DDD6;--border2:#CBC5BC;
+  --text:#1C1917;--text2:#57534E;--text3:#A8A29E;
+  --accent:#6D59E8;--accent-bg:#EEECFC;--accent-text:#3D2FB3;
+  --green:#0D9E74;--green-bg:#E3F5EE;--green-text:#065F46;
+  --amber:#B45309;--amber-bg:#FEF3C7;--amber-text:#92400E;
+  --red:#C2410C;--red-bg:#FFF1EE;--red-text:#9A3412;
+  --slate:#475569;--slate-bg:#F1F5F9;--slate-text:#1E293B;
+  --blue:#1D4ED8;--blue-bg:#EFF6FF;--blue-text:#1E40AF;
+  --purple:#7C3AED;--purple-bg:#F5F3FF;--purple-text:#5B21B6;
+  --nav-w:260px;--r:8px;--r-lg:14px;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{font-size:15px;scroll-behavior:smooth}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);line-height:1.65;display:flex;min-height:100vh}
+/* NAV */
+nav{width:var(--nav-w);min-width:var(--nav-w);background:var(--surface);border-right:1px solid var(--border);height:100vh;position:sticky;top:0;overflow-y:auto;display:flex;flex-direction:column;padding:0 0 2rem}
+.nav-logo{padding:1.25rem 1.25rem 1rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.5rem;font-weight:600;font-size:.85rem;color:var(--text2)}
+.nav-logo span{background:var(--accent-bg);color:var(--accent-text);font-family:var(--mono);font-size:.72rem;padding:.15rem .45rem;border-radius:4px}
+.nav-group{padding:.85rem 1.25rem .25rem;font-size:.67rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text3)}
+nav a{display:flex;align-items:center;gap:.55rem;padding:.4rem 1.25rem;font-size:.81rem;color:var(--text2);text-decoration:none;transition:background .12s,color .12s}
+nav a:hover{background:var(--bg);color:var(--text)}
+nav a.on{background:var(--accent-bg);color:var(--accent-text);font-weight:500}
+nav a .num{font-family:var(--mono);font-size:.68rem;color:var(--text3);min-width:22px}
+nav input{margin:.75rem 1.25rem;padding:.45rem .75rem;border:1px solid var(--border);border-radius:var(--r);font-size:.8rem;font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);outline:none;width:calc(100% - 2.5rem)}
+nav input:focus{border-color:var(--accent)}
+/* MAIN */
+main{flex:1;padding:3rem 2.5rem 5rem;max-width:880px}
+/* HERO */
+.hero-eyebrow{font-size:.7rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:.75rem}
+.hero h1{font-size:2rem;font-weight:700;letter-spacing:-.025em;line-height:1.2;margin-bottom:.875rem}
+.hero p{font-size:1rem;color:var(--text2);max-width:560px;line-height:1.65;margin-bottom:1.5rem}
+.philosophy{background:var(--accent-bg);border-left:3px solid var(--accent);border-radius:0 var(--r) var(--r) 0;padding:.9rem 1.1rem;font-size:.875rem;color:var(--accent-text);font-style:italic;margin-bottom:2.5rem}
+/* SECTIONS */
+.sec{margin-bottom:3.5rem;scroll-margin-top:2rem}
+.sec-hdr{display:flex;align-items:baseline;gap:.75rem;margin-bottom:1.25rem;padding-bottom:.75rem;border-bottom:1px solid var(--border)}
+.sec-num{font-family:var(--mono);font-size:.7rem;color:var(--text3);min-width:28px}
+.sec h2{font-size:1.2rem;font-weight:600;letter-spacing:-.015em}
+.sec h3{font-size:.9rem;font-weight:600;color:var(--text2);margin:1.25rem 0 .5rem}
+.sec p{font-size:.875rem;color:var(--text2);margin-bottom:.75rem;line-height:1.6}
+hr.div{border:none;border-top:1px solid var(--border);margin:3rem 0}
+/* GRID */
+.grid{display:grid;gap:.875rem;margin:1rem 0}
+.g2{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+.g4{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+/* CARD */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:1.1rem;transition:.18s}
+.card:hover{border-color:var(--border2);box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.card-icon{font-size:1.4rem;margin-bottom:.5rem;display:block}
+.card h4{font-size:.87rem;font-weight:600;margin-bottom:.3rem;color:var(--text)}
+.card p{font-size:.8rem;color:var(--text2);line-height:1.5}
+/* BADGE */
+.badge{font-size:.68rem;font-weight:600;padding:.2rem .55rem;border-radius:4px;display:inline-block;white-space:nowrap;letter-spacing:.02em}
+.b-a{background:var(--accent-bg);color:var(--accent-text)}
+.b-g{background:var(--green-bg);color:var(--green-text)}
+.b-y{background:var(--amber-bg);color:var(--amber-text)}
+.b-r{background:var(--red-bg);color:var(--red-text)}
+.b-s{background:var(--slate-bg);color:var(--slate-text)}
+.b-b{background:var(--blue-bg);color:var(--blue-text)}
+.b-p{background:var(--purple-bg);color:var(--purple-text)}
+/* ALERT */
+.alert{border-radius:var(--r);padding:.875rem 1rem;margin:1rem 0;display:flex;gap:.875rem;align-items:flex-start;font-size:.83rem;line-height:1.55}
+.ai{font-size:1rem;flex-shrink:0;margin-top:.1rem}
+.al-a{background:var(--accent-bg);border:1px solid #C7C2F5;color:var(--accent-text)}
+.al-g{background:var(--green-bg);border:1px solid #A7E8D0;color:var(--green-text)}
+.al-y{background:var(--amber-bg);border:1px solid #FCD34D;color:var(--amber-text)}
+.al-r{background:var(--red-bg);border:1px solid #FCA98A;color:var(--red-text)}
+.al-s{background:var(--slate-bg);border:1px solid #CBD5E1;color:var(--slate-text)}
+.al-b{background:var(--blue-bg);border:1px solid #BFDBFE;color:var(--blue-text)}
+/* TABLE */
+.tbl{width:100%;border-collapse:collapse;font-size:.82rem;margin:1rem 0 1.5rem;border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden}
+.tbl th{background:var(--surface2);color:var(--text2);font-size:.7rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:.65rem 1rem;text-align:left;border-bottom:1px solid var(--border)}
+.tbl td{padding:.65rem 1rem;border-bottom:1px solid var(--border);vertical-align:top;line-height:1.5;color:var(--text)}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:var(--bg)}
+/* STEPS */
+.steps{border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;margin:1rem 0}
+.step{display:grid;grid-template-columns:38px 1fr auto;gap:1rem;align-items:flex-start;padding:.875rem 1.25rem;border-bottom:1px solid var(--border)}
+.step:last-child{border-bottom:none}
+.sn{width:32px;height:32px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:.8rem;flex-shrink:0}
+.sn-a{background:var(--accent-bg);border:1px solid #C7C2F5;color:var(--accent)}
+.sn-g{background:var(--green-bg);border:1px solid #A7E8D0;color:var(--green)}
+.sn-y{background:var(--amber-bg);border:1px solid #FCD34D;color:var(--amber)}
+.sn-r{background:var(--red-bg);border:1px solid #FCA98A;color:var(--red)}
+.sn-s{background:var(--slate-bg);border:1px solid #CBD5E1;color:var(--slate)}
+.sn-b{background:var(--blue-bg);border:1px solid #BFDBFE;color:var(--blue)}
+.sn-p{background:var(--purple-bg);border:1px solid #DDD6FE;color:var(--purple)}
+.sh{font-size:.87rem;font-weight:600;color:var(--text);margin-bottom:.2rem}
+.sd{font-size:.78rem;color:var(--text2);line-height:1.5}
+/* CODE */
+code{font-family:var(--mono);font-size:.78rem;background:var(--accent-bg);color:var(--accent-text);padding:.1rem .4rem;border-radius:4px;border:1px solid #C7C2F5}
+@media(max-width:800px){nav{display:none}body{display:block}main{padding:1.5rem 1.25rem 4rem;max-width:100%}}
+</style>
+</head>
+<body>
+<nav>
+  <div class="nav-logo"><span>docs/</span>Dev Team</div>
+  <input type="text" placeholder="Buscar..." oninput="filterNav(this.value)">
+  <div class="nav-group">Navegación</div>
+  <a href="index.html"><span class="num">00</span>Inicio</a>
+  <a href="marco-calidad.html"><span class="num">01</span>Marco de calidad</a>
+  <a href="estructura-docs.html"><span class="num">02</span>Estructura docs/</a>
+  <a href="stack-herramientas.html"><span class="num">03</span>Stack & Herramientas</a>
+  <a href="gestion-proyectos.html"><span class="num">04</span>Gestión de proyectos</a>
+  <a href="onboarding-nuevo.html"><span class="num">05</span>Onboarding</a>
+  <a href="flujo-trabajo.html" class="on"><span class="num">06</span>Flujo de trabajo</a>
+</nav>
+<main>
+<div class="hero-eyebrow">06 · Flujo de trabajo y Git</div>
+<h1 style="font-size:1.75rem;font-weight:700;letter-spacing:-.025em;margin-bottom:.5rem">Gestión de código, Rediseños e Incidentes</h1>
+<p style="font-size:.97rem;color:var(--text2);margin-bottom:1.5rem">El código fuente es el activo más importante del proyecto. Este flujo garantiza que ningún cambio rompa producción y que todo commit tenga trazabilidad auditable según ISO 90003.</p>
+<div class="philosophy"><strong>La regla de oro:</strong> La rama <code>main</code> es sagrada. Todo código que llega a <code>main</code> está validado, probado, aprobado por L3/QA y listo para salir a producción en cualquier momento. Cero tolerancia a commits directos en main.</div>
+
+<div class="sec">
+  <div class="sec-hdr"><span class="sec-num">01</span><h2>Estrategia de ramas (Git Flow Adaptado)</h2></div>
+  <p>Mantenemos un flujo estructurado pero ligero. Solo existen dos ramas estables; todo lo demás es efímero.</p>
+  <div class="grid g2" style="margin-top:1rem">
+    <div class="card" style="border-left:3px solid var(--green)">
+      <h4>🌳 main</h4>
+      <p style="margin-top:.4rem">Espejo exacto de producción. Protegida por reglas estrictas. Solo acepta merges desde PRs validados o merges directos desde <code>staging</code> en momentos de release.</p>
+    </div>
+    <div class="card" style="border-left:3px solid var(--blue)">
+      <h4>🛠️ staging (o develop)</h4>
+      <p style="margin-top:.4rem">El entorno de integración. Aquí se despliegan automáticamente los cambios para revisión de QA. Todo PR de feature apunta aquí primero.</p>
+    </div>
+    <div class="card" style="border-left:3px solid var(--accent)">
+      <h4>🚀 feature/TICKET-ID</h4>
+      <p style="margin-top:.4rem">Para desarrollo de nuevas funcionalidades. Se crean a partir de <code>staging</code>. Ejemplo: <code>feature/NX-102-login-oauth</code>. Trazabilidad directa con ClickUp/Linear.</p>
+    </div>
+    <div class="card" style="border-left:3px solid var(--amber)">
+      <h4>🐛 bugfix/ o hotfix/</h4>
+      <p style="margin-top:.4rem"><code>bugfix/</code> sale de staging para errores en desarrollo. <code>hotfix/</code> sale de main para emergencias en producción e incluye rollback de seguridad rápida.</p>
+    </div>
+  </div>
+</div>
+
+<div class="sec">
+  <div class="sec-hdr"><span class="sec-num">02</span><h2>Convención de Commits</h2></div>
+  <p>Aplicamos <a href="https://www.conventionalcommits.org/" target="_blank" style="color:var(--accent);text-decoration:none">Conventional Commits</a>. Esto nos permite generar Changelogs automáticos y entender el historial sin leer el código.</p>
+  <div class="alert al-y">
+    <span class="ai">⚠️</span>
+    <div><strong>Importante:</strong> Todo commit debe contener el ID del ticket para cumplir con el estándar de trazabilidad. Ejemplo: <code>feat(auth): [NX-102] agregar validación de JWT</code>.</div>
+  </div>
+  <table class="tbl">
+    <thead><tr><th>Prefijo</th><th>Cuándo usarlo</th><th>Ejemplo</th></tr></thead>
+    <tbody>
+      <tr><td><code>feat:</code></td><td>Una nueva funcionalidad en el sistema.</td><td><code>feat(orders): [NX-150] endpoint para cancelar orden</code></td></tr>
+      <tr><td><code>fix:</code></td><td>Corrección de un bug.</td><td><code>fix(auth): [NX-151] error de expiración en refresh token</code></td></tr>
+      <tr><td><code>docs:</code></td><td>Cambios que solo afectan a <code>docs/</code>.</td><td><code>docs(adr): [NX-152] agregar ADR-004 sobre Redis</code></td></tr>
+      <tr><td><code>refactor:</code></td><td>Cambio de código que no corrige un bug ni añade feature.</td><td><code>refactor(core): [NX-153] extraer lógica de rate limiting</code></td></tr>
+      <tr><td><code>test:</code></td><td>Añadir o corregir pruebas unitarias / e2e.</td><td><code>test(orders): [NX-154] tests para transición de estado</code></td></tr>
+      <tr><td><code>chore:</code></td><td>Actualización de dependencias, scripts o CI/CD.</td><td><code>chore(ci): [NX-155] actualizar pipeline de docker</code></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<hr class="div">
+
+<div class="sec">
+  <div class="sec-hdr"><span class="sec-num">03</span><h2>Ciclo de vida del Pull Request (PR)</h2></div>
+  <div class="steps">
+    <div class="step"><div class="sn sn-b">1</div><div><div class="sh">Creación y descripción del PR</div><div class="sd">El PR debe tener contexto. ¿Qué problema resuelve? ¿Cómo se probó? Si afecta UI, debe incluir capturas de pantalla. Si cambia infraestructura, debe notificar al equipo.</div></div><span class="badge b-s">Autónomo</span></div>
+    <div class="step"><div class="sn sn-y">2</div><div><div class="sh">Checks automáticos (CI)</div><div class="sd">El pipeline compila el proyecto y ejecuta los tests. Luego, SonarQube escanea el código. <strong>El PR se bloquea</strong> si hay fallos en los tests o vulnerabilities/bugs críticos.</div></div><span class="badge b-r">Automático</span></div>
+    <div class="step"><div class="sn sn-a">3</div><div><div class="sh">Code Review (Peer Review)</div><div class="sd">Obligatorio mínimo 1 aprobación de un L2 o L3. El enfoque del revisor no es solo buscar errores, sino evaluar la arquitectura, legibilidad y alineación con las reglas de negocio.</div></div><span class="badge b-a">ISO 90003</span></div>
+    <div class="step"><div class="sn sn-g">4</div><div><div class="sh">Aprobación de QA en Staging</div><div class="sd">Una vez mergeado a <code>staging</code>, el entorno se actualiza automáticamente. QA valida el flujo real. Si pasa, queda listo para la ventana de release a <code>main</code>.</div></div><span class="badge b-g">Validado</span></div>
+  </div>
+</div>
+
+<hr class="div">
+
+<div class="sec">
+  <div class="sec-hdr"><span class="sec-num">04</span><h2>Manejo de Rediseños y Refactorizaciones</h2></div>
+  <p>Un rediseño visual masivo (ej. migrar toda la UI a nuevos componentes) o un cambio arquitectónico profundo no puede bloquear el flujo continuo de entregas en <code>staging</code> ni los parches urgentes.</p>
+  <div class="grid g2" style="margin-top:1rem">
+    <div class="card">
+      <span class="card-icon">🔀</span>
+      <h4>Feature Flags (Toggles)</h4>
+      <p>Siempre que sea posible, el rediseño se mezcla continuamente a <code>staging</code> pero permanece **oculto bajo un flag** (ej. <code>"UseNewDashboardV2": false</code>). Esto evita la "fatiga de integración" (merge hell) y permite desplegar funcionalidades sin mostrar el trabajo incompleto.</p>
+    </div>
+    <div class="card">
+      <span class="card-icon">🏗️</span>
+      <h4>Ramas Epic (epic/redesign-v2)</h4>
+      <p>Si el impacto rompe el modelo de datos o es imposible usar flags, se crea una rama <code>epic/redesign-v2</code> desde <code>staging</code>. Esta rama se debe **rebasear contra staging** al menos una vez por semana para evitar que el código quede obsoleto.</p>
+    </div>
+  </div>
+</div>
+
+<hr class="div">
+
+<div class="sec">
+  <div class="sec-hdr"><span class="sec-num">05</span><h2>Incidentes post-lanzamiento (Flujo Hotfix)</h2></div>
+  <p>Cuando un bug severo llega a producción (el producto ya fue lanzado y el cliente detecta un fallo crítico), el flujo normal se interrumpe. La prioridad es restablecer el servicio en NxFortress o para el cliente final inmediatamente.</p>
+  
+  <div class="steps">
+    <div class="step"><div class="sn sn-r">1</div><div><div class="sh">Crear rama desde main</div><div class="sd">No crees la rama desde staging. Ejecuta: <code>git checkout main</code> y luego <code>git checkout -b hotfix/NX-999-auth-crash</code>.</div></div><span class="badge b-r">Crítico</span></div>
+    <div class="step"><div class="sn sn-y">2</div><div><div class="sh">Reparar y testear localmente</div><div class="sd">Implementa la corrección mínima y necesaria. Un hotfix no es lugar para refactorizar código estético, solo para apagar el incendio y restaurar operatividad. Escribe o arregla el test unitario asociado.</div></div></div>
+    <div class="step"><div class="sn sn-a">3</div><div><div class="sh">PR directo a main y despliegue rápido</div><div class="sd">Crea el PR directo hacia <code>main</code>. Requiere aprobación urgente del TL. Una vez mergeado, el pipeline CI/CD lanza a producción.</div></div></div>
+    <div class="step"><div class="sn sn-p">4</div><div><div class="sh">Sincronización (Backmerge a staging)</div><div class="sd">Inmediatamente después de mergear en <code>main</code>, debes llevar ese mismo cambio a <code>staging</code> para evitar que la próxima feature en desarrollo elimine tu parche.</div></div><span class="badge b-p">Git</span></div>
+    <div class="step"><div class="sn sn-g">5</div><div><div class="sh">Post-mortem y Knowledge Base (KB)</div><div class="sd">El incidente termina documentando qué pasó y por qué en <code>11-incidents/</code> (BUG-XXX / INC-XXX). Si es un error operativo, se genera un Runbook y se guarda en <code>docs/</code> asegurando el estándar de calidad y prevención a futuro.</div></div><span class="badge b-g">ISO 9001</span></div>
+  </div>
+</div>
+
+</main>
+<script>
+function filterNav(q){document.querySelectorAll('nav a').forEach(a=>{a.style.display=a.textContent.toLowerCase().includes(q.toLowerCase())?'':'none';});}
+</script>
+</body>
+</html>

@@ -255,3 +255,74 @@ pub struct ListDirectoryResponse {
     pub items: Vec<DirectoryItemDto>,
     pub error: Option<String>,
 }
+
+/// Solicitud de sesión remota al estilo AnyDesk (ConnectionTypeDialog)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct SessionRequestDto {
+    pub request_id: String,
+    pub client_id: String,
+    pub client_alias: String,
+    #[serde(default = "default_session_role")]
+    pub requested_role: SessionRole,
+    #[serde(default = "default_true")]
+    pub allow_input: bool,
+    #[serde(default = "default_true")]
+    pub allow_clipboard: bool,
+    #[serde(default)]
+    pub allow_file_transfer: bool,
+    #[serde(default)]
+    pub timestamp: u64,
+}
+
+fn default_session_role() -> SessionRole {
+    SessionRole::FullControl
+}
+
+fn default_true() -> bool {
+    true
+}
+
+/// Decisión del anfitrión sobre la solicitud de sesión entrante (Aceptar / Rechazar)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct SessionDecisionDto {
+    pub request_id: String,
+    pub accept: bool,
+    pub granted_role: Option<SessionRole>,
+    #[serde(default = "default_true")]
+    pub allow_input: bool,
+    #[serde(default = "default_true")]
+    pub allow_clipboard: bool,
+    #[serde(default)]
+    pub allow_file_transfer: bool,
+    pub rejection_reason: Option<String>,
+}
+
+/// Respuesta de sesión remota entregada al cliente solicitante
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct SessionResponseDto {
+    pub success: bool,
+    pub request_id: String,
+    pub session_token: Option<String>,
+    pub granted_role: SessionRole,
+    pub allow_input: bool,
+    pub allow_clipboard: bool,
+    pub allow_file_transfer: bool,
+    pub error_message: Option<String>,
+}
+
+/// Información de la sesión activa en el anfitrión (HostDisconnectWindow)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct ActiveSessionInfo {
+    pub session_id: String,
+    pub peer_id: String,
+    pub peer_alias: String,
+    pub granted_role: SessionRole,
+    pub allow_input: bool,
+    pub allow_clipboard: bool,
+    pub allow_file_transfer: bool,
+    pub start_time: u64,
+}

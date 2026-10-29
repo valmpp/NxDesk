@@ -1,11 +1,5 @@
-version: '3.8'
-
 # ==============================================================================
-# NxDesk Stack: Servidor de Señalización + Caddy Reverse Proxy TLS Automático
-# ==============================================================================
-# Uso en producción:
-# 1. Configura tu dominio en Caddyfile (o variable DOMAIN)
-# 2. docker compose up -d
+# NxDesk Production Test Stack: Signaling Server (Rust) + Cloudflare & Ngrok WAN
 # ==============================================================================
 
 services:
@@ -14,36 +8,54 @@ services:
       context: ../../
       dockerfile: deploy/docker/Dockerfile.server
     container_name: nxdesk-signaling-server
-    restart: always
+    restart: unless-stopped
     environment:
       - RUST_LOG=info
+      - BIND_ADDR=0.0.0.0:5000
     networks:
       - nxdesk-net
     ports:
-      - "127.0.0.1:5000:5000"
+      - "5000:5000"
+    volumes:
+      - ../../dist:/home/nxdesk/dist:ro
     healthcheck:
-      test: ["CMD", "nc", "-z", "127.0.0.1", "5000"]
-      interval: 15s
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:5000/health"]
+      interval: 10s
       timeout: 5s
       retries: 3
 
-  caddy-proxy:
-    image: caddy:2-alpine
-    container_name: nxdesk-caddy-proxy
-    restart: always
-    environment:
-      - NXDESK_DOMAIN=${NXDESK_DOMAIN:-localhost}
-      - SIGNALING_UPSTREAM=nxdesk-server:5000
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp" # HTTP/3 QUIC
-    volumes:
-      - ../caddy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
+  # Túnel Cloudflare: Cero configuración ni authtoken requerido. Crea URL pública al instante.
+  cloudflare:
+    image: cloudflare/cloudflared:latest
+    container_name: nxdesk-cloudflare-tunnel
+    restart: unless-stopped
+    command:
+      - "tunnel"
+      - "--no-autoupdate"
+      - "--url"
+      - "http://nxdesk-server:5000"
     networks:
       - nxdesk-net
+    depends_on:
+      nxdesk-server:
+        condition: service_healthy
+
+  # Túnel Ngrok: Opcional (activar con --profile ngrok o definiendo NGROK_AUTHTOKEN)
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: nxdesk-ngrok-tunnel
+    restart: unless-stopped
+    command:
+      - "http"
+      - "nxdesk-server:5000"
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN:-}
+    ports:
+      - "4040:4040"
+    networks:
+      - nxdesk-net
+    profiles:
+      - ngrok
     depends_on:
       nxdesk-server:
         condition: service_healthy
@@ -51,7 +63,3 @@ services:
 networks:
   nxdesk-net:
     driver: bridge
-
-volumes:
-  caddy_data:
-  caddy_config:

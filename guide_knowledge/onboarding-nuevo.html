@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Dev Team · Onboarding</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#F7F6F3;--surface:#FFFFFF;--surface2:#F0EDE8;
+  --border:#E2DDD6;--border2:#CBC5BC;
+  --text:#1C1917;--text2:#57534E;--text3:#A8A29E;
+  --accent:#6D59E8;--accent-bg:#EEECFC;--accent-text:#3D2FB3;
+  --green:#0D9E74;--green-bg:#E3F5EE;--green-text:#065F46;
+  --amber:#B45309;--amber-bg:#FEF3C7;--amber-text:#92400E;
+  --red:#C2410C;--red-bg:#FFF1EE;--red-text:#9A3412;
+  --slate:#475569;--slate-bg:#F1F5F9;--slate-text:#1E293B;
+  --blue:#1D4ED8;--blue-bg:#EFF6FF;--blue-text:#1E40AF;
+  --purple:#7C3AED;--purple-bg:#F5F3FF;--purple-text:#5B21B6;
+  --nav-w:260px;--r:8px;--r-lg:14px;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{font-size:15px;scroll-behavior:smooth}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);line-height:1.65;display:flex;min-height:100vh}
+/* NAV */
+nav{width:var(--nav-w);min-width:var(--nav-w);background:var(--surface);border-right:1px solid var(--border);height:100vh;position:sticky;top:0;overflow-y:auto;display:flex;flex-direction:column;padding:0 0 2rem}
+.nav-logo{padding:1.25rem 1.25rem 1rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.5rem;font-weight:600;font-size:.85rem;color:var(--text2)}
+.nav-logo span{background:var(--accent-bg);color:var(--accent-text);font-family:var(--mono);font-size:.72rem;padding:.15rem .45rem;border-radius:4px}
+.nav-group{padding:.85rem 1.25rem .25rem;font-size:.67rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text3)}
+nav a{display:flex;align-items:center;gap:.55rem;padding:.4rem 1.25rem;font-size:.81rem;color:var(--text2);text-decoration:none;transition:background .12s,color .12s}
+nav a:hover{background:var(--bg);color:var(--text)}
+nav a.on{background:var(--accent-bg);color:var(--accent-text);font-weight:500}
+nav a .num{font-family:var(--mono);font-size:.68rem;color:var(--text3);min-width:22px}
+nav input{margin:.75rem 1.25rem;padding:.45rem .75rem;border:1px solid var(--border);border-radius:var(--r);font-size:.8rem;font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);outline:none;width:calc(100% - 2.5rem)}
+nav input:focus{border-color:var(--accent)}
+/* MAIN */
+main{flex:1;padding:3rem 2.5rem 5rem;max-width:880px}
+/* HERO */
+.hero-eyebrow{font-size:.7rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:.75rem}
+.hero h1{font-size:2rem;font-weight:700;letter-spacing:-.025em;line-height:1.2;margin-bottom:.875rem}
+.hero p{font-size:1rem;color:var(--text2);max-width:560px;line-height:1.65;margin-bottom:1.5rem}
+.philosophy{background:var(--accent-bg);border-left:3px solid var(--accent);border-radius:0 var(--r) var(--r) 0;padding:.9rem 1.1rem;font-size:.875rem;color:var(--accent-text);font-style:italic;margin-bottom:2.5rem}
+/* SECTIONS */
+.sec{margin-bottom:3.5rem;scroll-margin-top:2rem}
+.sec-hdr{display:flex;align-items:baseline;gap:.75rem;margin-bottom:1.25rem;padding-bottom:.75rem;border-bottom:1px solid var(--border)}
+.sec-num{font-family:var(--mono);font-size:.7rem;color:var(--text3);min-width:28px}
+.sec h2{font-size:1.2rem;font-weight:600;letter-spacing:-.015em}
+.sec h3{font-size:.9rem;font-weight:600;color:var(--text2);margin:1.25rem 0 .5rem}
+.sec p{font-size:.875rem;color:var(--text2);margin-bottom:.75rem;line-height:1.6}
+hr.div{border:none;border-top:1px solid var(--border);margin:3rem 0}
+/* GRID */
+.grid{display:grid;gap:.875rem;margin:1rem 0}
+.g2{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+.g4{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+/* CARD */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:1.1rem;transition:.18s}
+.card:hover{border-color:var(--border2);box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.card-icon{font-size:1.4rem;margin-bottom:.5rem;display:block}
+.card h4{font-size:.87rem;font-weight:600;margin-bottom:.3rem;color:var(--text)}
+.card p{font-size:.8rem;color:var(--text2);line-height:1.5}
+/* BADGE */
+.badge{font-size:.68rem;font-weight:600;padding:.2rem .55rem;border-radius:4px;display:inline-block;white-space:nowrap;letter-spacing:.02em}
+.b-a{background:var(--accent-bg);color:var(--accent-text)}
+.b-g{background:var(--green-bg);color:var(--green-text)}
+.b-y{background:var(--amber-bg);color:var(--amber-text)}
+.b-r{background:var(--red-bg);color:var(--red-text)}
+.b-s{background:var(--slate-bg);color:var(--slate-text)}
+.b-b{background:var(--blue-bg);color:var(--blue-text)}
+.b-p{background:var(--purple-bg);color:var(--purple-text)}
+/* ALERT */
+.alert{border-radius:var(--r);padding:.875rem 1rem;margin:1rem 0;display:flex;gap:.875rem;align-items:flex-start;font-size:.83rem;line-height:1.55}
+.ai{font-size:1rem;flex-shrink:0;margin-top:.1rem}
+.al-a{background:var(--accent-bg);border:1px solid #C7C2F5;color:var(--accent-text)}
+.al-g{background:var(--green-bg);border:1px solid #A7E8D0;color:var(--green-text)}
+.al-y{background:var(--amber-bg);border:1px solid #FCD34D;color:var(--amber-text)}
+.al-r{background:var(--red-bg);border:1px solid #FCA98A;color:var(--red-text)}
+.al-s{background:var(--slate-bg);border:1px solid #CBD5E1;color:var(--slate-text)}
+.al-b{background:var(--blue-bg);border:1px solid #BFDBFE;color:var(--blue-text)}
+/* TABLE */
+.tbl{width:100%;border-collapse:collapse;font-size:.82rem;margin:1rem 0 1.5rem;border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden}
+.tbl th{background:var(--surface2);color:var(--text2);font-size:.7rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:.65rem 1rem;text-align:left;border-bottom:1px solid var(--border)}
+.tbl td{padding:.65rem 1rem;border-bottom:1px solid var(--border);vertical-align:top;line-height:1.5;color:var(--text)}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:var(--bg)}
+/* STEPS */
+.steps{border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;margin:1rem 0}
+.step{display:grid;grid-template-columns:38px 1fr auto;gap:1rem;align-items:flex-start;padding:.875rem 1.25rem;border-bottom:1px solid var(--border)}
+.step:last-child{border-bottom:none}
+.sn{width:32px;height:32px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:.8rem;flex-shrink:0}
+.sn-a{background:var(--accent-bg);border:1px solid #C7C2F5;color:var(--accent)}
+.sn-g{background:var(--green-bg);border:1px solid #A7E8D0;color:var(--green)}
+.sn-y{background:var(--amber-bg);border:1px solid #FCD34D;color:var(--amber)}
+.sn-r{background:var(--red-bg);border:1px solid #FCA98A;color:var(--red)}
+.sn-s{background:var(--slate-bg);border:1px solid #CBD5E1;color:var(--slate)}
+.sn-b{background:var(--blue-bg);border:1px solid #BFDBFE;color:var(--blue)}
+.sn-p{background:var(--purple-bg);border:1px solid #DDD6FE;color:var(--purple)}
+.sh{font-size:.87rem;font-weight:600;color:var(--text);margin-bottom:.2rem}
+.sd{font-size:.78rem;color:var(--text2);line-height:1.5}
+/* EXPANDABLE */
+.exp{border:1px solid var(--border);border-radius:var(--r);margin-bottom:.4rem;overflow:hidden}
+.eh{display:flex;align-items:center;gap:.75rem;padding:.8rem 1rem;cursor:pointer;background:none;border:none;width:100%;text-align:left;font-family:'Inter',sans-serif;transition:background .12s}
+.eh:hover{background:var(--bg)}
+.ei{font-size:.95rem;flex-shrink:0}
+.et{font-size:.84rem;font-weight:600;color:var(--text);flex:1}
+.ec{font-size:.75rem;color:var(--text3);transition:transform .2s;margin-left:auto}
+.eb{display:none;padding:.8rem 1rem;border-top:1px solid var(--border);font-size:.82rem;color:var(--text2);line-height:1.6;background:var(--surface2)}
+.eb.open{display:block}.eh.open .ec{transform:rotate(180deg)}
+/* TIMELINE */
+.tl{position:relative;padding-left:2.25rem;margin:1rem 0}
+.tl::before{content:'';position:absolute;left:8px;top:6px;bottom:6px;width:2px;background:linear-gradient(to bottom,var(--accent),var(--green));border-radius:1px}
+.ti{position:relative;margin-bottom:1.25rem}
+.td{position:absolute;left:-1.9rem;top:4px;width:14px;height:14px;border-radius:50%;border:2px solid var(--bg);z-index:1}
+.td.done{background:var(--green)}.td.now{background:var(--accent);box-shadow:0 0 0 4px rgba(109,89,232,.15)}.td.next{background:var(--amber)}.td.fut{background:var(--border2)}
+.tp{font-size:.62rem;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--text3);margin-bottom:2px}
+.tt{font-size:.9rem;font-weight:600;color:var(--text);margin-bottom:.25rem}
+.tb{font-size:.8rem;color:var(--text2);line-height:1.55}
+/* CODE */
+code{font-family:var(--mono);font-size:.78rem;background:var(--accent-bg);color:var(--accent-text);padding:.1rem .4rem;border-radius:4px;border:1px solid #C7C2F5}
+pre{font-family:var(--mono);font-size:.75rem;background:var(--slate-bg);border:1px solid var(--border);border-radius:var(--r);padding:1rem;overflow-x:auto;margin:.75rem 0;line-height:1.75;color:var(--slate-text)}
+/* TREE */
+.filetree{border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;margin:1rem 0}
+.ft-hdr{background:var(--surface2);padding:.65rem 1rem;display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);font-size:.8rem;font-weight:500;border-bottom:1px solid var(--border)}
+.ft-body{padding:.75rem 1rem;font-family:var(--mono);font-size:.78rem;line-height:2;color:var(--text2)}
+.ft-dir{color:var(--green);font-weight:600}
+.ft-file{color:var(--blue)}
+.ft-note{color:var(--text3);font-size:.72rem}
+/* TEMPLATE BOX */
+.tmpl{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;margin:1rem 0}
+.tmpl-hdr{background:var(--surface2);padding:.6rem 1rem;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border)}
+.tmpl-title{font-family:var(--mono);font-size:.77rem;color:var(--text2)}
+.copy-btn{font-size:.72rem;font-weight:600;padding:.25rem .65rem;border-radius:5px;border:1px solid var(--border);background:var(--surface);color:var(--text2);cursor:pointer;font-family:'Inter',sans-serif;transition:.15s}
+.copy-btn:hover{background:var(--accent-bg);color:var(--accent-text);border-color:var(--accent)}
+.tmpl-body{padding:1rem;font-family:var(--mono);font-size:.75rem;line-height:1.75;color:var(--slate-text);white-space:pre;overflow-x:auto}
+/* ISO CARD */
+.iso-card{border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;margin-bottom:.875rem}
+.iso-hdr{display:grid;grid-template-columns:auto 1fr auto;gap:1rem;align-items:center;padding:1rem 1.25rem;background:var(--surface)}
+.iso-code{font-family:var(--mono);font-size:.78rem;font-weight:700;background:var(--accent-bg);color:var(--accent-text);padding:.2rem .55rem;border-radius:5px;white-space:nowrap}
+.iso-title{font-size:.9rem;font-weight:600;color:var(--text)}
+.iso-body{padding:0 1.25rem 1rem;border-top:1px solid var(--border);background:var(--bg)}
+.iso-body p{font-size:.8rem;color:var(--text2);line-height:1.55;margin-top:.75rem}
+/* TOOL SECTION */
+.tool-group{margin-bottom:1.75rem}
+.tool-group-hdr{font-size:.75rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:.75rem;padding:.5rem 0;border-bottom:1px solid var(--border)}
+.tool-item{display:flex;align-items:flex-start;gap:.875rem;padding:.75rem 0;border-bottom:1px solid var(--border)}
+.tool-item:last-child{border-bottom:none}
+.tool-name{font-size:.87rem;font-weight:600;color:var(--text);margin-bottom:.2rem;display:flex;align-items:center;gap:.4rem;flex-wrap:wrap}
+.tool-desc{font-size:.79rem;color:var(--text2);line-height:1.5}
+.tool-icon{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;background:var(--surface2);border:1px solid var(--border)}
+/* SUMMARY TABLE */
+.sum-tbl{width:100%;border-collapse:collapse;font-size:.82rem;margin:1rem 0}
+.sum-tbl th{background:var(--surface2);color:var(--text2);font-size:.7rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:.6rem .875rem;text-align:left;border:1px solid var(--border)}
+.sum-tbl td{padding:.6rem .875rem;border:1px solid var(--border);vertical-align:top;line-height:1.5;color:var(--text)}
+/* PHASE */
+.phase{border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;margin-bottom:.875rem}
+.phase-hdr{padding:.875rem 1.25rem;display:flex;align-items:center;gap:.875rem;cursor:pointer;background:var(--surface);border:none;width:100%;text-align:left;font-family:'Inter',sans-serif;transition:background .12s}
+.phase-hdr:hover{background:var(--bg)}
+.phase-badge{font-family:var(--mono);font-size:.72rem;font-weight:700;padding:.2rem .55rem;border-radius:5px;white-space:nowrap;flex-shrink:0}
+.phase-title{font-size:.9rem;font-weight:600;color:var(--text);flex:1}
+.phase-body{display:none;padding:.875rem 1.25rem;border-top:1px solid var(--border);background:var(--bg)}
+.phase-body.open{display:block}
+/* SCROLLBAR */
+::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+@media(max-width:800px){nav{display:none}body{display:block}main{padding:1.5rem 1.25rem 4rem;max-width:100%}}
+</style>
+</head>
+<body>
+<nav>
+  <div class="nav-logo"><span>docs/</span>Dev Team</div>
+  <input type="text" placeholder="Buscar..." oninput="filterNav(this.value)">
+  <div id="nav-items">
+    <div class="nav-group">Navegación</div>
+    <a href="index.html" ><span class="num">00</span>Inicio</a>
+    <a href="marco-calidad.html" ><span class="num">01</span>Marco de calidad</a>
+    <a href="estructura-docs.html" ><span class="num">02</span>Estructura docs/</a>
+    <a href="stack-herramientas.html" ><span class="num">03</span>Stack & Herramientas</a>
+    <a href="gestion-proyectos.html" ><span class="num">04</span>Gestión de proyectos</a>
+    <a href="onboarding-nuevo.html" class="on"><span class="num">05</span>Onboarding</a>
+  </div>
+</nav>
+<main>
+  
+<div class="hero-eyebrow">05 · Onboarding</div>
+<div class="sec-hdr" style="border:none;padding:0;margin-bottom:.5rem"><h2 style="font-size:1.75rem;font-weight:700;letter-spacing:-.025em">Operativo desde el día 1</h2></div>
+<p style="font-size:.97rem;color:var(--text2);margin-bottom:1.5rem">El onboarding no termina cuando el nuevo desarrollador "ya sabe cómo funciona todo". Termina cuando puede operar de forma autónoma sin depender de que alguien le explique algo.</p>
+<div class="philosophy">
+  <strong>El criterio real:</strong> el onboarding funcionó si, al mes, el nuevo integrante puede tomar un ticket de complejidad media, trabajarlo hasta el cierre y que nadie tenga que completar lo que dejó. Ese es el umbral mínimo.
+</div>
+
+<div class="sec">
+  <div class="sec-hdr"><span class="sec-num">01</span><h2>Día 1 — Acceso, contexto y primer commit</h2></div>
+  <div class="steps">
+    <div class="step"><div class="sn sn-a">AM</div><div><div class="sh">Sesión 1:1 con el TL — contexto, no procedimientos</div><div class="sd">El TL explica por qué existe el equipo, qué tipo de proyectos hace, cómo funciona la cadena de responsabilidad y cuál es el estándar de calidad que se espera. No es bienvenida corporativa — es contexto real.</div></div></div>
+    <div class="step"><div class="sn sn-a">AM</div><div><div class="sh">Accesos completos el día 1</div><div class="sd">Repositorio de código, servidor de desarrollo, BD de desarrollo, ClickUp/Linear, canal del equipo, Antigravity/Cursor, servidor de documentación. Si algún acceso falta al final del día 1, es un bloqueante que el TL resuelve ese mismo día.</div></div><span class="badge b-r">Sin excusas</span></div>
+    <div class="step"><div class="sn sn-a">PM</div><div><div class="sh">Leer docs/ del proyecto activo — no el código todavía</div><div class="sd">Primero el overview, luego la arquitectura, luego los módulos activos. El objetivo es tener el mapa mental antes de abrir el IDE. Documentar por escrito cualquier pregunta que surja — esas preguntas se responden en la sesión del día 2.</div></div></div>
+    <div class="step"><div class="sn sn-g">EOD</div><div><div class="sh">Compilar el proyecto localmente — primer commit</div><div class="sd">El proyecto compila en el entorno del nuevo integrante. Si no compila, es un bloqueante que el TL atiende ese mismo día. El primer commit puede ser tan pequeño como corregir un typo en la documentación — lo que importa es que el flujo completo funcionó: branch → commit → PR.</div></div><span class="badge b-g">Validación real</span></div>
+  </div>
+</div>
+
+<hr class="div">
+
+<div class="sec">
+  <div class="sec-hdr"><span class="sec-num">02</span><h2>Semana 1 — Primera contribución real</h2></div>
+  <div class="steps">
+    <div class="step"><div class="sn sn-b">Día 2</div><div><div class="sh">Code walk-through con el desarrollador más afín a su perfil</div><div class="sd">No una clase magistral — abrir el código del módulo más relevante para el nuevo integrante y recorrerlo en vivo. El nuevo integrante hace preguntas. El objetivo es que entienda cómo se aplica la arquitectura en código real de este proyecto específico.</div></div></div>
+    <div class="step"><div class="sn sn-b">Día 3</div><div><div class="sh">Primer ticket asignado — complejidad baja, criterios claros</div><div class="sd">El TL asigna un ticket de baja complejidad con criterios de aceptación muy específicos. No hay sorpresas en este ticket — el propósito es que el nuevo integrante recorra el flujo completo: refinamiento → branch → commits → PR → review → cierre.</div></div></div>
+    <div class="step"><div class="sn sn-b">Día 4-5</div><div><div class="sh">Primera PR — revisión formativa</div><div class="sd">La PR se revisa con el objetivo de enseñar, no solo de aprobar. El revisor explica cada comentario: por qué es un problema y cómo se corrige. Una PR con 5 comentarios explicados vale más que 10 PRs aprobadas sin feedback.</div></div><span class="badge b-a">Formativo</span></div>
+    <div class="step"><div class="sn sn-g">Viernes</div><div><div class="sh">Retrospectiva individual al fin de la semana 1</div><div class="sd">15 minutos con el TL: qué estuvo claro, qué fue confuso, qué falta para operar con más autonomía. El TL define el plan para la semana 2 basado en las brechas detectadas.</div></div></div>
+  </div>
+</div>
+
+<hr class="div">
+
+<div class="sec">
+  <div class="sec-hdr"><span class="sec-num">03</span><h2>Plan 30-60-90 días — hitos medibles</h2></div>
+  <div class="tl">
+    <div class="ti"><div class="td now"></div><div class="tp">Día 30</div><div class="tt">Autonomía en tickets de baja-media complejidad</div><div class="tb">
+      <strong>Técnico:</strong> completa tickets sin supervisión de arquitectura. Build limpio en todas sus PRs. CancellationToken propagado, lógica en capa correcta.<br>
+      <strong>Operativo:</strong> reporta bloqueos antes de las 2h. Ticket actualizado en tiempo real. Al menos 3 PRs aprobadas sin builds rotos.<br>
+      <strong>Señal de éxito:</strong> el TL no tuvo que completar nada que el nuevo integrante dejó a medias.
+    </div></div>
+    <div class="ti"><div class="td next"></div><div class="tp">Día 60</div><div class="tt">Módulos completos — BE + FE conectados</div><div class="tb">
+      <strong>Técnico:</strong> entrega módulos completos de forma autónoma — backend conectado a la interfaz, verificado end-to-end. Primer runbook o artículo de KB documentado.<br>
+      <strong>Operativo:</strong> hace code review formativo de un L1. Escaló bloqueos siempre con contexto y propuesta. Sin deuda técnica generada.<br>
+      <strong>Señal de éxito:</strong> el módulo que entregó fue verificado por QA sin necesitar ayuda del desarrollador.
+    </div></div>
+    <div class="ti"><div class="td fut"></div><div class="tp">Día 90</div><div class="tt">Ownership de un flujo — evaluación de continuidad</div><div class="tb">
+      <strong>Técnico:</strong> es responsable de al menos 1 flujo documentado. El bus factor de ese flujo pasó de 1 a 2. Propuso al menos 1 mejora al proceso o a la arquitectura.<br>
+      <strong>Operativo:</strong> historial limpio: cero builds rotos, cero código huérfano, cero deuda generada. Aplica los estándares sin recordatorios del TL.<br>
+      <strong>Evaluación:</strong> el TL y la coordinación deciden continuidad basándose en evidencia del historial — no en percepción.
+    </div></div>
+  </div>
+</div>
+
+<hr class="div">
+
+<div class="sec">
+  <div class="sec-hdr"><span class="sec-num">04</span><h2>Qué tiene disponible el nuevo integrante desde el día 1</h2></div>
+  <div class="grid g3">
+    <div class="card">
+      <span class="card-icon">📁</span>
+      <h4>docs/ del proyecto</h4>
+      <p>Arquitectura, módulos, flujos, base de datos, integraciones, guías de operación. No necesita preguntar cómo está construido el sistema — está documentado.</p>
+    </div>
+    <div class="card">
+      <span class="card-icon">📋</span>
+      <h4>Plantillas listas</h4>
+      <p>ADR, runbook, bug report, KB. No empieza desde cero cuando necesita documentar algo — copia la plantilla y completa los campos.</p>
+    </div>
+    <div class="card">
+      <span class="card-icon">⚙️</span>
+      <h4>Stack definido</h4>
+      <p>Las herramientas están elegidas, configuradas y documentadas. No hay que decidir qué ORM usar, qué framework de testing, qué logger — ya está decidido.</p>
+    </div>
+    <div class="card">
+      <span class="card-icon">📐</span>
+      <h4>Estándares claros</h4>
+      <p>Qué significa "listo", cómo se escribe un commit, cómo se describe una PR, cuándo se escala un bloqueo. No hay zona gris.</p>
+    </div>
+    <div class="card">
+      <span class="card-icon">🤖</span>
+      <h4>Agentes IA activos</h4>
+      <p>Antigravity/Cursor disponible desde el día 1. Puede generar estructura, depurar errores y revisar su propio código antes de abrir una PR desde la primera semana.</p>
+    </div>
+    <div class="card">
+      <span class="card-icon">🏥</span>
+      <h4>Runbooks del proyecto</h4>
+      <p>Si algo falla, hay un runbook que dice qué hacer. No necesita llamar al que construyó el módulo para resolver un incidente conocido.</p>
+    </div>
+  </div>
+</div>
+
+<hr class="div">
+
+<div class="sec">
+  <div class="sec-hdr"><span class="sec-num">05</span><h2>Cómo se transfiere conocimiento — métodos reales</h2></div>
+  <div class="steps">
+    <div class="step"><div class="sn sn-g">①</div><div><div class="sh">Programación en pareja sobre código real</div><div class="sd">El L2/L3 y el nuevo integrante trabajan juntos en un requerimiento real. No es una clase — es resolver algo en vivo. El nuevo integrante ve las decisiones en tiempo real y puede preguntar en el momento.</div></div><span class="badge b-g">Más efectivo</span></div>
+    <div class="step"><div class="sn sn-b">②</div><div><div class="sh">Code review explicado — no solo aprobado</div><div class="sd">El revisor explica cada comentario: por qué es un problema y cómo se corrige. Un review con 5 comentarios bien explicados tiene más valor de aprendizaje que 10 aprobaciones silenciosas.</div></div><span class="badge b-b">Alta transferencia</span></div>
+    <div class="step"><div class="sn sn-y">③</div><div><div class="sh">Delegar con red</div><div class="sd">El L2/L3 asigna un flujo al nuevo integrante pero permanece disponible. La señal de que funcionó: el nuevo integrante no escaló durante 3 ejecuciones consecutivas del flujo.</div></div><span class="badge b-y">Validación real</span></div>
+    <div class="step"><div class="sn sn-r">✗</div><div><div class="sh">Lo que no funciona — contratar sin documentar</div><div class="sd">Contratar más personas sin documentar primero no sube el bus factor. Si quien entra depende de preguntarle todo al senior, el bus factor sigue siendo 1 con más gente alrededor. El orden correcto: documentar → transferir → contratar si todavía falta capacidad.</div></div><span class="badge b-r">Anti-patrón</span></div>
+  </div>
+</div>
+</main>
+<script>
+function filterNav(q){
+  document.querySelectorAll('#nav-items a').forEach(a=>{
+    a.style.display=a.textContent.toLowerCase().includes(q.toLowerCase())?'':'none';
+  });
+}
+document.querySelectorAll('.eh').forEach(h=>{
+  h.addEventListener('click',()=>{
+    const b=h.nextElementSibling;
+    const o=b.classList.toggle('open');
+    h.classList.toggle('open',o);
+  });
+});
+document.querySelectorAll('.phase-hdr').forEach(h=>{
+  h.addEventListener('click',()=>{
+    const b=h.nextElementSibling;
+    b.classList.toggle('open');
+  });
+});
+function copyTmpl(id){
+  const el=document.getElementById(id);
+  if(!el)return;
+  navigator.clipboard.writeText(el.innerText||el.textContent).then(()=>{
+    const btn=event.target;
+    btn.textContent='✓ Copiado';
+    setTimeout(()=>btn.textContent='Copiar',1600);
+  });
+}
+</script>
+</body>
+</html>

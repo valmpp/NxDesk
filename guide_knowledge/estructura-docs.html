@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Dev Team · Estructura docs/</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#F7F6F3;--surface:#FFFFFF;--surface2:#F0EDE8;
+  --border:#E2DDD6;--border2:#CBC5BC;
+  --text:#1C1917;--text2:#57534E;--text3:#A8A29E;
+  --accent:#6D59E8;--accent-bg:#EEECFC;--accent-text:#3D2FB3;
+  --green:#0D9E74;--green-bg:#E3F5EE;--green-text:#065F46;
+  --amber:#B45309;--amber-bg:#FEF3C7;--amber-text:#92400E;
+  --red:#C2410C;--red-bg:#FFF1EE;--red-text:#9A3412;
+  --slate:#475569;--slate-bg:#F1F5F9;--slate-text:#1E293B;
+  --blue:#1D4ED8;--blue-bg:#EFF6FF;--blue-text:#1E40AF;
+  --purple:#7C3AED;--purple-bg:#F5F3FF;--purple-text:#5B21B6;
+  --nav-w:260px;--r:8px;--r-lg:14px;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{font-size:15px;scroll-behavior:smooth}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);line-height:1.65;display:flex;min-height:100vh}
+/* NAV */
+nav{width:var(--nav-w);min-width:var(--nav-w);background:var(--surface);border-right:1px solid var(--border);height:100vh;position:sticky;top:0;overflow-y:auto;display:flex;flex-direction:column;padding:0 0 2rem}
+.nav-logo{padding:1.25rem 1.25rem 1rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.5rem;font-weight:600;font-size:.85rem;color:var(--text2)}
+.nav-logo span{background:var(--accent-bg);color:var(--accent-text);font-family:var(--mono);font-size:.72rem;padding:.15rem .45rem;border-radius:4px}
+.nav-group{padding:.85rem 1.25rem .25rem;font-size:.67rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text3)}
+nav a{display:flex;align-items:center;gap:.55rem;padding:.4rem 1.25rem;font-size:.81rem;color:var(--text2);text-decoration:none;transition:background .12s,color .12s}
+nav a:hover{background:var(--bg);color:var(--text)}
+nav a.on{background:var(--accent-bg);color:var(--accent-text);font-weight:500}
+nav a .num{font-family:var(--mono);font-size:.68rem;color:var(--text3);min-width:22px}
+nav input{margin:.75rem 1.25rem;padding:.45rem .75rem;border:1px solid var(--border);border-radius:var(--r);font-size:.8rem;font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);outline:none;width:calc(100% - 2.5rem)}
+nav input:focus{border-color:var(--accent)}
+/* MAIN */
+main{flex:1;padding:3rem 2.5rem 5rem;max-width:880px}
+/* HERO */
+.hero-eyebrow{font-size:.7rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:.75rem}
+.hero h1{font-size:2rem;font-weight:700;letter-spacing:-.025em;line-height:1.2;margin-bottom:.875rem}
+.hero p{font-size:1rem;color:var(--text2);max-width:560px;line-height:1.65;margin-bottom:1.5rem}
+.philosophy{background:var(--accent-bg);border-left:3px solid var(--accent);border-radius:0 var(--r) var(--r) 0;padding:.9rem 1.1rem;font-size:.875rem;color:var(--accent-text);font-style:italic;margin-bottom:2.5rem}
+/* SECTIONS */
+.sec{margin-bottom:3.5rem;scroll-margin-top:2rem}
+.sec-hdr{display:flex;align-items:baseline;gap:.75rem;margin-bottom:1.25rem;padding-bottom:.75rem;border-bottom:1px solid var(--border)}
+.sec-num{font-family:var(--mono);font-size:.7rem;color:var(--text3);min-width:28px}
+.sec h2{font-size:1.2rem;font-weight:600;letter-spacing:-.015em}
+.sec h3{font-size:.9rem;font-weight:600;color:var(--text2);margin:1.25rem 0 .5rem}
+.sec p{font-size:.875rem;color:var(--text2);margin-bottom:.75rem;line-height:1.6}
+hr.div{border:none;border-top:1px solid var(--border);margin:3rem 0}
+/* GRID */
+.grid{display:grid;gap:.875rem;margin:1rem 0}
+.g2{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+.g4{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+/* CARD */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:1.1rem;transition:.18s}
+.card:hover{border-color:var(--border2);box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.card-icon{font-size:1.4rem;margin-bottom:.5rem;display:block}
+.card h4{font-size:.87rem;font-weight:600;margin-bottom:.3rem;color:var(--text)}
+.card p{font-size:.8rem;color:var(--text2);line-height:1.5}
+/* BADGE */
+.badge{font-size:.68rem;font-weight:600;padding:.2rem .55rem;border-radius:4px;display:inline-block;white-space:nowrap;letter-spacing:.02em}
+.b-a{background:var(--accent-bg);color:var(--accent-text)}
+.b-g{background:var(--green-bg);color:var(--green-text)}
+.b-y{background:var(--amber-bg);color:var(--amber-text)}
+.b-r{background:var(--red-bg);color:var(--red-text)}
+.b-s{background:var(--slate-bg);color:var(--slate-text)}
+.b-b{background:var(--blue-bg);color:var(--blue-text)}
+.b-p{background:var(--purple-bg);color:var(--purple-text)}
+/* ALERT */
+.alert{border-radius:var(--r);padding:.875rem 1rem;margin:1rem 0;display:flex;gap:.875rem;align-items:flex-start;font-size:.83rem;line-height:1.55}
+.ai{font-size:1rem;flex-shrink:0;margin-top:.1rem}
+.al-a{background:var(--accent-bg);border:1px solid #C7C2F5;color:var(--accent-text)}
+.al-g{background:var(--green-bg);border:1px solid #A7E8D0;color:var(--green-text)}
+.al-y{background:var(--amber-bg);border:1px solid #FCD34D;color:var(--amber-text)}
+.al-r{background:var(--red-bg);border:1px solid #FCA98A;color:var(--red-text)}
+.al-s{background:var(--slate-bg);border:1px solid #CBD5E1;color:var(--slate-text)}
+.al-b{background:var(--blue-bg);border:1px solid #BFDBFE;color:var(--blue-text)}
+/* TABLE */
+.tbl{width:100%;border-collapse:collapse;font-size:.82rem;margin:1rem 0 1.5rem;border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden}
+.tbl th{background:var(--surface2);color:var(--text2);font-size:.7rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:.65rem 1rem;text-align:left;border-bottom:1px solid var(--border)}
+.tbl td{padding:.65rem 1rem;border-bottom:1px solid var(--border);vertical-align:top;line-height:1.5;color:var(--text)}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:var(--bg)}
+/* STEPS */
+.steps{border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;margin:1rem 0}
+.step{display:grid;grid-template-columns:38px 1fr auto;gap:1rem;align-items:flex-start;padding:.875rem 1.25rem;border-bottom:1px solid var(--border)}
+.step:last-child{border-bottom:none}
+.sn{width:32px;height:32px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:.8rem;flex-shrink:0}
+.sn-a{background:var(--accent-bg);border:1px solid #C7C2F5;color:var(--accent)}
+.sn-g{background:var(--green-bg);border:1px solid #A7E8D0;color:var(--green)}
+.sn-y{background:var(--amber-bg);border:1px solid #FCD34D;color:var(--amber)}
+.sn-r{background:var(--red-bg);border:1px solid #FCA98A;color:var(--red)}
+.sn-s{background:var(--slate-bg);border:1px solid #CBD5E1;color:var(--slate)}
+.sn-b{background:var(--blue-bg);border:1px solid #BFDBFE;color:var(--blue)}
+.sn-p{background:var(--purple-bg);border:1px solid #DDD6FE;color:var(--purple)}
+.sh{font-size:.87rem;font-weight:600;color:var(--text);margin-bottom:.2rem}
+.sd{font-size:.78rem;color:var(--text2);line-height:1.5}
+/* EXPANDABLE */
+.exp{border:1px solid var(--border);border-radius:var(--r);margin-bottom:.4rem;overflow:hidden}
+.eh{display:flex;align-items:center;gap:.75rem;padding:.8rem 1rem;cursor:pointer;background:none;border:none;width:100%;text-align:left;font-family:'Inter',sans-serif;transition:background .12s}
+.eh:hover{background:var(--bg)}
+.ei{font-size:.95rem;flex-shrink:0}
+.et{font-size:.84rem;font-weight:600;color:var(--text);flex:1}
+.ec{font-size:.75rem;color:var(--text3);transition:transform .2s;margin-left:auto}
+.eb{display:none;padding:.8rem 1rem;border-top:1px solid var(--border);font-size:.82rem;color:var(--text2);line-height:1.6;background:var(--surface2)}
+.eb.open{display:block}.eh.open .ec{transform:rotate(180deg)}
+/* TIMELINE */
+.tl{position:relative;padding-left:2.25rem;margin:1rem 0}
+.tl::before{content:'';position:absolute;left:8px;top:6px;bottom:6px;width:2px;background:linear-gradient(to bottom,var(--accent),var(--green));border-radius:1px}
+.ti{position:relative;margin-bottom:1.25rem}
+.td{position:absolute;left:-1.9rem;top:4px;width:14px;height:14px;border-radius:50%;border:2px solid var(--bg);z-index:1}
+.td.done{background:var(--green)}.td.now{background:var(--accent);box-shadow:0 0 0 4px rgba(109,89,232,.15)}.td.next{background:var(--amber)}.td.fut{background:var(--border2)}
+.tp{font-size:.62rem;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--text3);margin-bottom:2px}
+.tt{font-size:.9rem;font-weight:600;color:var(--text);margin-bottom:.25rem}
+.tb{font-size:.8rem;color:var(--text2);line-height:1.55}
+/* CODE */
+code{font-family:var(--mono);font-size:.78rem;background:var(--accent-bg);color:var(--accent-text);padding:.1rem .4rem;border-radius:4px;border:1px solid #C7C2F5}
+pre{font-family:var(--mono);font-size:.75rem;background:var(--slate-bg);border:1px solid var(--border);border-radius:var(--r);padding:1rem;overflow-x:auto;margin:.75rem 0;line-height:1.75;color:var(--slate-text)}
+/* TREE */
+.filetree{border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;margin:1rem 0}
+.ft-hdr{background:var(--surface2);padding:.65rem 1rem;display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);font-size:.8rem;font-weight:500;border-bottom:1px solid var(--border)}
+.ft-body{padding:.75rem 1rem;font-family:var(--mono);font-size:.78rem;line-height:2;color:var(--text2)}
+.ft-dir{color:var(--green);font-weight:600}
+.ft-file{color:var(--blue)}
+.ft-note{color:var(--text3);font-size:.72rem}
+/* TEMPLATE BOX */
+.tmpl{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;margin:1rem 0}
+.tmpl-hdr{background:var(--surface2);padding:.6rem 1rem;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border)}
+.tmpl-title{font-family:var(--mono);font-size:.77rem;color:var(--text2)}
+.copy-btn{font-size:.72rem;font-weight:600;padding:.25rem .65rem;border-radius:5px;border:1px solid var(--border);background:var(--surface);color:var(--text2);cursor:pointer;font-family:'Inter',sans-serif;transition:.15s}
+.copy-btn:hover{background:var(--accent-bg);color:var(--accent-text);border-color:var(--accent)}
+.tmpl-body{padding:1rem;font-family:var(--mono);font-size:.75rem;line-height:1.75;color:var(--slate-text);white-space:pre;overflow-x:auto}
+/* ISO CARD */
+.iso-card{border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;margin-bottom:.875rem}
+.iso-hdr{display:grid;grid-template-columns:auto 1fr auto;gap:1rem;align-items:center;padding:1rem 1.25rem;background:var(--surface)}
+.iso-code{font-family:var(--mono);font-size:.78rem;font-weight:700;background:var(--accent-bg);color:var(--accent-text);padding:.2rem .55rem;border-radius:5px;white-space:nowrap}
+.iso-title{font-size:.9rem;font-weight:600;color:var(--text)}
+.iso-body{padding:0 1.25rem 1rem;border-top:1px solid var(--border);background:var(--bg)}
+.iso-body p{font-size:.8rem;color:var(--text2);line-height:1.55;margin-top:.75rem}
+/* TOOL SECTION */
+.tool-group{margin-bottom:1.75rem}
+.tool-group-hdr{font-size:.75rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:.75rem;padding:.5rem 0;border-bottom:1px solid var(--border)}
+.tool-item{display:flex;align-items:flex-start;gap:.875rem;padding:.75rem 0;border-bottom:1px solid var(--border)}
+.tool-item:last-child{border-bottom:none}
+.tool-name{font-size:.87rem;font-weight:600;color:var(--text);margin-bottom:.2rem;display:flex;align-items:center;gap:.4rem;flex-wrap:wrap}
+.tool-desc{font-size:.79rem;color:var(--text2);line-height:1.5}
+.tool-icon{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;background:var(--surface2);border:1px solid var(--border)}
+/* SUMMARY TABLE */
+.sum-tbl{width:100%;border-collapse:collapse;font-size:.82rem;margin:1rem 0}
+.sum-tbl th{background:var(--surface2);color:var(--text2);font-size:.7rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:.6rem .875rem;text-align:left;border:1px solid var(--border)}
+.sum-tbl td{padding:.6rem .875rem;border:1px solid var(--border);vertical-align:top;line-height:1.5;color:var(--text)}
+/* PHASE */
+.phase{border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;margin-bottom:.875rem}
+.phase-hdr{padding:.875rem 1.25rem;display:flex;align-items:center;gap:.875rem;cursor:pointer;background:var(--surface);border:none;width:100%;text-align:left;font-family:'Inter',sans-serif;transition:background .12s}
+.phase-hdr:hover{background:var(--bg)}
+.phase-badge{font-family:var(--mono);font-size:.72rem;font-weight:700;padding:.2rem .55rem;border-radius:5px;white-space:nowrap;flex-shrink:0}
+.phase-title{font-size:.9rem;font-weight:600;color:var(--text);flex:1}
+.phase-body{display:none;padding:.875rem 1.25rem;border-top:1px solid var(--border);background:var(--bg)}
+.phase-body.open{display:block}
+/* SCROLLBAR */
+::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+@media(max-width:800px){nav{display:none}body{display:block}main{padding:1.5rem 1.25rem 4rem;max-width:100%}}
+
+.sec-compare{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin:1rem 0}
+.sc-box{border-radius:14px;border:1px solid var(--border);overflow:hidden}
+.sc-hdr{padding:.6rem 1rem;font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.5rem}
+.sc-body{padding:.875rem 1rem;font-size:.79rem;color:var(--text2);line-height:1.6}
+.sc-body strong{color:var(--text);display:block;margin-bottom:.2rem}
+.ft-body span{display:inline}
+@media(max-width:700px){.sec-compare{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<nav>
+  <div class="nav-logo"><span>docs/</span>Dev Team</div>
+  <input type="text" placeholder="Buscar..." oninput="filterNav(this.value)">
+  <div class="nav-group">Navegación</div>
+  <a href="index.html"><span class="num">00</span>Inicio</a>
+<a href="marco-calidad.html"><span class="num">01</span>Marco de calidad</a>
+<a href="estructura-docs.html" class="on"><span class="num">02</span>Estructura docs/</a>
+<a href="stack-herramientas.html"><span class="num">03</span>Stack & Herramientas</a>
+<a href="gestion-proyectos.html"><span class="num">04</span>Gestión de proyectos</a>
+<a href="onboarding-nuevo.html"><span class="num">05</span>Onboarding</a>
+
+</nav>
+<main>
+<div class="hero-eyebrow">02 · Estructura docs/</div>
+<h1 style="font-size:1.75rem;font-weight:700;letter-spacing:-.025em;margin-bottom:.5rem">La memoria técnica<br>de cada proyecto</h1>
+<p style="font-size:.97rem;color:var(--text2);margin-bottom:1.5rem">Una estructura de <code>docs/</code> que funciona para cualquier stack. Se copia al repositorio de cada proyecto nuevo y se mantiene viva durante todo el ciclo de vida.</p>
+<div class="philosophy"><strong>Filosofía:</strong> <code>docs/</code> no es un almacén de archivos — es la memoria técnica, operativa y funcional del proyecto. Si algo ocurrió y no está en docs/, para el equipo siguiente no ocurrió.</div>
+
+<div class="sec">
+  <div class="sec-hdr"><span class="sec-num">—</span><h2>Estructura completa</h2></div>
+  <div class="filetree">
+    <div class="ft-hdr">📁 docs/ — estructura base de cualquier proyecto</div>
+    <div class="ft-body"><span class="ft-file">README.md</span> <span class="ft-note">← portal de entrada — lleva rápido al lugar correcto</span>  <span class="ft-file">DOCUMENTATION_RULES.md</span> <span class="ft-note">← reglas del equipo: cómo se documenta en este proyecto</span>
+
+<span class="ft-dir">00-overview/</span> <span class="ft-note">← qué es este proyecto</span>
+    <span class="ft-file">project-overview.md</span>  <span class="ft-file">objectives.md</span>  <span class="ft-file">scope.md</span> <span class="ft-note">← qué hace y qué NO hace</span>  <span class="ft-file">glossary.md</span>  <span class="ft-file">roadmap.md</span>
+
+<span class="ft-dir">01-architecture/</span> <span class="ft-note">← cómo está construido</span>
+    <span class="ft-file">architecture-overview.md</span>  <span class="ft-file">hexagonal-architecture.md</span>  <span class="ft-file">components.md</span>  <span class="ft-file">dependencies.md</span>
+    <span class="ft-dir">diagrams/</span>
+        <span class="ft-file">architecture.drawio</span>  <span class="ft-file">architecture.png</span>
+    <span class="ft-dir">decisions/</span> <span class="ft-note">← ADRs — por qué se tomaron las decisiones</span>
+        <span class="ft-file">ADR-001-hexagonal-architecture.md</span>  <span class="ft-file">ADR-002-database.md</span>  <span class="ft-file">ADR-003-authentication.md</span>
+
+<span class="ft-dir">02-modules/</span> <span class="ft-note">← qué hace cada parte del sistema</span>
+    <span class="ft-dir">authentication/</span>
+        <span class="ft-file">overview.md</span>  <span class="ft-file">business-rules.md</span>  <span class="ft-file">endpoints.md</span>
+    <span class="ft-dir">orders/</span>  <span class="ft-dir">notifications/</span>
+
+<span class="ft-dir">03-flows/</span> <span class="ft-note">← cómo funciona cada proceso de punta a punta</span>
+    <span class="ft-dir">authentication/</span>
+        <span class="ft-file">login.md</span>  <span class="ft-file">refresh-token.md</span>
+    <span class="ft-dir">orders/</span>
+        <span class="ft-file">create-order.md</span>  <span class="ft-file">status-transition.md</span>
+
+<span class="ft-dir">04-database/</span> <span class="ft-note">← cómo está modelada la información</span>
+    <span class="ft-file">architecture.md</span>  <span class="ft-file">tables.md</span>  <span class="ft-file">migrations.md</span>
+    <span class="ft-dir">queries/</span>
+        <span class="ft-file">common.md</span>  <span class="ft-file">troubleshooting.md</span>
+
+<span class="ft-dir">05-integrations/</span> <span class="ft-note">← sistemas externos conectados</span>
+    <span class="ft-dir">postgresql/</span>  <span class="ft-dir">smtp/</span>  <span class="ft-dir">external-api/</span>
+
+<span class="ft-dir">06-infrastructure/</span> <span class="ft-note">← dónde y sobre qué corre</span>
+    <span class="ft-file">servers.md</span>  <span class="ft-file">docker.md</span>  <span class="ft-file">nginx.md</span>  <span class="ft-file">environment-variables.md</span>
+
+<span class="ft-dir">07-operations/</span> <span class="ft-note">← cómo se administra</span>
+    <span class="ft-file">deployment.md</span>  <span class="ft-file">backup.md</span>  <span class="ft-file">monitoring.md</span>  <span class="ft-file">troubleshooting.md</span>
+    <span class="ft-dir">runbooks/</span>
+        <span class="ft-file">DEV-RUN-001-auth-down.md</span>  <span class="ft-file">DEV-RUN-002-db-connection.md</span>
+
+<span class="ft-dir">08-user-guides/</span> <span class="ft-note">← cómo se usa el sistema</span>
+    <span class="ft-dir">admin/</span>  <span class="ft-dir">supervisor/</span>  <span class="ft-dir">operator/</span>
+
+<span class="ft-dir">09-visual-docs/</span> <span class="ft-note">← HTML, mockups, walkthroughs, flujos visuales</span>
+    <span class="ft-dir">mockups/</span>  <span class="ft-dir">walkthroughs/</span>  <span class="ft-dir">diagrams/</span>
+
+<span class="ft-dir">10-knowledge-base/</span> <span class="ft-note">← cómo resolver sin depender de nadie</span>
+    <span class="ft-dir">how-to/</span>  <span class="ft-dir">troubleshooting/</span>  <span class="ft-dir">runbooks/</span>  <span class="ft-dir">concepts/</span>
+    <span class="ft-dir">recipes/</span> <span class="ft-note">← patrones reutilizables</span>
+
+<span class="ft-dir">11-incidents/</span> <span class="ft-note">← qué salió mal y qué se aprendió</span>
+    <span class="ft-dir">bugs/</span>
+        <span class="ft-file">BUG-001-login-error.md</span>
+    <span class="ft-dir">incidents/</span>
+        <span class="ft-file">INC-001-database-down.md</span>
+    <span class="ft-dir">known-issues/</span>
+
+<span class="ft-dir">12-security/</span> <span class="ft-note">← cómo está protegido</span>
+    <span class="ft-file">authentication.md</span>  <span class="ft-file">authorization.md</span>  <span class="ft-file">secrets.md</span> <span class="ft-note">← qué variables existen — NUNCA sus valores</span>  <span class="ft-file">vulnerabilities.md</span>
+
+<span class="ft-dir">13-testing/</span> <span class="ft-note">← estrategia de pruebas</span>
+    <span class="ft-file">strategy.md</span>  <span class="ft-file">unit-tests.md</span>  <span class="ft-file">integration-tests.md</span>  <span class="ft-file">e2e-tests.md</span>
+
+<span class="ft-dir">14-changelog/</span> <span class="ft-note">← qué cambió entre versiones</span>
+    <span class="ft-dir">releases/</span>
+        <span class="ft-file">v1.0.0.md</span>  <span class="ft-file">v1.1.0.md</span>
+    <span class="ft-file">breaking-changes.md</span>
+
+<span class="ft-dir">99-reference/</span> <span class="ft-note">← chuleta de consulta rápida</span>
+    <span class="ft-file">commands.md</span>  <span class="ft-file">environment-variables.md</span>  <span class="ft-file">ports.md</span>  <span class="ft-file">error-codes.md</span>
+
+<span class="ft-dir">_templates/</span> <span class="ft-note">← copiar a todo proyecto nuevo</span>
+    <span class="ft-dir">ADR/</span>  <span class="ft-dir">module/</span>  <span class="ft-dir">flow/</span>  <span class="ft-dir">bug/</span>  <span class="ft-dir">incident/</span>  <span class="ft-dir">knowledge-base/</span>  <span class="ft-dir">runbook/</span>
+    <span class="ft-dir">html/</span> <span class="ft-note">← identidad visual de HTMLs del proyecto</span></div>
+  </div>
+</div>
+
+<hr class="div">
+
+<div class="sec">
+  <div class="sec-hdr"><span class="sec-num">—</span><h2>Relación entre carpetas</h2></div>
+  <table class="tbl">
+    <thead><tr><th>Carpeta</th><th>Pregunta que responde</th><th>Formato</th></tr></thead>
+    <tbody>
+      <tr><td><code>00-overview/</code></td><td>¿Qué es este proyecto y para qué existe?</td><td>Markdown</td></tr>
+      <tr><td><code>01-architecture/</code></td><td>¿Cómo está construido? ¿Por qué así?</td><td>Markdown + ADR + drawio</td></tr>
+      <tr><td><code>02-modules/</code></td><td>¿Qué hace cada parte del sistema?</td><td>Markdown</td></tr>
+      <tr><td><code>03-flows/</code></td><td>¿Cómo funciona cada proceso de punta a punta?</td><td>Markdown + diagramas</td></tr>
+      <tr><td><code>04-database/</code></td><td>¿Cómo está modelada la información?</td><td>Markdown + SQL</td></tr>
+      <tr><td><code>05-integrations/</code></td><td>¿Con qué sistemas externos se comunica?</td><td>Markdown</td></tr>
+      <tr><td><code>06-infrastructure/</code></td><td>¿Dónde y sobre qué corre?</td><td>Markdown + docker-compose</td></tr>
+      <tr><td><code>07-operations/</code></td><td>¿Cómo se administra y opera?</td><td>Markdown + runbooks</td></tr>
+      <tr><td><code>08-user-guides/</code></td><td>¿Cómo lo usa el usuario final?</td><td>Markdown + HTML</td></tr>
+      <tr><td><code>09-visual-docs/</code></td><td>¿Cómo se ve y entiende visualmente?</td><td>HTML + drawio + video</td></tr>
+      <tr><td><code>10-knowledge-base/</code></td><td>¿Cómo resolver problemas sin depender de nadie?</td><td>Markdown</td></tr>
+      <tr><td><code>11-incidents/</code></td><td>¿Qué salió mal y qué se aprendió?</td><td>Markdown (BUG/INC)</td></tr>
+      <tr><td><code>12-security/</code></td><td>¿Cómo está protegido?</td><td>Markdown — sin valores reales</td></tr>
+      <tr><td><code>13-testing/</code></td><td>¿Cómo se verifica que funciona?</td><td>Markdown</td></tr>
+      <tr><td><code>14-changelog/</code></td><td>¿Qué cambió entre versiones?</td><td>Markdown</td></tr>
+      <tr><td><code>99-reference/</code></td><td>¿Dónde está X rápidamente?</td><td>Markdown</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<hr class="div">
+
+<div class="sec">
+  <div class="sec-hdr"><span class="sec-num">—</span><h2>Plantillas listas para copiar</h2></div>
+
+  <h3>ADR — Architecture Decision Record</h3>
+  <div class="tmpl">
+    <div class="tmpl-hdr"><span class="tmpl-title">_templates/ADR/template.md</span><button class="copy-btn" onclick="copyTmpl('adr-tpl')">Copiar</button></div>
+    <div class="tmpl-body" id="adr-tpl"># ADR-XXX — [Título]
+
+## Estado
+Aceptado
+
+## Fecha
+YYYY-MM-DD
+
+## Contexto
+El sistema necesita...
+
+## Problema
+Necesitamos decidir...
+
+## Alternativas consideradas
+1. Opción A — descripción
+2. Opción B — descripción
+
+## Decisión
+Utilizar [opción elegida].
+
+## Motivos
+- ...
+
+## Consecuencias
+### Positivas
+- ...
+### Trade-offs
+- ...
+
+## Referencias
+- ...</div>
+  </div>
+
+  <h3>Bug report</h3>
+  <div class="tmpl">
+    <div class="tmpl-hdr"><span class="tmpl-title">_templates/bug/template.md</span><button class="copy-btn" onclick="copyTmpl('bug-tpl')">Copiar</button></div>
+    <div class="tmpl-body" id="bug-tpl"># BUG-[XXX] — [Título]
+
+## Estado
+🔴 Abierto
+
+## Severidad
+Alta / Media / Baja
+
+## Fecha
+YYYY-MM-DD
+
+---
+
+## 1. Problema
+### Descripción
+...
+### Cómo reproducir
+1. ...
+
+## 2. Investigación
+...
+
+## 3. Intentos
+### Intento #1
+Resultado: ❌ No solucionó
+
+## 4. Causa
+Causa: ...  Certeza: 🟢 Confirmada
+
+## 5. Resolución
+Solución: ...
+
+## 6. Validación
+- [ ] Caso original resuelto
+- [ ] Sin regresiones
+
+## 7. Knowledge Base
+[Guía generada](../../10-knowledge-base/...)</div>
+  </div>
+
+  <h3>Runbook</h3>
+  <div class="tmpl">
+    <div class="tmpl-hdr"><span class="tmpl-title">_templates/runbook/template.md</span><button class="copy-btn" onclick="copyTmpl('run-tpl')">Copiar</button></div>
+    <div class="tmpl-body" id="run-tpl"># DEV-RUN-XXX — [Nombre del incidente]
+
+| Código | DEV-RUN-XXX | Versión | v1.0 |
+|--------|-------------|---------|------|
+| Actualizado | YYYY-MM | Autor | [Nombre] |
+
+## Historial
+| Versión | Fecha | Cambio | Autor |
+|---------|-------|--------|-------|
+| v1.0 | YYYY-MM | Creación | [Nombre] |
+
+---
+
+## 1. Cómo detectar
+...
+
+## 2. Qué revisar primero
+...
+
+## 3. Pasos para resolver
+1. ...
+
+## 4. A quién escalar
+Quién: [rol]  Cuándo: [condición]
+
+## 5. Cómo verificar
+...
+
+---
+Recurso visual: No / Sí — [archivo]</div>
+  </div>
+
+  <h3>Knowledge Base</h3>
+  <div class="tmpl">
+    <div class="tmpl-hdr"><span class="tmpl-title">_templates/knowledge-base/template.md</span><button class="copy-btn" onclick="copyTmpl('kb-tpl')">Copiar</button></div>
+    <div class="tmpl-body" id="kb-tpl"># [Título de la guía]
+
+## Cuándo usar esta guía
+...
+
+## Diagnóstico
+...
+
+## Solución paso a paso
+1. ...
+
+## Resultado esperado
+...
+
+## Qué no hacer
+- ❌ ...
+
+## Rollback
+...
+
+## Origen
+[BUG-XXX o INC-XXX que generó esta guía]</div>
+  </div>
+</div>
+
+<hr class="div">
+
+<div class="sec">
+  <div class="sec-hdr"><span class="sec-num">—</span><h2>10 reglas del sistema documental</h2></div>
+  <div class="steps">
+    <div class="step"><div class="sn sn-a">01</div><div><div class="sh">Documentar el porqué, no solo el qué</div><div class="sd">Si una decisión técnica puede generar dudas a futuro, va como ADR. El código dice qué — la documentación dice por qué.</div></div></div>
+    <div class="step"><div class="sn sn-a">02</div><div><div class="sh">Todo problema importante termina en KB</div><div class="sd">El ciclo es: BUG/INC → resolución → KB. Sin KB, el aprendizaje se pierde en la siguiente rotación de equipo.</div></div></div>
+    <div class="step"><div class="sn sn-a">03</div><div><div class="sh">Diferenciar mitigación de solución definitiva</div><div class="sd">Un workaround no es una solución. Se documenta como mitigación y el issue queda abierto hasta causa raíz confirmada.</div></div></div>
+    <div class="step"><div class="sn sn-a">04</div><div><div class="sh">La KB debe ser accionable</div><div class="sd">Cuándo usarla, diagnóstico, pasos, resultado esperado, qué no hacer y rollback. Una guía que no da el resultado esperado no sirve.</div></div></div>
+    <div class="step"><div class="sn sn-a">05</div><div><div class="sh">Markdown para conocimiento — HTML para lo visual</div><div class="sd">Arquitectura, ADR, BD, APIs, incidentes → Markdown. Mockups, walkthroughs, flujos interactivos → HTML en 09-visual-docs/.</div></div></div>
+    <div class="step"><div class="sn sn-a">06</div><div><div class="sh">Los documentos se enlazan entre sí</div><div class="sd">Bugs → KB que generaron. Módulos → sus flujos. Flujos → sus integraciones. La documentación es una red, no una lista de archivos.</div></div></div>
+    <div class="step"><div class="sn sn-r">07</div><div><div class="sh">Nunca secrets reales en docs/</div><div class="sd">Solo se documenta qué variables existen, no sus valores. Las credenciales reales van en Vault o en variables de entorno del servidor.</div></div></div>
+    <div class="step"><div class="sn sn-a">08</div><div><div class="sh">Encabezado ISO en todo documento</div><div class="sd">Código, versión, fecha, autor e historial de cambios. Sin encabezado, el documento no está bajo control documental.</div></div></div>
+    <div class="step"><div class="sn sn-a">09</div><div><div class="sh">Actualizar cuando cambia el sistema</div><div class="sd">Si cambió el código que afecta un flujo documentado, el documento sube de versión en el mismo PR. Código actualizado con docs desactualizadas = deuda.</div></div></div>
+    <div class="step"><div class="sn sn-a">10</div><div><div class="sh">La documentación crece con el proyecto</div><div class="sd">No es tarea final del proyecto — es continua. Cada cambio relevante, incidente o decisión nueva alimenta el sistema.</div></div></div>
+  </div>
+</div></main>
+<script>
+function filterNav(q){document.querySelectorAll('nav a').forEach(a=>{a.style.display=a.textContent.toLowerCase().includes(q.toLowerCase())?'':'none';});}
+document.querySelectorAll('.eh').forEach(h=>{h.addEventListener('click',()=>{const b=h.nextElementSibling;const o=b.classList.toggle('open');h.classList.toggle('open',o);});});
+document.querySelectorAll('.phase-hdr').forEach(h=>{h.addEventListener('click',()=>{h.nextElementSibling.classList.toggle('open');});});
+function copyTmpl(id){const el=document.getElementById(id);if(!el)return;navigator.clipboard.writeText(el.innerText||el.textContent).then(()=>{const btn=event.target;btn.textContent='✓ Copiado';setTimeout(()=>btn.textContent='Copiar',1600);});}
+</script>
+</body>
+</html>

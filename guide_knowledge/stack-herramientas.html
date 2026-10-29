@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Dev Team · Stack & Herramientas</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#F7F6F3;--surface:#FFFFFF;--surface2:#F0EDE8;
+  --border:#E2DDD6;--border2:#CBC5BC;
+  --text:#1C1917;--text2:#57534E;--text3:#A8A29E;
+  --accent:#6D59E8;--accent-bg:#EEECFC;--accent-text:#3D2FB3;
+  --green:#0D9E74;--green-bg:#E3F5EE;--green-text:#065F46;
+  --amber:#B45309;--amber-bg:#FEF3C7;--amber-text:#92400E;
+  --red:#C2410C;--red-bg:#FFF1EE;--red-text:#9A3412;
+  --slate:#475569;--slate-bg:#F1F5F9;--slate-text:#1E293B;
+  --blue:#1D4ED8;--blue-bg:#EFF6FF;--blue-text:#1E40AF;
+  --purple:#7C3AED;--purple-bg:#F5F3FF;--purple-text:#5B21B6;
+  --nav-w:260px;--r:8px;--r-lg:14px;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{font-size:15px;scroll-behavior:smooth}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);line-height:1.65;display:flex;min-height:100vh}
+/* NAV */
+nav{width:var(--nav-w);min-width:var(--nav-w);background:var(--surface);border-right:1px solid var(--border);height:100vh;position:sticky;top:0;overflow-y:auto;display:flex;flex-direction:column;padding:0 0 2rem}
+.nav-logo{padding:1.25rem 1.25rem 1rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.5rem;font-weight:600;font-size:.85rem;color:var(--text2)}
+.nav-logo span{background:var(--accent-bg);color:var(--accent-text);font-family:var(--mono);font-size:.72rem;padding:.15rem .45rem;border-radius:4px}
+.nav-group{padding:.85rem 1.25rem .25rem;font-size:.67rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text3)}
+nav a{display:flex;align-items:center;gap:.55rem;padding:.4rem 1.25rem;font-size:.81rem;color:var(--text2);text-decoration:none;transition:background .12s,color .12s}
+nav a:hover{background:var(--bg);color:var(--text)}
+nav a.on{background:var(--accent-bg);color:var(--accent-text);font-weight:500}
+nav a .num{font-family:var(--mono);font-size:.68rem;color:var(--text3);min-width:22px}
+nav input{margin:.75rem 1.25rem;padding:.45rem .75rem;border:1px solid var(--border);border-radius:var(--r);font-size:.8rem;font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);outline:none;width:calc(100% - 2.5rem)}
+nav input:focus{border-color:var(--accent)}
+/* MAIN */
+main{flex:1;padding:3rem 2.5rem 5rem;max-width:880px}
+/* HERO */
+.hero-eyebrow{font-size:.7rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:.75rem}
+.hero h1{font-size:2rem;font-weight:700;letter-spacing:-.025em;line-height:1.2;margin-bottom:.875rem}
+.hero p{font-size:1rem;color:var(--text2);max-width:560px;line-height:1.65;margin-bottom:1.5rem}
+.philosophy{background:var(--accent-bg);border-left:3px solid var(--accent);border-radius:0 var(--r) var(--r) 0;padding:.9rem 1.1rem;font-size:.875rem;color:var(--accent-text);font-style:italic;margin-bottom:2.5rem}
+/* SECTIONS */
+.sec{margin-bottom:3.5rem;scroll-margin-top:2rem}
+.sec-hdr{display:flex;align-items:baseline;gap:.75rem;margin-bottom:1.25rem;padding-bottom:.75rem;border-bottom:1px solid var(--border)}
+.sec-num{font-family:var(--mono);font-size:.7rem;color:var(--text3);min-width:28px}
+.sec h2{font-size:1.2rem;font-weight:600;letter-spacing:-.015em}
+.sec h3{font-size:.9rem;font-weight:600;color:var(--text2);margin:1.25rem 0 .5rem}
+.sec p{font-size:.875rem;color:var(--text2);margin-bottom:.75rem;line-height:1.6}
+hr.div{border:none;border-top:1px solid var(--border);margin:3rem 0}
+/* GRID */
+.grid{display:grid;gap:.875rem;margin:1rem 0}
+.g2{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+.g4{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+/* CARD */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:1.1rem;transition:.18s}
+.card:hover{border-color:var(--border2);box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.card-icon{font-size:1.4rem;margin-bottom:.5rem;display:block}
+.card h4{font-size:.87rem;font-weight:600;margin-bottom:.3rem;color:var(--text)}
+.card p{font-size:.8rem;color:var(--text2);line-height:1.5}
+/* BADGE */
+.badge{font-size:.68rem;font-weight:600;padding:.2rem .55rem;border-radius:4px;display:inline-block;white-space:nowrap;letter-spacing:.02em}
+.b-a{background:var(--accent-bg);color:var(--accent-text)}
+.b-g{background:var(--green-bg);color:var(--green-text)}
+.b-y{background:var(--amber-bg);color:var(--amber-text)}
+.b-r{background:var(--red-bg);color:var(--red-text)}
+.b-s{background:var(--slate-bg);color:var(--slate-text)}
+.b-b{background:var(--blue-bg);color:var(--blue-text)}
+.b-p{background:var(--purple-bg);color:var(--purple-text)}
+/* ALERT */
+.alert{border-radius:var(--r);padding:.875rem 1rem;margin:1rem 0;display:flex;gap:.875rem;align-items:flex-start;font-size:.83rem;line-height:1.55}
+.ai{font-size:1rem;flex-shrink:0;margin-top:.1rem}
+.al-a{background:var(--accent-bg);border:1px solid #C7C2F5;color:var(--accent-text)}
+.al-g{background:var(--green-bg);border:1px solid #A7E8D0;color:var(--green-text)}
+.al-y{background:var(--amber-bg);border:1px solid #FCD34D;color:var(--amber-text)}
+.al-r{background:var(--red-bg);border:1px solid #FCA98A;color:var(--red-text)}
+.al-s{background:var(--slate-bg);border:1px solid #CBD5E1;color:var(--slate-text)}
+.al-b{background:var(--blue-bg);border:1px solid #BFDBFE;color:var(--blue-text)}
+/* TABLE */
+.tbl{width:100%;border-collapse:collapse;font-size:.82rem;margin:1rem 0 1.5rem;border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden}
+.tbl th{background:var(--surface2);color:var(--text2);font-size:.7rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:.65rem 1rem;text-align:left;border-bottom:1px solid var(--border)}
+.tbl td{padding:.65rem 1rem;border-bottom:1px solid var(--border);vertical-align:top;line-height:1.5;color:var(--text)}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:var(--bg)}
+/* STEPS */
+.steps{border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;margin:1rem 0}
+.step{display:grid;grid-template-columns:38px 1fr auto;gap:1rem;align-items:flex-start;padding:.875rem 1.25rem;border-bottom:1px solid var(--border)}
+.step:last-child{border-bottom:none}
+.sn{width:32px;height:32px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:.8rem;flex-shrink:0}
+.sn-a{background:var(--accent-bg);border:1px solid #C7C2F5;color:var(--accent)}
+.sn-g{background:var(--green-bg);border:1px solid #A7E8D0;color:var(--green)}
+.sn-y{background:var(--amber-bg);border:1px solid #FCD34D;color:var(--amber)}
+.sn-r{background:var(--red-bg);border:1px solid #FCA98A;color:var(--red)}
+.sn-s{background:var(--slate-bg);border:1px solid #CBD5E1;color:var(--slate)}
+.sn-b{background:var(--blue-bg);border:1px solid #BFDBFE;color:var(--blue)}
+.sn-p{background:var(--purple-bg);border:1px solid #DDD6FE;color:var(--purple)}
+.sh{font-size:.87rem;font-weight:600;color:var(--text);margin-bottom:.2rem}
+.sd{font-size:.78rem;color:var(--text2);line-height:1.5}
+/* EXPANDABLE */
+.exp{border:1px solid var(--border);border-radius:var(--r);margin-bottom:.4rem;overflow:hidden}
+.eh{display:flex;align-items:center;gap:.75rem;padding:.8rem 1rem;cursor:pointer;background:none;border:none;width:100%;text-align:left;font-family:'Inter',sans-serif;transition:background .12s}
+.eh:hover{background:var(--bg)}
+.ei{font-size:.95rem;flex-shrink:0}
+.et{font-size:.84rem;font-weight:600;color:var(--text);flex:1}
+.ec{font-size:.75rem;color:var(--text3);transition:transform .2s;margin-left:auto}
+.eb{display:none;padding:.8rem 1rem;border-top:1px solid var(--border);font-size:.82rem;color:var(--text2);line-height:1.6;background:var(--surface2)}
+.eb.open{display:block}.eh.open .ec{transform:rotate(180deg)}
+/* TIMELINE */
+.tl{position:relative;padding-left:2.25rem;margin:1rem 0}
+.tl::before{content:'';position:absolute;left:8px;top:6px;bottom:6px;width:2px;background:linear-gradient(to bottom,var(--accent),var(--green));border-radius:1px}
+.ti{position:relative;margin-bottom:1.25rem}
+.td{position:absolute;left:-1.9rem;top:4px;width:14px;height:14px;border-radius:50%;border:2px solid var(--bg);z-index:1}
+.td.done{background:var(--green)}.td.now{background:var(--accent);box-shadow:0 0 0 4px rgba(109,89,232,.15)}.td.next{background:var(--amber)}.td.fut{background:var(--border2)}
+.tp{font-size:.62rem;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--text3);margin-bottom:2px}
+.tt{font-size:.9rem;font-weight:600;color:var(--text);margin-bottom:.25rem}
+.tb{font-size:.8rem;color:var(--text2);line-height:1.55}
+/* CODE */
+code{font-family:var(--mono);font-size:.78rem;background:var(--accent-bg);color:var(--accent-text);padding:.1rem .4rem;border-radius:4px;border:1px solid #C7C2F5}
+pre{font-family:var(--mono);font-size:.75rem;background:var(--slate-bg);border:1px solid var(--border);border-radius:var(--r);padding:1rem;overflow-x:auto;margin:.75rem 0;line-height:1.75;color:var(--slate-text)}
+/* TREE */
+.filetree{border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;margin:1rem 0}
+.ft-hdr{background:var(--surface2);padding:.65rem 1rem;display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);font-size:.8rem;font-weight:500;border-bottom:1px solid var(--border)}
+.ft-body{padding:.75rem 1rem;font-family:var(--mono);font-size:.78rem;line-height:2;color:var(--text2)}
+.ft-dir{color:var(--green);font-weight:600}
+.ft-file{color:var(--blue)}
+.ft-note{color:var(--text3);font-size:.72rem}
+/* TEMPLATE BOX */
+.tmpl{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;margin:1rem 0}
+.tmpl-hdr{background:var(--surface2);padding:.6rem 1rem;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border)}
+.tmpl-title{font-family:var(--mono);font-size:.77rem;color:var(--text2)}
+.copy-btn{font-size:.72rem;font-weight:600;padding:.25rem .65rem;border-radius:5px;border:1px solid var(--border);background:var(--surface);color:var(--text2);cursor:pointer;font-family:'Inter',sans-serif;transition:.15s}
+.copy-btn:hover{background:var(--accent-bg);color:var(--accent-text);border-color:var(--accent)}
+.tmpl-body{padding:1rem;font-family:var(--mono);font-size:.75rem;line-height:1.75;color:var(--slate-text);white-space:pre;overflow-x:auto}
+/* ISO CARD */
+.iso-card{border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;margin-bottom:.875rem}
+.iso-hdr{display:grid;grid-template-columns:auto 1fr auto;gap:1rem;align-items:center;padding:1rem 1.25rem;background:var(--surface)}
+.iso-code{font-family:var(--mono);font-size:.78rem;font-weight:700;background:var(--accent-bg);color:var(--accent-text);padding:.2rem .55rem;border-radius:5px;white-space:nowrap}
+.iso-title{font-size:.9rem;font-weight:600;color:var(--text)}
+.iso-body{padding:0 1.25rem 1rem;border-top:1px solid var(--border);background:var(--bg)}
+.iso-body p{font-size:.8rem;color:var(--text2);line-height:1.55;margin-top:.75rem}
+/* TOOL SECTION */
+.tool-group{margin-bottom:1.75rem}
+.tool-group-hdr{font-size:.75rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:.75rem;padding:.5rem 0;border-bottom:1px solid var(--border)}
+.tool-item{display:flex;align-items:flex-start;gap:.875rem;padding:.75rem 0;border-bottom:1px solid var(--border)}
+.tool-item:last-child{border-bottom:none}
+.tool-name{font-size:.87rem;font-weight:600;color:var(--text);margin-bottom:.2rem;display:flex;align-items:center;gap:.4rem;flex-wrap:wrap}
+.tool-desc{font-size:.79rem;color:var(--text2);line-height:1.5}
+.tool-icon{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;background:var(--surface2);border:1px solid var(--border)}
+/* SUMMARY TABLE */
+.sum-tbl{width:100%;border-collapse:collapse;font-size:.82rem;margin:1rem 0}
+.sum-tbl th{background:var(--surface2);color:var(--text2);font-size:.7rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:.6rem .875rem;text-align:left;border:1px solid var(--border)}
+.sum-tbl td{padding:.6rem .875rem;border:1px solid var(--border);vertical-align:top;line-height:1.5;color:var(--text)}
+/* PHASE */
+.phase{border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;margin-bottom:.875rem}
+.phase-hdr{padding:.875rem 1.25rem;display:flex;align-items:center;gap:.875rem;cursor:pointer;background:var(--surface);border:none;width:100%;text-align:left;font-family:'Inter',sans-serif;transition:background .12s}
+.phase-hdr:hover{background:var(--bg)}
+.phase-badge{font-family:var(--mono);font-size:.72rem;font-weight:700;padding:.2rem .55rem;border-radius:5px;white-space:nowrap;flex-shrink:0}
+.phase-title{font-size:.9rem;font-weight:600;color:var(--text);flex:1}
+.phase-body{display:none;padding:.875rem 1.25rem;border-top:1px solid var(--border);background:var(--bg)}
+.phase-body.open{display:block}
+/* SCROLLBAR */
+::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+@media(max-width:800px){nav{display:none}body{display:block}main{padding:1.5rem 1.25rem 4rem;max-width:100%}}
+
+.sec-compare{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin:1rem 0}
+.sc-box{border-radius:14px;border:1px solid var(--border);overflow:hidden}
+.sc-hdr{padding:.6rem 1rem;font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.5rem}
+.sc-body{padding:.875rem 1rem;font-size:.79rem;color:var(--text2);line-height:1.6}
+.sc-body strong{color:var(--text);display:block;margin-bottom:.2rem}
+.ft-body{padding:.875rem 1.1rem;font-family:var(--mono);font-size:.77rem;line-height:2;color:var(--text2);overflow-x:auto;word-break:break-all}
+@media(max-width:700px){.sec-compare{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<nav>
+  <div class="nav-logo"><span>docs/</span>Dev Team</div>
+  <input type="text" placeholder="Buscar..." oninput="filterNav(this.value)">
+  <div class="nav-group">Navegación</div>
+  <a href="index.html"><span class="num">00</span>Inicio</a>
+<a href="marco-calidad.html"><span class="num">01</span>Marco de calidad</a>
+<a href="estructura-docs.html"><span class="num">02</span>Estructura docs/</a>
+<a href="stack-herramientas.html" class="on"><span class="num">03</span>Stack & Herramientas</a>
+<a href="gestion-proyectos.html"><span class="num">04</span>Gestión de proyectos</a>
+<a href="onboarding-nuevo.html"><span class="num">05</span>Onboarding</a>
+
+</nav>
+<main>
+<div class="hero-eyebrow">03 · Stack &amp; Herramientas</div>
+<h1 style="font-size:1.75rem;font-weight:700;letter-spacing:-.025em;margin-bottom:.5rem">El stack completo del equipo</h1>
+<p style="font-size:.97rem;color:var(--text2);margin-bottom:1.5rem">Herramientas de pago y open source, organizadas por categoría. Cada una está aquí porque resuelve un problema concreto.</p>
+<div class="alert al-g"><span class="ai">✅</span><div><strong>Criterio de selección:</strong> si hay open source que resuelve el mismo problema igual de bien, se elige el open source. Si la herramienta de pago reduce fricción o riesgo operativo significativamente, se justifica el costo.</div></div>
+
+<div class="sec">
+  <div class="sec-hdr"><span class="sec-num">01</span><h2>Backend — .NET 9 / C#</h2></div>
+  <div class="tool-group">
+    <div class="tool-group-hdr">Core — obligatorio en todo proyecto</div>
+    <div class="tool-item"><div class="tool-icon">⚙️</div><div><div class="tool-name">.NET 9 / ASP.NET Core <span class="badge b-g">Open source</span></div><div class="tool-desc">.NET 9 trae mejoras de rendimiento en HTTP/3, mejor soporte AOT (Ahead-of-Time compilation) y OpenAPI built-in nativo. Web API, Minimal API, Background Services, Workers. El OpenAPI integrado de .NET 9 elimina la necesidad de Swashbuckle en la mayoría de escenarios.</div></div></div>
+    <div class="tool-item"><div class="tool-icon">🗄️</div><div><div class="tool-name">Dapper <span class="badge b-g">Open source</span></div><div class="tool-desc">Micro-ORM sobre ADO.NET. Elegido sobre EF Core para control total de queries SQL. En tablas con alta concurrencia o millones de registros, EF genera joins innecesarios que multiplican el tiempo de respuesta.</div></div></div>
+    <div class="tool-item"><div class="tool-icon">🔐</div><div><div class="tool-name">Data Protection API (.NET 9) <span class="badge b-g">Open source</span></div><div class="tool-desc">.NET 9 refuerza la Data Protection API con soporte nativo para almacenar claves en HashiCorp Vault o Azure Key Vault, y rotación automática configurable por proyecto. Cifrado de cookies de sesión, tokens CSRF y datos PII en reposo.</div></div></div>
+    <div class="tool-item"><div class="tool-icon">🎫</div><div><div class="tool-name">JWT + Refresh Tokens con revocación <span class="badge b-g">Open source</span></div><div class="tool-desc">Access token de vida corta (15 min). Refresh token con hash en BD y registro de rotación. Detección de robo de token: si un refresh token se usa dos veces, se revoca toda la familia de tokens del usuario.</div></div></div>
+    <div class="tool-item"><div class="tool-icon">📄</div><div><div class="tool-name">Scalar <span class="badge b-g">Open source</span> <span class="badge b-b">Reemplaza Swagger UI</span></div><div class="tool-desc">Documentación moderna de APIs OpenAPI. Integración nativa con el nuevo <code>app.MapOpenApi()</code> de .NET 9. UI más limpia que Swagger UI, mejor experiencia de prueba de endpoints, soporte para múltiples versiones de API y autenticación integrada en la interfaz. Sin necesidad de Swashbuckle.</div></div></div>
+    <div class="tool-item"><div class="tool-icon">⏱️</div><div><div class="tool-name">Rate Limiting integrado (.NET 9) <span class="badge b-g">Open source</span></div><div class="tool-desc">.NET 9 incluye rate limiting nativo en el pipeline de ASP.NET Core: fixed window, sliding window, concurrency y token bucket. Configurable por endpoint, por usuario autenticado y por IP. No requiere middleware externo para el caso base.</div></div></div>
+    <div class="tool-item"><div class="tool-icon">📋</div><div><div class="tool-name">Serilog + Seq <span class="badge b-g">Open source</span> <span class="badge b-y">Seq: pago en cloud</span></div><div class="tool-desc">Logging estructurado: userId, operationId, traceId, clientId en cada log. Seq self-hosteable. Los logs son la primera herramienta de diagnóstico en producción y parte del modelo de observabilidad documentado en <code>07-operations/monitoring.md</code>.</div></div></div>
+  </div>
+  <div class="tool-group">
+    <div class="tool-group-hdr">Testing backend</div>
+    <div class="tool-item"><div class="tool-icon">🧪</div><div><div class="tool-name">xUnit <span class="badge b-g">Open source</span></div><div class="tool-desc">Framework de tests unitarios e integración estándar del ecosistema .NET. Tests de dominio, aplicación y repositorios.</div></div></div>
+    <div class="tool-item"><div class="tool-icon">🎭</div><div><div class="tool-name">Moq <span class="badge b-g">Open source</span></div><div class="tool-desc">Mocking para tests unitarios. Aísla dependencias y prueba lógica de negocio sin base de datos real.</div></div></div>
+    <div class="tool-item"><div class="tool-icon">📊</div><div><div class="tool-name">NBomber / k6 <span class="badge b-g">Open source</span></div><div class="tool-desc">Load testing antes de cada despliegue a producción. NBomber para integración nativa .NET; k6 para scripts más flexibles. Directamente relacionado con ISO 25010 (eficiencia de rendimiento).</div></div></div>
+  </div>
+</div>
+
+<hr class="div">
+
+<div class="sec">
+  <div class="sec-hdr"><span class="sec-num">02</span><h2>Frontend — Blazor (.NET 9)</h2></div>
+  <div class="tool-group">
+    <div class="tool-item"><div class="tool-icon">🎨</div><div><div class="tool-name">Blazor Server + WASM Hybrid (.NET 9) <span class="badge b-g">Open source</span></div><div class="tool-desc">Server para supervisores (estado en servidor, conexión SignalR). WASM para clientes externos (sin conexión permanente). Un solo lenguaje en todo el stack — los desarrolladores backend contribuyen al frontend sin cambiar de contexto.</div></div></div>
+    <div class="tool-item"><div class="tool-icon">🧩</div><div><div class="tool-name">MudBlazor / Radzen <span class="badge b-g">Open source</span></div><div class="tool-desc">Librería de componentes. Se elige una por proyecto. La librería compartida entre proyectos acelera el arranque de nuevos clientes.</div></div></div>
+    <div class="tool-item"><div class="tool-icon">⚡</div><div><div class="tool-name">Virtualize (built-in Blazor) <span class="badge b-g">Open source</span></div><div class="tool-desc">Obligatorio en cualquier lista con más de 100 elementos. Sin virtualización el navegador colapsa con datos reales de producción. No negociable.</div></div></div>
+    <div class="tool-item"><div class="tool-icon">🧪</div><div><div class="tool-name">bUnit + Playwright <span class="badge b-g">Open source</span></div><div class="tool-desc">bUnit para tests de componentes Blazor sin browser real. Playwright para E2E en Chromium, Firefox y WebKit.</div></div></div>
+  </div>
+</div>
+
+<hr class="div">
+
+<div class="sec">
+  <div class="sec-hdr"><span class="sec-num">03</span><h2>Base de datos</h2></div>
+  <div class="tool-group">
+    <div class="tool-item"><div class="tool-icon">🐘</div><div><div class="tool-name">PostgreSQL 16 <span class="badge b-g">Open source</span></div><div class="tool-desc">Principal. FDW, particionamiento con pg_partman, alta concurrencia. Elegido sobre SQL Server por licenciamiento y rendimiento en el tipo de carga de los proyectos del equipo.</div></div></div>
+    <div class="tool-item"><div class="tool-icon">📦</div><div><div class="tool-name">Npgsql + Dapper <span class="badge b-g">Open source</span></div><div class="tool-desc">Driver .NET para PostgreSQL y micro-ORM. Pool de conexiones gestionado, tipos específicos de PostgreSQL, queries explícitas y optimizables con EXPLAIN ANALYZE.</div></div></div>
+    <div class="tool-item"><div class="tool-icon">⚡</div><div><div class="tool-name">Redis <span class="badge b-g">Open source</span></div><div class="tool-desc">Caché en memoria y pub/sub. Se añade cuando el perfil de carga justifica respuestas sub-10ms en lecturas frecuentes. La decisión de incluirlo se documenta como ADR.</div></div></div>
+  </div>
+</div>
+
+<hr class="div">
+
+<div class="sec">
+  <div class="sec-hdr"><span class="sec-num">04</span><h2>Infraestructura &amp; DevOps</h2></div>
+  <div class="tool-group">
+    <div class="tool-item"><div class="tool-icon">🐳</div><div><div class="tool-name">Docker + Docker Compose <span class="badge b-g">Open source</span></div><div class="tool-desc">Contenedorización completa. Dockerfile multi-stage para imágenes optimizadas en producción. Compose para el stack completo en desarrollo y staging.</div></div></div>
+    <div class="tool-item"><div class="tool-icon">🌐</div><div><div class="tool-name">Nginx <span class="badge b-g">Open source</span></div><div class="tool-desc">Proxy inverso hacia los contenedores .NET. Terminación SSL, headers hardened (HSTS, CSP, X-Frame-Options, Permissions-Policy), rate limiting por IP en endpoints sensibles, compresión gzip. Primera línea de defensa del perímetro.</div></div></div>
+    <div class="tool-item"><div class="tool-icon">🔑</div><div><div class="tool-name">Certbot / Let's Encrypt <span class="badge b-g">Open source</span></div><div class="tool-desc">Certificados SSL/TLS con renovación automática. Sin excusas para HTTP en cualquier ambiente accesible desde el exterior.</div></div></div>
+    <div class="tool-item"><div class="tool-icon">📊</div><div><div class="tool-name">Grafana + Loki + Prometheus <span class="badge b-g">Open source</span></div><div class="tool-desc">Stack de observabilidad completo self-hosteable. Prometheus recolecta métricas (latencia, error rate, uso de recursos). Loki centraliza logs. Grafana visualiza dashboards con alertas configuradas.</div></div></div>
+    <div class="tool-item"><div class="tool-icon">⚙️</div><div><div class="tool-name">GitHub Actions / GitLab CI <span class="badge b-g">Open source self-hosted</span></div><div class="tool-desc">CI/CD integrado. Pipeline: build → test → SonarQube → deploy. El pipeline no aprueba si algún test falla o si SonarQube detecta issues críticos de seguridad.</div></div></div>
+  </div>
+</div>
+
+<hr class="div">
+
+<div class="sec">
+  <div class="sec-hdr"><span class="sec-num">05</span><h2>🔒 Seguridad — modelo por capas</h2></div>
+  <div class="alert al-r"><span class="ai">🛡️</span><div><strong>La seguridad no es una feature — es una propiedad del sistema.</strong> Cada capa tiene su responsabilidad. Si una falla, la siguiente la contiene. Este es el modelo que documenta <code>12-security/</code> en cada proyecto.</div></div>
+
+  <h3 style="margin-top:1.5rem">Capa 1 — Aplicación (.NET 9)</h3>
+  <div class="tool-group">
+    <div class="tool-item"><div class="tool-icon">🔐</div><div><div class="tool-name">Data Protection API (.NET 9) <span class="badge b-g">Open source</span></div><div class="tool-desc">Cifrado de datos sensibles en reposo. .NET 9 agrega soporte nativo para almacenar las claves en HashiCorp Vault con rotación automática. Cubre cookies de sesión, tokens CSRF y campos PII en BD.</div></div></div>
+    <div class="tool-item"><div class="tool-icon">🎫</div><div><div class="tool-name">JWT + detección de robo de token <span class="badge b-g">Open source</span></div><div class="tool-desc">Access token corto (15 min) + refresh token con hash en BD. Si un refresh token se reutiliza, se revoca toda la familia de tokens del usuario — patrón de detección de robo de sesión.</div></div></div>
+    <div class="tool-item"><div class="tool-icon">⏱️</div><div><div class="tool-name">Rate limiting nativo (.NET 9) <span class="badge b-g">Open source</span></div><div class="tool-desc">Por endpoint, por usuario autenticado y por IP. Fixed window en login y registro. Token bucket en APIs de alta frecuencia. Complementa el rate limiting de Nginx — dos capas independientes.</div></div></div>
+    <div class="tool-item"><div class="tool-icon">✅</div><div><div class="tool-name">Validación de inputs en la frontera <span class="badge b-g">Open source</span></div><div class="tool-desc">Todo dato externo validado antes de procesar: tamaño máximo, formato esperado, detección de payloads ofuscados (base64, URL encoding, null bytes). Sin validación, no hay procesamiento.</div></div></div>
+    <div class="tool-item"><div class="tool-icon">🔒</div><div><div class="tool-name">BCrypt.Net + PBKDF2 <span class="badge b-g">Open source</span></div><div class="tool-desc">BCrypt para passwords. PBKDF2 cuando se requiere compatibilidad con auditorías formales. Work factor documentado en ADR — ajustado al hardware del servidor y revisado en cada release mayor.</div></div></div>
+  </div>
+
+  <h3>Capa 2 — Proxy (Nginx)</h3>
+  <div class="tool-group">
+    <div class="tool-item"><div class="tool-icon">🌐</div><div><div class="tool-name">Headers de seguridad hardened</div><div class="tool-desc"><code>Strict-Transport-Security</code> con preload. <code>Content-Security-Policy</code> restrictivo por proyecto. <code>X-Frame-Options: DENY</code>. <code>Permissions-Policy</code> sin acceso a cámara/micrófono/geolocalización. <code>Referrer-Policy: strict-origin</code>. Configuración completa en <code>06-infrastructure/nginx.md</code>.</div></div></div>
+    <div class="tool-item"><div class="tool-icon">⏱️</div><div><div class="tool-name">Rate limiting en Nginx</div><div class="tool-desc">Límites por IP en <code>/api/auth/</code>, <code>/api/register</code> y otros endpoints sensibles antes de que lleguen al servidor .NET. Primera barrera contra brute force y credential stuffing.</div></div></div>
+  </div>
+
+  <h3>Capa 3 — Sistema operativo: fail2ban vs CrowdSec</h3>
+  <div class="alert al-s" style="margin-bottom:1rem"><span class="ai">📋</span><div>La elección entre fail2ban y CrowdSec se documenta como ADR en cada proyecto. No son equivalentes — tienen casos de uso distintos. La tabla de abajo define cuándo va cada uno.</div></div>
+  <div class="sec-compare">
+    <div class="sc-box" style="border-color:#FCD34D">
+      <div class="sc-hdr" style="background:var(--amber-bg);color:var(--amber-text)">fail2ban <span class="badge b-g">Open source</span></div>
+      <div class="sc-body">
+        <strong>Cuándo elegirlo</strong>
+        Servidor único. Sin requisito de cumplimiento formal. El equipo de infraestructura es pequeño y se necesita simplicidad operativa.
+        <strong style="margin-top:.875rem">Qué hace</strong>
+        Lee logs de Nginx, SSH y la aplicación. Detecta patrones de ataque (brute force, escaneos) y banea la IP a nivel de iptables por tiempo configurable.
+        <strong style="margin-top:.875rem">Configuración documentada en</strong>
+        <code>12-security/authentication.md</code>
+        <strong style="margin-top:.875rem">Mantenimiento</strong>
+        Bajo. Las reglas (jails) son archivos de texto. Sin agente central ni dashboard.
+      </div>
+    </div>
+    <div class="sc-box" style="border-color:#A7E8D0">
+      <div class="sc-hdr" style="background:var(--green-bg);color:var(--green-text)">CrowdSec <span class="badge b-g">Open source</span></div>
+      <div class="sc-body">
+        <strong>Cuándo elegirlo</strong>
+        Multi-servidor. Datos sensibles de clientes. Requisito de cumplimiento formal (ISO 27001). Mayor superficie de ataque o tráfico elevado.
+        <strong style="margin-top:.875rem">Qué agrega vs fail2ban</strong>
+        Inteligencia de amenazas compartida: IPs maliciosas conocidas se bloquean proactivamente antes de atacar. Múltiples bouncers (Nginx, iptables, Cloudflare). Dashboard centralizado de amenazas activas.
+        <strong style="margin-top:.875rem">Configuración documentada en</strong>
+        <code>12-security/vulnerabilities.md</code>
+        <strong style="margin-top:.875rem">Mantenimiento</strong>
+        Medio. Agente en cada servidor. Dashboard centralizado para ver amenazas en todos los proyectos.
+      </div>
+    </div>
+  </div>
+
+  <h3>Capa 4 — Gestión de secretos</h3>
+  <div class="tool-group">
+    <div class="tool-item"><div class="tool-icon">🔐</div><div><div class="tool-name">HashiCorp Vault <span class="badge b-g">Open source</span></div><div class="tool-desc">Gestión centralizada de secretos. Acceso por política: cada servicio solo accede a lo que necesita. Audit log de quién accedió a qué y cuándo. Integración con Data Protection API de .NET 9 para almacenamiento de claves de cifrado. Self-hosteable.</div></div></div>
+    <div class="tool-item"><div class="tool-icon">🔒</div><div><div class="tool-name">dotnet user-secrets (desarrollo local) <span class="badge b-g">Open source</span></div><div class="tool-desc">Para secrets en desarrollo. Nunca en <code>appsettings.json</code> ni en el repositorio. Staging y producción usan Vault o variables de entorno del servidor.</div></div></div>
+  </div>
+
+  <h3>Capa 5 — Análisis estático y detección de leaks</h3>
+  <div class="tool-group">
+    <div class="tool-item"><div class="tool-icon">🔍</div><div><div class="tool-name">SonarQube Community <span class="badge b-g">Open source</span></div><div class="tool-desc">Análisis estático en CI/CD. Detecta vulnerabilidades OWASP, code smells y deuda técnica. El pipeline no aprueba si hay issues de seguridad críticos o altos sin resolución.</div></div></div>
+    <div class="tool-item"><div class="tool-icon">🔐</div><div><div class="tool-name">GitGuardian <span class="badge b-y">Pago — gratis para open source</span></div><div class="tool-desc">Detecta secrets en el historial de Git: API keys, passwords, tokens — incluso en commits ya subidos. Primera defensa contra leaks de credenciales accidentales.</div></div></div>
+    <div class="tool-item"><div class="tool-icon">📋</div><div><div class="tool-name">OWASP Dependency-Check <span class="badge b-g">Open source</span></div><div class="tool-desc">Detecta dependencias NuGet con CVE conocidas. Se ejecuta en CI/CD. Si una dependencia tiene CVE crítica, el build falla hasta que se actualice.</div></div></div>
+  </div>
+
+  <h3>Qué documenta <code>12-security/</code> en cada proyecto</h3>
+  <table class="tbl">
+    <thead><tr><th>Archivo</th><th>Qué contiene</th></tr></thead>
+    <tbody>
+      <tr><td><code>authentication.md</code></td><td>JWT, refresh tokens, configuración de fail2ban o CrowdSec (según el ADR), intentos máximos por endpoint.</td></tr>
+      <tr><td><code>authorization.md</code></td><td>Modelo de claims y permisos. Qué rol puede hacer qué. Cómo se valida en el middleware de .NET 9.</td></tr>
+      <tr><td><code>secrets.md</code></td><td>Qué variables de entorno existen y qué protegen — NUNCA los valores reales. Solo nombres y propósito.</td></tr>
+      <tr><td><code>vulnerabilities.md</code></td><td>Vectores mitigados, configuración activa de protección en infraestructura, política de actualizaciones de dependencias.</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<hr class="div">
+
+<div class="sec">
+  <div class="sec-hdr"><span class="sec-num">06</span><h2>IDEs y agentes IA</h2></div>
+  <div class="tool-group">
+    <div class="tool-item"><div class="tool-icon">⚡</div><div><div class="tool-name">Antigravity IDE <span class="badge b-y">Pago</span></div><div class="tool-desc">IDE principal. Agentes IA nativos para generación, refactorización, debugging y revisión sin cambiar de contexto.</div></div></div>
+    <div class="tool-item"><div class="tool-icon">💻</div><div><div class="tool-name">Cursor <span class="badge b-y">Pago — plan gratuito limitado</span></div><div class="tool-desc">Alternativa con agente integrado. Entiende el contexto de todo el proyecto, no solo el archivo abierto.</div></div></div>
+    <div class="tool-item"><div class="tool-icon">🔧</div><div><div class="tool-name">JetBrains Rider + AI Assistant <span class="badge b-y">Pago</span></div><div class="tool-desc">Para proyectos .NET de alta complejidad donde el análisis estático avanzado de Rider aporta mayor productividad.</div></div></div>
+  </div>
+</div>
+
+<hr class="div">
+
+<div class="sec">
+  <div class="sec-hdr"><span class="sec-num">07</span><h2>Gestión de proyectos y APIs</h2></div>
+  <div class="tool-group">
+    <div class="tool-item"><div class="tool-icon">📋</div><div><div class="tool-name">ClickUp <span class="badge b-y">Pago</span> → Linear <span class="badge b-y">Pago</span></div><div class="tool-desc">ClickUp actual. Linear reemplaza: branch → tarea "En progreso", merge → ticket cerrado automáticamente. Trazabilidad total del commit al cliente.</div></div></div>
+    <div class="tool-item"><div class="tool-icon">🗂️</div><div><div class="tool-name">Plane <span class="badge b-g">Open source — self-hosted</span></div><div class="tool-desc">Alternativa open source a Linear/Jira. Self-hosteable si el cliente exige que los datos de gestión estén en infraestructura propia.</div></div></div>
+    <div class="tool-item"><div class="tool-icon">📮</div><div><div class="tool-name">Bruno <span class="badge b-g">Open source</span> / Postman <span class="badge b-y">Pago</span></div><div class="tool-desc">Testing de APIs. Bruno guarda las colecciones como archivos en el repositorio — se versionan con Git. Scalar también expone un cliente de prueba integrado directamente en la documentación de la API.</div></div></div>
+    <div class="tool-item"><div class="tool-icon">📊</div><div><div class="tool-name">draw.io / diagrams.net <span class="badge b-g">Open source</span></div><div class="tool-desc">Diagramas de arquitectura, flujos, entidad-relación. Los .drawio se guardan en <code>01-architecture/diagrams/</code> junto con el .png exportado. Integración con VS Code y Rider.</div></div></div>
+  </div>
+</div>
+
+<hr class="div">
+
+<div class="sec">
+  <div class="sec-hdr"><span class="sec-num">08</span><h2>Automatización y RPA</h2></div>
+  <div class="tool-group">
+    <div class="tool-item"><div class="tool-icon">🐍</div><div><div class="tool-name">Python 3.11+ <span class="badge b-g">Open source</span></div><div class="tool-desc">Lenguaje principal para RPA y procesamiento de datos. Generadores eficientes, async, Regex avanzado, integración con PostgreSQL via psycopg2.</div></div></div>
+    <div class="tool-item"><div class="tool-icon">🌐</div><div><div class="tool-name">Playwright (Python) <span class="badge b-g">Open source</span></div><div class="tool-desc">Automatización de navegadores para RPA web. Más robusto que Selenium en SPAs y aplicaciones modernas.</div></div></div>
+    <div class="tool-item"><div class="tool-icon">⏰</div><div><div class="tool-name">Hangfire <span class="badge b-g">Open source core</span></div><div class="tool-desc">Scheduling de tareas recurrentes en .NET. Background jobs con dashboard visual de estado. Para automatizaciones que viven dentro del ecosistema .NET 9.</div></div></div>
+  </div>
+</div></main>
+<script>
+function filterNav(q){document.querySelectorAll('nav a').forEach(a=>{a.style.display=a.textContent.toLowerCase().includes(q.toLowerCase())?'':'none';});}
+document.querySelectorAll('.eh').forEach(h=>{h.addEventListener('click',()=>{const b=h.nextElementSibling;const o=b.classList.toggle('open');h.classList.toggle('open',o);});});
+document.querySelectorAll('.phase-hdr').forEach(h=>{h.addEventListener('click',()=>{h.nextElementSibling.classList.toggle('open');});});
+function copyTmpl(id){const el=document.getElementById(id);if(!el)return;navigator.clipboard.writeText(el.innerText||el.textContent).then(()=>{const btn=event.target;btn.textContent='✓ Copiado';setTimeout(()=>btn.textContent='Copiar',1600);});}
+</script>
+</body>
+</html>

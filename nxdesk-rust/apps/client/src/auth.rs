@@ -91,10 +91,16 @@ impl AuthManager {
         let mut tokens = self.active_tokens.write().await;
         tokens.remove(token);
     }
+
+    /// Otorga un token de sesión directamente con el rol aprobado por el anfitrión
+    pub async fn grant_token(&self, token: String, role: SessionRole) {
+        let mut tokens = self.active_tokens.write().await;
+        tokens.insert(token, role);
+    }
 }
 
 /// Generador criptográficamente seguro de tokens de sesión (CSPRNG 192-bit)
-fn generate_secure_token() -> String {
+pub fn generate_secure_token() -> String {
     use rand::RngCore;
     use std::fmt::Write;
     let mut bytes = [0u8; 24]; // 192 bits de entropía criptográfica

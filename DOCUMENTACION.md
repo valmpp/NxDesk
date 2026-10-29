@@ -7,16 +7,14 @@ NxDesk es una plataforma de escritorio remoto, asistencia técnica y streaming d
 
 ## 2. Tecnologías y Requisitos
 
-### Tecnologías Principales
-* **Rust (2021 Edition):** Motor nativo de streaming, Tokio 1.38, Axum 0.8.9 (Web Dashboard), Tokio-Tungstenite (WebSockets), Win32 GDI / SendInput.
-* **C# (.NET 10.0):** Cliente de escritorio alternativo con Avalonia UI 11.3 (Fluent MVVM), SharpDX (DirectX 11 DXGI) y ASP.NET Core SignalR.
+* **Rust (2021 Edition / 100% Nativo):** Cliente de escritorio nativo con eframe / egui (aceleración Glow OpenGL), Servidor de señalización asíncrono Tokio-Tungstenite, motor de captura multimonitor Win32, inyector de entrada `SendInput`, radar UDP LAN y sandbox hermético de archivos.
+* **Arquitectura:** Monorepo Rust modularizado en 7 crates (`core`, `capture`, `input`, `discovery`, `signaling`, `file-transfer`, `terminal`) y 2 aplicaciones ejecutables (`client`, `server`).
 * **Protocolos:** WebSockets con delimitador SignalR `0x1E`, UDP Broadcast en puerto `5001`.
 
 ### Requisitos del Sistema
-* **Windows 10 / 11 (64-bit)** o **Linux** (con PipeWire / X11).
+* **Windows 10 / 11 (64-bit)** o **Linux** (con OpenGL / X11 / Wayland).
 * **Rust Toolchain:** `rustc` y `cargo` 1.75+ (`rustup default stable`).
-* **.NET SDK:** Versión 10.0+ (solo para compilación del ecosistema C#).
-* Red local Wi-Fi o Ethernet para streaming y radar de descubrimiento.
+* Red local Wi-Fi, Ethernet o WAN para streaming y control remoto.
 
 ---
 
@@ -28,16 +26,20 @@ NxDesk es una plataforma de escritorio remoto, asistencia técnica y streaming d
    cd NxDesk
    ```
 
-2. **Compilar el ecosistema Rust (Cliente y Servidor):**
+2. **Compilar y Ejecutar el Servidor de Señalización (Rust):**
    ```powershell
    cd nxdesk-rust
-   cargo build --release
+   cargo run -p nxdesk-server
    ```
 
-3. **(Opcional) Compilar la solución .NET 10:**
+3. **Compilar y Ejecutar el Cliente de Escritorio Nativo (Rust):**
    ```powershell
-   cd ..
-   dotnet build NxDesk.slnx
+   cargo run -p nxdesk-client
+   ```
+
+4. **Ejecutar Suite de Pruebas Automatizadas y E2E:**
+   ```powershell
+   cargo test --workspace
    ```
 
 4. **Configurar regla de Firewall en Windows (PowerShell como Administrador):**
@@ -47,31 +49,29 @@ NxDesk es una plataforma de escritorio remoto, asistencia técnica y streaming d
 
 ---
 
-## 4. Uso
+## 4. Uso de la Aplicación de Escritorio
 
-### Caso 1: Compartir Pantalla con Web Dashboard (Modo Anfitrión)
-Inicia la captura y el servidor web para acceso local o remoto:
+### Caso 1: Ejecutar la Aplicación de Escritorio Nativa (NxDesk Desktop App)
+Abre la interfaz gráfica nativa de escritorio (Avalonia UI con soporte para bandeja del sistema, radar LAN y conexión AnyDesk):
 ```powershell
-cargo run -p nxdesk-client -- --share --port 5050
+dotnet run --project src/NxDesk.Client/NxDesk.Client.csproj
 ```
-Accede desde cualquier navegador en `http://localhost:5050` o `http://<IP-HOST>:5050`.
+> **Características de la aplicación de escritorio:**
+> * Abre una ventana nativa de Windows (sin necesidad de abrir navegadores web).
+> * Muestra tu ID de puesto de trabajo de 9 dígitos.
+> * Radar de equipos descubiertos en red local en tiempo real con tarjetas interactivas.
+> * Cuadro de diálogo de petición y autorización de conexión entrante (`ConnectionTypeDialog`).
+> * Ventana flotante de sesión activa con temporizador y botón de desconexión (`HostDisconnectWindow`).
 
-### Caso 2: Conectar como Visor por ID o IP Directa
-* **Vía Web Dashboard:** Abre `http://localhost:5050`, escribe el ID (ej. `111-222-333`) o la IP directa en el buscador superior y presiona **⚡ Conectar**.
-* **Vía Línea de Comandos (CLI):**
-  ```powershell
-  # Conexión por ID AnyDesk (requiere nxdesk-server activo):
-  cargo run -p nxdesk-client -- --connect 111-222-333
-
-  # Conexión directa por IP en red local (P2P sin servidor de señalización):
-  cargo run -p nxdesk-client -- --connect 192.168.1.50:5050
-  ```
-
-### Caso 3: Iniciar Servidor de Señalización Dedicado
+### Caso 2: Ejecutar el Motor de Señalización o Servidor Central
 ```powershell
+# En Rust (alto rendimiento Tokio):
 cargo run -p nxdesk-server
+
+# O en C# ASP.NET Core:
+dotnet run --project src/NxDesk.Server/NxDesk.Server.csproj
 ```
-Escucha en `ws://0.0.0.0:5000/signalinghub` para coordinar salas concurrentes.
+Escucha en `http://0.0.0.0:5000/signalinghub` para coordinar salas concurrentes y relay P2P.
 
 ---
 
@@ -152,20 +152,21 @@ graph LR
 
 ---
 
-## 8. API y Endpoints Principales (Axum Web Server)
+## 8. Protocolo de Señalización y Eventos de Escritorio Nativo
 
-| Método | Endpoint | Parámetros (Body / Query) | Respuesta | Descripción |
-| :--- | :--- | :--- | :--- | :--- |
-| `GET` | `/api/status` | Ninguno | `StatusResponse` (JSON) | Retorna estado del nodo, espectadores web, usuarios en sala e ID. |
-| `GET` | `/api/screens` | Ninguno | `Vec<ScreenInfoDto>` | Lista monitores físicos y opción Mosaico Doble Pantalla. |
-| `POST` | `/api/screens/select` | `{ "index": 0 }` | `Result<ScreenInfoDto, String>` | Conmuta la captura activa a otro monitor sin reiniciar sesión. |
-| `POST` | `/api/connect` | `{ "target": "111-222-333" }` | `{ "success": true, "message": "..." }` | Conecta el cliente a un equipo remoto por ID o dirección IP. |
-| `POST` | `/api/disconnect` | Ninguno | `{ "success": true, "message": "..." }` | Finaliza la sesión remota y restablece la vista anfitrión local. |
-| `POST` | `/api/terminal/auth` | `{ "enable": true, "password": "..." }` | `{ "success": true, "allowed": true }` | Desbloquea o bloquea en caliente la ejecución de la terminal remota (VUL-01). |
-| `GET` | `/api/peers` | Ninguno | `Vec<PeerIdentity>` | Lista equipos descubiertos en LAN por el radar UDP 5001. |
-| `GET` | `/api/files` | `?path=<DIR>` | `ListDirectoryResponse` | Lista archivos dentro del sandbox seguro de transferencias. |
-| `POST` | `/api/input` | `InputEvent` (JSON) | `"OK"` | Inyecta eventos de ratón o teclado en el sistema anfitrión. |
-| `WS` | `/ws/stream` | Protocolo WebSocket | Frames Binarios (JPEG) / JSON | Canal bidireccional de streaming de vídeo, input y terminal PTY. |
+La comunicación en tiempo real entre pares se gestiona mediante eventos bidireccionales sobre WebSocket con enmarcado delimitado por `0x1E` (SignalR Compatible):
+
+| Evento / Mensaje | Carga Útil (Payload) | Dirección | Descripción y Políticas de Seguridad |
+| :--- | :--- | :---: | :--- |
+| `join` | `{ "Payload": "<RoomID>" }` | Cliente ➔ Servidor | Solicita ingreso a la sala de señalización (validación alfanumérica, máx 5 clientes). |
+| `leave` | `{ "Payload": "<RoomID>" }` | Cliente ➔ Servidor | Abandona la sala y notifica decremento de ocupación a los pares restantes. |
+| `Input` | `InputEvent` (JSON) | Remoto ➔ Anfitrión | Inyección de ratón/teclado. **Seguridad:** Requiere sesión activa aprobada con `allow_input == true`. |
+| `frame` | Binario (JPEG) | Anfitrión ➔ Remoto | Fotogramas de video comprimidos en JPEG acelerado (calidad y FPS dinámicos). |
+| `select_screen` | Índice entero (`"0"`, `"1"`) | Remoto ➔ Anfitrión | Conmuta dinámicamente el monitor capturado sin interrumpir la sesión activa. |
+| `terminal_cmd` | Texto del comando | Remoto ➔ Anfitrión | Ejecución diagnóstica. **Seguridad:** Requiere rol `FullControl` y validación por lista blanca estricta. |
+| `file_chunk` | `FileChunk` (JSON) | Bidireccional | Chunks de transferencia. **Seguridad:** Sandbox obligatorio en `%USERPROFILE%\Downloads\NxDesk_Transfers`. |
+| `SessionRequest` | `SessionRequestDto` | Remoto ➔ Anfitrión | Petición AnyDesk en caliente con modal de consentimiento previo en pantalla del anfitrión. |
+| `SessionDecision`| `SessionDecisionDto`| Anfitrión ➔ Remoto | Aprobación o rechazo con roles granulares (`FullControl`, `ViewOnly`, `FileOnly`). |
 
 ---
 

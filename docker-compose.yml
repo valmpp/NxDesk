@@ -1,0 +1,63 @@
+# ==============================================================================
+# NxDesk Production Test Stack: Signaling Server (Rust) + Cloudflare & Ngrok WAN
+# ==============================================================================
+
+services:
+  nxdesk-server:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.server
+    container_name: nxdesk-signaling-server
+    restart: unless-stopped
+    environment:
+      - RUST_LOG=info
+      - BIND_ADDR=0.0.0.0:5000
+    networks:
+      - nxdesk-net
+    ports:
+      - "5000:5000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:5000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Túnel Cloudflare: Cero configuración ni authtoken requerido. Crea URL pública al instante.
+  cloudflare:
+    image: cloudflare/cloudflared:latest
+    container_name: nxdesk-cloudflare-tunnel
+    restart: unless-stopped
+    command:
+      - "tunnel"
+      - "--no-autoupdate"
+      - "--url"
+      - "http://nxdesk-server:5000"
+    networks:
+      - nxdesk-net
+    depends_on:
+      nxdesk-server:
+        condition: service_healthy
+
+  # Túnel Ngrok: Opcional (activar con --profile ngrok o definiendo NGROK_AUTHTOKEN)
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: nxdesk-ngrok-tunnel
+    restart: unless-stopped
+    command:
+      - "http"
+      - "nxdesk-server:5000"
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN:-}
+    ports:
+      - "4040:4040"
+    networks:
+      - nxdesk-net
+    profiles:
+      - ngrok
+    depends_on:
+      nxdesk-server:
+        condition: service_healthy
+
+networks:
+  nxdesk-net:
+    driver: bridge

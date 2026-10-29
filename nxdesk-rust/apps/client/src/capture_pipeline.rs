@@ -9,6 +9,12 @@ pub struct CapturePipeline {
     is_running: Arc<AtomicBool>,
 }
 
+impl Default for CapturePipeline {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CapturePipeline {
     pub fn new() -> Self {
         Self {
@@ -60,20 +66,21 @@ impl CapturePipeline {
                 match capture_res {
                     Ok(frame) => {
                         // 2. Compresión JPEG acelerada
-                        match frame.to_jpeg(quality) {
+                        match frame_to_jpeg(&frame, quality) {
                             Ok(jpeg_bytes) => {
-                                // Almacenar último fotograma en memoria para clientes web
+                                // 3. Almacenar último fotograma y difundir localmente a la UI
                                 {
                                     let mut cache = state.latest_jpeg_frame.write().await;
                                     *cache = Some(jpeg_bytes.clone());
                                 }
-
-                                // 3. Difundir a viewers locales (Web UI)
+                                state.increment_frame_sequence();
                                 let _ = state.frame_broadcast_tx.send(jpeg_bytes.clone());
 
-                                // 4. Retransmitir al par remoto mediante señalización si está conectado
+                                // 4. Retransmitir al par remoto mediante señalización solo si hay sala o sesión activa
                                 if let Some(ref sig) = signaling_opt {
-                                    let _ = sig.send_video_frame(jpeg_bytes).await;
+                                    if state.room_occupancy.load(Ordering::Relaxed) > 1 {
+                                        let _ = sig.send_video_frame(jpeg_bytes).await;
+                                    }
                                 }
                             }
                             Err(e) => {
@@ -91,6 +98,18 @@ impl CapturePipeline {
             info!("🛑 [CapturePipeline] Bucle de captura detenido.");
         });
     }
+}
+
+/// Comprime un fotograma crudo BGRA a formato JPEG usando la biblioteca image
+pub fn frame_to_jpeg(frame: &nxdesk_capture::CapturedFrame, quality: u8) -> Result<Vec<u8>, String> {
+    let mut rgb = Vec::new();
+    frame.to_rgb_into(&mut rgb);
+    let mut jpeg_bytes = Vec::new();
+    let mut encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg_bytes, quality);
+    encoder
+        .encode(&rgb, frame.width, frame.height, image::ExtendedColorType::Rgb8)
+        .map_err(|e| e.to_string())?;
+    Ok(jpeg_bytes)
 }
 
 #[cfg(test)]

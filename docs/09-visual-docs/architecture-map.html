@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NxDesk · Mapa Interactivo de Arquitectura</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+  :root {
+    --bg: #121214;
+    --surface: #1E1E22;
+    --surface2: #26262B;
+    --border: #33333A;
+    --text: #F4F4F5;
+    --text-muted: #A1A1AA;
+    --accent: #007ACC;
+    --accent-glow: rgba(0, 122, 204, 0.25);
+    --green: #00CC66;
+    --red: #D13438;
+    --purple: #8B5CF6;
+    --mono: 'JetBrains Mono', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 1rem 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-weight: 700;
+    font-size: 1.15rem;
+  }
+  .brand span {
+    color: var(--accent);
+  }
+  .search-box {
+    flex: 1;
+    max-width: 420px;
+    position: relative;
+  }
+  .search-box input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    color: var(--text);
+    font-size: 0.85rem;
+    outline: none;
+    transition: 0.2s border-color, 0.2s box-shadow;
+  }
+  .search-box input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+  .badge {
+    background: var(--surface2);
+    color: var(--text-muted);
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+  }
+  main {
+    flex: 1;
+    padding: 2.5rem;
+    max-width: 1300px;
+    margin: 0 auto;
+    width: 100%;
+  }
+  .grid-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: 1.5rem;
+    margin-top: 2rem;
+  }
+  .node-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .node-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  }
+  .node-card.highlight {
+    border-color: var(--green);
+    box-shadow: 0 0 0 2px var(--green);
+  }
+  .node-card.dim {
+    opacity: 0.25;
+  }
+  .node-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.85rem;
+  }
+  .node-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .node-badge {
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    text-transform: uppercase;
+  }
+  .b-rust { background: rgba(222, 92, 46, 0.2); color: #FF7849; }
+  .b-csharp { background: rgba(104, 33, 122, 0.2); color: #C084FC; }
+  .b-core { background: rgba(0, 122, 204, 0.2); color: #38BDF8; }
+  .b-sec { background: rgba(0, 204, 102, 0.2); color: #4ADE80; }
+  .node-desc {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+    margin-bottom: 1.25rem;
+  }
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+  .tag {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    background: var(--surface2);
+    color: var(--text-muted);
+    padding: 0.15rem 0.45rem;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+  .topo-diagram {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    text-align: center;
+  }
+  svg text {
+    font-family: 'Inter', sans-serif;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <span>Nx</span>Desk &middot; Mapa de Arquitectura
+  </div>
+  <div class="search-box">
+    <input type="text" id="searchInput" placeholder="Buscar componente, protocolo, crate o tecnología..." oninput="filterNodes(this.value)">
+  </div>
+  <div class="badge">v1.0.0 &middot; Glowing Clean Arch</div>
+</header>
+
+<main>
+  <div class="topo-diagram">
+    <h3 style="font-size: 1.1rem; margin-bottom: 1.25rem;">Topología Visual de Flujos de Red</h3>
+    <svg width="100%" height="220" viewBox="0 0 900 220" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <!-- Conexiones -->
+      <line x1="220" y1="110" x2="400" y2="110" stroke="#007ACC" stroke-width="2" stroke-dasharray="6 6"/>
+      <line x1="500" y1="110" x2="680" y2="110" stroke="#007ACC" stroke-width="2" stroke-dasharray="6 6"/>
+      <path d="M 220 130 C 350 200, 550 200, 680 130" stroke="#00CC66" stroke-width="2" stroke-dasharray="4 4"/>
+
+      <!-- Nodos -->
+      <!-- Host -->
+      <rect x="50" y="50" width="170" height="120" rx="12" fill="#1E1E22" stroke="#33333A" stroke-width="2"/>
+      <text x="135" y="85" text-anchor="middle" fill="#FFFFFF" font-weight="700" font-size="14">Anfitrión (Host)</text>
+      <text x="135" y="110" text-anchor="middle" fill="#007ACC" font-weight="600" font-size="12">Glow OpenGL / GDI</text>
+      <text x="135" y="130" text-anchor="middle" fill="#A1A1AA" font-size="11">SendInput & Sandbox</text>
+
+      <!-- Servidor de Señalización -->
+      <rect x="360" y="50" width="180" height="120" rx="12" fill="#1E1E22" stroke="#007ACC" stroke-width="2"/>
+      <text x="450" y="85" text-anchor="middle" fill="#38BDF8" font-weight="700" font-size="14">Servidor Señalización</text>
+      <text x="450" y="110" text-anchor="middle" fill="#FFFFFF" font-weight="600" font-size="12">Port 5000 (0x1E)</text>
+      <text x="450" y="130" text-anchor="middle" fill="#A1A1AA" font-size="11">WebSocket Hub Tokio</text>
+
+      <!-- Cliente Remoto -->
+      <rect x="680" y="50" width="170" height="120" rx="12" fill="#1E1E22" stroke="#33333A" stroke-width="2"/>
+      <text x="765" y="85" text-anchor="middle" fill="#FFFFFF" font-weight="700" font-size="14">Operador Remoto</text>
+      <text x="765" y="110" text-anchor="middle" fill="#007ACC" font-weight="600" font-size="12">RemoteView Canvas</text>
+      <text x="765" y="130" text-anchor="middle" fill="#A1A1AA" font-size="11">Texture Streaming</text>
+
+      <!-- Labels -->
+      <text x="310" y="100" text-anchor="middle" fill="#38BDF8" font-size="10">Frames JPEG</text>
+      <text x="590" y="100" text-anchor="middle" fill="#38BDF8" font-size="10">Eventos Input</text>
+      <text x="450" y="195" text-anchor="middle" fill="#00CC66" font-size="11">Radar LAN UDP 5001 Broadcast</text>
+    </svg>
+  </div>
+
+  <div class="grid-container" id="nodesContainer">
+    <!-- Node 1 -->
+    <div class="node-card" data-tags="rust client egui desktop glow ui app">
+      <div class="node-header">
+        <div class="node-title">🖥️ apps/client (Rust Desktop)</div>
+        <span class="node-badge b-rust">Rust 2021</span>
+      </div>
+      <p class="node-desc">Aplicación de escritorio nativa sin dependencias de navegadores web. Implementa la UI completa idéntica a Avalonia con eframe y aceleración Glow (OpenGL).</p>
+      <div class="tags">
+        <span class="tag">app.rs</span>
+        <span class="tag">state.rs</span>
+        <span class="tag">Glow OpenGL</span>
+        <span class="tag">main.rs</span>
+      </div>
+    </div>
+
+    <!-- Node 2 -->
+    <div class="node-card" data-tags="csharp avalonia mvvm client ui desktop fluent">
+      <div class="node-header">
+        <div class="node-title">💻 NxDesk.Client (C# Avalonia)</div>
+        <span class="node-badge b-csharp">.NET 10.0</span>
+      </div>
+      <p class="node-desc">Cliente de escritorio nativo multiplataforma en C# con Avalonia UI 11.3, Fluent MVVM, SharpDX (DirectX 11) y Microsoft.AspNetCore.SignalR.Client.</p>
+      <div class="tags">
+        <span class="tag">MainWindow.axaml</span>
+        <span class="tag">HomeView.axaml</span>
+        <span class="tag">SharpDX DXGI</span>
+        <span class="tag">CommunityToolkit.Mvvm</span>
+      </div>
+    </div>
+
+    <!-- Node 3 -->
+    <div class="node-card" data-tags="rust server signaling hub websocket tokio 5000">
+      <div class="node-header">
+        <div class="node-title">🌐 apps/server (Signaling Hub)</div>
+        <span class="node-badge b-rust">Rust Tokio</span>
+      </div>
+      <p class="node-desc">Servidor de señalización asíncrono con Tokio-Tungstenite. Maneja el protocolo SignalR 0x1E, límite de 5 peers por sala y retransmisión ultrarrápida.</p>
+      <div class="tags">
+        <span class="tag">Port 5000</span>
+        <span class="tag">0x1E Delimiter</span>
+        <span class="tag">Health Check</span>
+        <span class="tag">RwLock State</span>
+      </div>
+    </div>
+
+    <!-- Node 4 -->
+    <div class="node-card" data-tags="capture gdi dxgi screen video jpeg">
+      <div class="node-header">
+        <div class="node-title">🎥 crates/capture & Pipeline</div>
+        <span class="node-badge b-core">Hardware I/O</span>
+      </div>
+      <p class="node-desc">Subsistema de captura de pantalla nativo en Win32 GDI y DirectX 11 DXGI con compresión JPEG acelerada por hardware y streaming condicional.</p>
+      <div class="tags">
+        <span class="tag">GetDIBits</span>
+        <span class="tag">JPEG 75%</span>
+        <span class="tag">30-60 FPS</span>
+        <span class="tag">Zero-Copy Move</span>
+      </div>
+    </div>
+
+    <!-- Node 5 -->
+    <div class="node-card" data-tags="file transfer sandbox chunks cwe-22 security">
+      <div class="node-header">
+        <div class="node-title">📁 FileTransfer & Sandbox</div>
+        <span class="node-badge b-sec">Seguridad</span>
+      </div>
+      <p class="node-desc">Mecanismo de fragmentación en Chunks de 64 KB confinado de forma absoluta en %USERPROFILE%\Downloads\NxDesk_Transfers contra ataques Path Traversal.</p>
+      <div class="tags">
+        <span class="tag">CWE-22 Mitigado</span>
+        <span class="tag">Seek Async</span>
+        <span class="tag">Chunk Stream</span>
+        <span class="tag">Strict Prefix</span>
+      </div>
+    </div>
+
+    <!-- Node 6 -->
+    <div class="node-card" data-tags="input injection sendinput keyboard mouse security">
+      <div class="node-header">
+        <div class="node-title">🖱️ Input Injection & Auth</div>
+        <span class="node-badge b-sec">Seguridad</span>
+      </div>
+      <p class="node-desc">Inyección de periféricos con Win32 SendInput supeditada obligatoriamente a la existencia de una sesión activa aprobada con bandera allow_input.</p>
+      <div class="tags">
+        <span class="tag">CWE-20 / CWE-285</span>
+        <span class="tag">Normalized Coords</span>
+        <span class="tag">High-DPI PerMonitor</span>
+        <span class="tag">ActiveSession Guard</span>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+function filterNodes(query) {
+  const q = query.toLowerCase().trim();
+  const cards = document.querySelectorAll('.node-card');
+  cards.forEach(card => {
+    const text = card.textContent.toLowerCase();
+    const tags = card.getAttribute('data-tags') || '';
+    if (!q || text.includes(q) || tags.includes(q)) {
+      card.classList.remove('dim');
+      if (q) card.classList.add('highlight');
+      else card.classList.remove('highlight');
+    } else {
+      card.classList.add('dim');
+      card.classList.remove('highlight');
+    }
+  });
+}
+</script>
+</body>
+</html>

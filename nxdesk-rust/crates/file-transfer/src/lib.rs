@@ -111,10 +111,68 @@ pub async fn list_directory_async(path_str: &str) -> ListDirectoryResponse {
     response
 }
 
-/// Gestor asíncrono de transferencias activas
+/// Explora y lista el contenido de un directorio local de forma síncrona
+pub fn list_directory_sync(path_str: &str) -> ListDirectoryResponse {
+    let target_path = if path_str.trim().is_empty() {
+        let safe = get_safe_transfers_dir();
+        let _ = std::fs::create_dir_all(&safe);
+        safe
+    } else {
+        PathBuf::from(path_str)
+    };
+
+    let mut response = ListDirectoryResponse {
+        current_path: target_path.to_string_lossy().to_string(),
+        items: Vec::new(),
+        error: None,
+    };
+
+    let read_dir = match std::fs::read_dir(&target_path) {
+        Ok(rd) => rd,
+        Err(e) => {
+            response.error = Some(format!("No se pudo leer el directorio: {}", e));
+            return response;
+        }
+    };
+
+    for entry in read_dir.flatten() {
+        if let Ok(metadata) = entry.metadata() {
+            let is_dir = metadata.is_dir();
+            let size = if is_dir { 0 } else { metadata.len() };
+            let name = entry.file_name().to_string_lossy().to_string();
+
+            response.items.push(DirectoryItemDto {
+                name,
+                is_directory: is_dir,
+                size,
+                last_modified: None,
+            });
+        }
+    }
+
+    response
+        .items
+        .sort_by(|a, b| match (a.is_directory, b.is_directory) {
+            (true, false) => std::cmp::Ordering::Less,
+            (false, true) => std::cmp::Ordering::Greater,
+            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+        });
+
+    response
+}
+
+pub use list_directory_sync as list_directory;
+
+#[derive(Clone)]
+struct ActiveTransferEntry {
+    path: PathBuf,
+    started_at: std::time::Instant,
+}
+
+/// Gestor asíncrono de transferencias activas con mitigación de fugas en disco
 #[derive(Default, Clone)]
 pub struct FileTransferManager {
-    active_transfers: Arc<Mutex<HashMap<String, PathBuf>>>,
+    active_transfers: Arc<Mutex<HashMap<String, ActiveTransferEntry>>>,
 }
 
 impl FileTransferManager {
@@ -143,7 +201,13 @@ impl FileTransferManager {
         File::create(&dest).await.map_err(|e| e.to_string())?;
 
         let mut lock = self.active_transfers.lock().await;
-        lock.insert(transfer_id.to_string(), dest.clone());
+        lock.insert(
+            transfer_id.to_string(),
+            ActiveTransferEntry {
+                path: dest.clone(),
+                started_at: std::time::Instant::now(),
+            },
+        );
 
         info!(
             "📁 [FileTransfer] Transferencia '{}' registrada en: {:?}",
@@ -152,12 +216,52 @@ impl FileTransferManager {
         Ok(dest)
     }
 
+    /// Cancela una transferencia activa y remueve el archivo incompleto para evitar fugas de disco
+    pub async fn cancel_transfer(&self, transfer_id: &str) -> bool {
+        let mut lock = self.active_transfers.lock().await;
+        if let Some(entry) = lock.remove(transfer_id) {
+            let _ = fs::remove_file(&entry.path).await;
+            info!(
+                "🧹 [FileTransfer] Transferencia cancelada '{}'. Archivo parcial eliminado: {:?}",
+                transfer_id, entry.path
+            );
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Limpia transferencias abandonadas que excedan el tiempo máximo de inactividad
+    pub async fn cleanup_abandoned_transfers(&self, max_age: std::time::Duration) -> usize {
+        let mut lock = self.active_transfers.lock().await;
+        let now = std::time::Instant::now();
+        let mut to_remove = Vec::new();
+
+        for (id, entry) in lock.iter() {
+            if now.duration_since(entry.started_at) > max_age {
+                to_remove.push((id.clone(), entry.path.clone()));
+            }
+        }
+
+        let count = to_remove.len();
+        for (id, path) in to_remove {
+            lock.remove(&id);
+            let _ = fs::remove_file(&path).await;
+            info!(
+                "🧹 [FileTransfer] Purgada transferencia abandonada '{}'. Archivo huérfano eliminado: {:?}",
+                id, path
+            );
+        }
+
+        count
+    }
+
     /// Escribe un fragmento en el archivo correspondiente
     pub async fn write_chunk(&self, chunk: &FileChunk) -> Result<(), String> {
         let path = {
             let lock = self.active_transfers.lock().await;
             lock.get(&chunk.transfer_id)
-                .cloned()
+                .map(|e| e.path.clone())
                 .ok_or_else(|| format!("ID de transferencia desconocido: {}", chunk.transfer_id))?
         };
 

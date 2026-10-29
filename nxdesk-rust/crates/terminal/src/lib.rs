@@ -181,6 +181,18 @@ impl TerminalSession {
     }
 }
 
+impl Drop for TerminalSession {
+    fn drop(&mut self) {
+        self.is_running.store(false, Ordering::SeqCst);
+        if let Ok(mut child_lock) = self.child.try_lock() {
+            if let Some(mut child) = child_lock.take() {
+                let _ = child.start_kill();
+                tracing::info!("🛑 [TerminalSession] Proceso hijo terminado automáticamente en Drop.");
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

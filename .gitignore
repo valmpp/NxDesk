@@ -38,6 +38,7 @@ release/
 *~
 
 # NxDesk runtime & logs
+.env
 nxdesk.log
 *.log
 portal_restore_token.txt

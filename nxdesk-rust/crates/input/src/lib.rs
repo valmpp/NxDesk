@@ -36,8 +36,18 @@ impl InputInjector {
     pub fn inject(&self, event: &InputEvent) {
         match event {
             InputEvent::MouseMove { x, y } => self.inject_mouse_move(*x, *y),
-            InputEvent::MouseDown { button, .. } => self.inject_mouse_button(*button, true),
-            InputEvent::MouseUp { button, .. } => self.inject_mouse_button(*button, false),
+            InputEvent::MouseDown { button, x, y } => {
+                if *x > 0.0 || *y > 0.0 {
+                    self.inject_mouse_move(*x, *y);
+                }
+                self.inject_mouse_button(*button, true);
+            }
+            InputEvent::MouseUp { button, x, y } => {
+                if *x > 0.0 || *y > 0.0 {
+                    self.inject_mouse_move(*x, *y);
+                }
+                self.inject_mouse_button(*button, false);
+            }
             InputEvent::MouseWheel { delta_x, delta_y } => {
                 self.inject_mouse_wheel(*delta_x, *delta_y)
             }

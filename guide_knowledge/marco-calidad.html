@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Dev Team · Marco de Calidad</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{
+  --bg:#F7F6F3;--surface:#FFFFFF;--surface2:#F0EDE8;
+  --border:#E2DDD6;--border2:#CBC5BC;
+  --text:#1C1917;--text2:#57534E;--text3:#A8A29E;
+  --accent:#6D59E8;--accent-bg:#EEECFC;--accent-text:#3D2FB3;
+  --green:#0D9E74;--green-bg:#E3F5EE;--green-text:#065F46;
+  --amber:#B45309;--amber-bg:#FEF3C7;--amber-text:#92400E;
+  --red:#C2410C;--red-bg:#FFF1EE;--red-text:#9A3412;
+  --slate:#475569;--slate-bg:#F1F5F9;--slate-text:#1E293B;
+  --blue:#1D4ED8;--blue-bg:#EFF6FF;--blue-text:#1E40AF;
+  --purple:#7C3AED;--purple-bg:#F5F3FF;--purple-text:#5B21B6;
+  --nav-w:260px;--r:8px;--r-lg:14px;
+  --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{font-size:15px;scroll-behavior:smooth}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);line-height:1.65;display:flex;min-height:100vh}
+/* NAV */
+nav{width:var(--nav-w);min-width:var(--nav-w);background:var(--surface);border-right:1px solid var(--border);height:100vh;position:sticky;top:0;overflow-y:auto;display:flex;flex-direction:column;padding:0 0 2rem}
+.nav-logo{padding:1.25rem 1.25rem 1rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.5rem;font-weight:600;font-size:.85rem;color:var(--text2)}
+.nav-logo span{background:var(--accent-bg);color:var(--accent-text);font-family:var(--mono);font-size:.72rem;padding:.15rem .45rem;border-radius:4px}
+.nav-group{padding:.85rem 1.25rem .25rem;font-size:.67rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text3)}
+nav a{display:flex;align-items:center;gap:.55rem;padding:.4rem 1.25rem;font-size:.81rem;color:var(--text2);text-decoration:none;transition:background .12s,color .12s}
+nav a:hover{background:var(--bg);color:var(--text)}
+nav a.on{background:var(--accent-bg);color:var(--accent-text);font-weight:500}
+nav a .num{font-family:var(--mono);font-size:.68rem;color:var(--text3);min-width:22px}
+nav input{margin:.75rem 1.25rem;padding:.45rem .75rem;border:1px solid var(--border);border-radius:var(--r);font-size:.8rem;font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);outline:none;width:calc(100% - 2.5rem)}
+nav input:focus{border-color:var(--accent)}
+/* MAIN */
+main{flex:1;padding:3rem 2.5rem 5rem;max-width:880px}
+/* HERO */
+.hero-eyebrow{font-size:.7rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:.75rem}
+.hero h1{font-size:2rem;font-weight:700;letter-spacing:-.025em;line-height:1.2;margin-bottom:.875rem}
+.hero p{font-size:1rem;color:var(--text2);max-width:560px;line-height:1.65;margin-bottom:1.5rem}
+.philosophy{background:var(--accent-bg);border-left:3px solid var(--accent);border-radius:0 var(--r) var(--r) 0;padding:.9rem 1.1rem;font-size:.875rem;color:var(--accent-text);font-style:italic;margin-bottom:2.5rem}
+/* SECTIONS */
+.sec{margin-bottom:3.5rem;scroll-margin-top:2rem}
+.sec-hdr{display:flex;align-items:baseline;gap:.75rem;margin-bottom:1.25rem;padding-bottom:.75rem;border-bottom:1px solid var(--border)}
+.sec-num{font-family:var(--mono);font-size:.7rem;color:var(--text3);min-width:28px}
+.sec h2{font-size:1.2rem;font-weight:600;letter-spacing:-.015em}
+.sec h3{font-size:.9rem;font-weight:600;color:var(--text2);margin:1.25rem 0 .5rem}
+.sec p{font-size:.875rem;color:var(--text2);margin-bottom:.75rem;line-height:1.6}
+hr.div{border:none;border-top:1px solid var(--border);margin:3rem 0}
+/* GRID */
+.grid{display:grid;gap:.875rem;margin:1rem 0}
+.g2{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
+.g4{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+/* CARD */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:1.1rem;transition:.18s}
+.card:hover{border-color:var(--border2);box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.card-icon{font-size:1.4rem;margin-bottom:.5rem;display:block}
+.card h4{font-size:.87rem;font-weight:600;margin-bottom:.3rem;color:var(--text)}
+.card p{font-size:.8rem;color:var(--text2);line-height:1.5}
+/* BADGE */
+.badge{font-size:.68rem;font-weight:600;padding:.2rem .55rem;border-radius:4px;display:inline-block;white-space:nowrap;letter-spacing:.02em}
+.b-a{background:var(--accent-bg);color:var(--accent-text)}
+.b-g{background:var(--green-bg);color:var(--green-text)}
+.b-y{background:var(--amber-bg);color:var(--amber-text)}
+.b-r{background:var(--red-bg);color:var(--red-text)}
+.b-s{background:var(--slate-bg);color:var(--slate-text)}
+.b-b{background:var(--blue-bg);color:var(--blue-text)}
+.b-p{background:var(--purple-bg);color:var(--purple-text)}
+/* ALERT */
+.alert{border-radius:var(--r);padding:.875rem 1rem;margin:1rem 0;display:flex;gap:.875rem;align-items:flex-start;font-size:.83rem;line-height:1.55}
+.ai{font-size:1rem;flex-shrink:0;margin-top:.1rem}
+.al-a{background:var(--accent-bg);border:1px solid #C7C2F5;color:var(--accent-text)}
+.al-g{background:var(--green-bg);border:1px solid #A7E8D0;color:var(--green-text)}
+.al-y{background:var(--amber-bg);border:1px solid #FCD34D;color:var(--amber-text)}
+.al-r{background:var(--red-bg);border:1px solid #FCA98A;color:var(--red-text)}
+.al-s{background:var(--slate-bg);border:1px solid #CBD5E1;color:var(--slate-text)}
+.al-b{background:var(--blue-bg);border:1px solid #BFDBFE;color:var(--blue-text)}
+/* TABLE */
+.tbl{width:100%;border-collapse:collapse;font-size:.82rem;margin:1rem 0 1.5rem;border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden}
+.tbl th{background:var(--surface2);color:var(--text2);font-size:.7rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:.65rem 1rem;text-align:left;border-bottom:1px solid var(--border)}
+.tbl td{padding:.65rem 1rem;border-bottom:1px solid var(--border);vertical-align:top;line-height:1.5;color:var(--text)}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:var(--bg)}
+/* STEPS */
+.steps{border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;margin:1rem 0}
+.step{display:grid;grid-template-columns:38px 1fr auto;gap:1rem;align-items:flex-start;padding:.875rem 1.25rem;border-bottom:1px solid var(--border)}
+.step:last-child{border-bottom:none}
+.sn{width:32px;height:32px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:.8rem;flex-shrink:0}
+.sn-a{background:var(--accent-bg);border:1px solid #C7C2F5;color:var(--accent)}
+.sn-g{background:var(--green-bg);border:1px solid #A7E8D0;color:var(--green)}
+.sn-y{background:var(--amber-bg);border:1px solid #FCD34D;color:var(--amber)}
+.sn-r{background:var(--red-bg);border:1px solid #FCA98A;color:var(--red)}
+.sn-s{background:var(--slate-bg);border:1px solid #CBD5E1;color:var(--slate)}
+.sn-b{background:var(--blue-bg);border:1px solid #BFDBFE;color:var(--blue)}
+.sn-p{background:var(--purple-bg);border:1px solid #DDD6FE;color:var(--purple)}
+.sh{font-size:.87rem;font-weight:600;color:var(--text);margin-bottom:.2rem}
+.sd{font-size:.78rem;color:var(--text2);line-height:1.5}
+/* EXPANDABLE */
+.exp{border:1px solid var(--border);border-radius:var(--r);margin-bottom:.4rem;overflow:hidden}
+.eh{display:flex;align-items:center;gap:.75rem;padding:.8rem 1rem;cursor:pointer;background:none;border:none;width:100%;text-align:left;font-family:'Inter',sans-serif;transition:background .12s}
+.eh:hover{background:var(--bg)}
+.ei{font-size:.95rem;flex-shrink:0}
+.et{font-size:.84rem;font-weight:600;color:var(--text);flex:1}
+.ec{font-size:.75rem;color:var(--text3);transition:transform .2s;margin-left:auto}
+.eb{display:none;padding:.8rem 1rem;border-top:1px solid var(--border);font-size:.82rem;color:var(--text2);line-height:1.6;background:var(--surface2)}
+.eb.open{display:block}.eh.open .ec{transform:rotate(180deg)}
+/* TIMELINE */
+.tl{position:relative;padding-left:2.25rem;margin:1rem 0}
+.tl::before{content:'';position:absolute;left:8px;top:6px;bottom:6px;width:2px;background:linear-gradient(to bottom,var(--accent),var(--green));border-radius:1px}
+.ti{position:relative;margin-bottom:1.25rem}
+.td{position:absolute;left:-1.9rem;top:4px;width:14px;height:14px;border-radius:50%;border:2px solid var(--bg);z-index:1}
+.td.done{background:var(--green)}.td.now{background:var(--accent);box-shadow:0 0 0 4px rgba(109,89,232,.15)}.td.next{background:var(--amber)}.td.fut{background:var(--border2)}
+.tp{font-size:.62rem;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--text3);margin-bottom:2px}
+.tt{font-size:.9rem;font-weight:600;color:var(--text);margin-bottom:.25rem}
+.tb{font-size:.8rem;color:var(--text2);line-height:1.55}
+/* CODE */
+code{font-family:var(--mono);font-size:.78rem;background:var(--accent-bg);color:var(--accent-text);padding:.1rem .4rem;border-radius:4px;border:1px solid #C7C2F5}
+pre{font-family:var(--mono);font-size:.75rem;background:var(--slate-bg);border:1px solid var(--border);border-radius:var(--r);padding:1rem;overflow-x:auto;margin:.75rem 0;line-height:1.75;color:var(--slate-text)}
+/* TREE */
+.filetree{border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;margin:1rem 0}
+.ft-hdr{background:var(--surface2);padding:.65rem 1rem;display:flex;justify-content:space-between;align-items:center;font-family:var(--mono);font-size:.8rem;font-weight:500;border-bottom:1px solid var(--border)}
+.ft-body{padding:.75rem 1rem;font-family:var(--mono);font-size:.78rem;line-height:2;color:var(--text2)}
+.ft-dir{color:var(--green);font-weight:600}
+.ft-file{color:var(--blue)}
+.ft-note{color:var(--text3);font-size:.72rem}
+/* TEMPLATE BOX */
+.tmpl{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;margin:1rem 0}
+.tmpl-hdr{background:var(--surface2);padding:.6rem 1rem;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border)}
+.tmpl-title{font-family:var(--mono);font-size:.77rem;color:var(--text2)}
+.copy-btn{font-size:.72rem;font-weight:600;padding:.25rem .65rem;border-radius:5px;border:1px solid var(--border);background:var(--surface);color:var(--text2);cursor:pointer;font-family:'Inter',sans-serif;transition:.15s}
+.copy-btn:hover{background:var(--accent-bg);color:var(--accent-text);border-color:var(--accent)}
+.tmpl-body{padding:1rem;font-family:var(--mono);font-size:.75rem;line-height:1.75;color:var(--slate-text);white-space:pre;overflow-x:auto}
+/* ISO CARD */
+.iso-card{border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;margin-bottom:.875rem}
+.iso-hdr{display:grid;grid-template-columns:auto 1fr auto;gap:1rem;align-items:center;padding:1rem 1.25rem;background:var(--surface)}
+.iso-code{font-family:var(--mono);font-size:.78rem;font-weight:700;background:var(--accent-bg);color:var(--accent-text);padding:.2rem .55rem;border-radius:5px;white-space:nowrap}
+.iso-title{font-size:.9rem;font-weight:600;color:var(--text)}
+.iso-body{padding:0 1.25rem 1rem;border-top:1px solid var(--border);background:var(--bg)}
+.iso-body p{font-size:.8rem;color:var(--text2);line-height:1.55;margin-top:.75rem}
+/* TOOL SECTION */
+.tool-group{margin-bottom:1.75rem}
+.tool-group-hdr{font-size:.75rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:.75rem;padding:.5rem 0;border-bottom:1px solid var(--border)}
+.tool-item{display:flex;align-items:flex-start;gap:.875rem;padding:.75rem 0;border-bottom:1px solid var(--border)}
+.tool-item:last-child{border-bottom:none}
+.tool-name{font-size:.87rem;font-weight:600;color:var(--text);margin-bottom:.2rem;display:flex;align-items:center;gap:.4rem;flex-wrap:wrap}
+.tool-desc{font-size:.79rem;color:var(--text2);line-height:1.5}
+.tool-icon{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;background:var(--surface2);border:1px solid var(--border)}
+/* SUMMARY TABLE */
+.sum-tbl{width:100%;border-collapse:collapse;font-size:.82rem;margin:1rem 0}
+.sum-tbl th{background:var(--surface2);color:var(--text2);font-size:.7rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:.6rem .875rem;text-align:left;border:1px solid var(--border)}
+.sum-tbl td{padding:.6rem .875rem;border:1px solid var(--border);vertical-align:top;line-height:1.5;color:var(--text)}
+/* PHASE */
+.phase{border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;margin-bottom:.875rem}
+.phase-hdr{padding:.875rem 1.25rem;display:flex;align-items:center;gap:.875rem;cursor:pointer;background:var(--surface);border:none;width:100%;text-align:left;font-family:'Inter',sans-serif;transition:background .12s}
+.phase-hdr:hover{background:var(--bg)}
+.phase-badge{font-family:var(--mono);font-size:.72rem;font-weight:700;padding:.2rem .55rem;border-radius:5px;white-space:nowrap;flex-shrink:0}
+.phase-title{font-size:.9rem;font-weight:600;color:var(--text);flex:1}
+.phase-body{display:none;padding:.875rem 1.25rem;border-top:1px solid var(--border);background:var(--bg)}
+.phase-body.open{display:block}
+/* SCROLLBAR */
+::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+@media(max-width:800px){nav{display:none}body{display:block}main{padding:1.5rem 1.25rem 4rem;max-width:100%}}
+
+.sec-compare{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin:1rem 0}
+.sc-box{border-radius:14px;border:1px solid var(--border);overflow:hidden}
+.sc-hdr{padding:.6rem 1rem;font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.5rem}
+.sc-body{padding:.875rem 1rem;font-size:.79rem;color:var(--text2);line-height:1.6}
+.sc-body strong{color:var(--text);display:block;margin-bottom:.2rem}
+.ft-body span{display:inline}
+@media(max-width:700px){.sec-compare{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<nav>
+  <div class="nav-logo"><span>docs/</span>Dev Team</div>
+  <input type="text" placeholder="Buscar..." oninput="filterNav(this.value)">
+  <div class="nav-group">Navegación</div>
+  <a href="index.html"><span class="num">00</span>Inicio</a>
+<a href="marco-calidad.html"><span class="num">01</span>Marco de calidad</a>
+<a href="estructura-docs.html"><span class="num">02</span>Estructura docs/</a>
+<a href="stack-herramientas.html"><span class="num">03</span>Stack & Herramientas</a>
+<a href="gestion-proyectos.html"><span class="num">04</span>Gestión de proyectos</a>
+<a href="onboarding-nuevo.html"><span class="num">05</span>Onboarding</a>
+
+</nav>
+<main>
+<div class="hero-eyebrow">01 · Marco de Calidad</div>
+<h1 style="font-size:1.75rem;font-weight:700;letter-spacing:-.025em;margin-bottom:.5rem">Normas ISO aplicables</h1>
+<p style="font-size:.97rem;color:var(--text2);margin-bottom:1.5rem">No como certificación inmediata — como marco que estructura cómo trabajamos desde hoy y es auditable desde el primer proyecto.</p>
+<div class="alert al-a"><span class="ai">💡</span><div><strong>El principio:</strong> las ISOs le dan nombre formal, estructura medible y trazabilidad auditable a lo que el equipo ya hace bien. No son trabajo extra — son el estándar que formaliza las prácticas actuales.</div></div>
+
+<div class="sec">
+  <div class="sec-hdr"><span class="sec-num">01</span><h2>ISO 9001 · Gestión de la calidad</h2></div>
+  <div class="iso-card">
+    <div class="iso-hdr"><span class="iso-code">ISO 9001:2015</span><span class="iso-title">Sistema de Gestión de la Calidad</span><span class="badge b-g">Implementando</span></div>
+    <div class="iso-body">
+      <p><strong>Qué exige:</strong> procesos documentados, revisados y medibles. Que el cliente reciba consistentemente lo que se prometió. Que los problemas se detecten antes de llegar al cliente.</p>
+      <div class="grid g3" style="margin-top:.75rem">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:.75rem;font-size:.79rem;color:var(--text2)"><strong style="display:block;margin-bottom:.2rem;color:var(--text)">Cláusula 7.5 — Info documentada</strong>docs/ con encabezado ISO, control de versiones e historial. La estructura de carpetas numeradas cumple exactamente este requisito.</div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:.75rem;font-size:.79rem;color:var(--text2)"><strong style="display:block;margin-bottom:.2rem;color:var(--text)">Cláusula 8.3 — Diseño y desarrollo</strong>ADRs para decisiones de diseño. Ciclo de ticket con criterios de aceptación como proceso de desarrollo controlado.</div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:.75rem;font-size:.79rem;color:var(--text2)"><strong style="display:block;margin-bottom:.2rem;color:var(--text)">Cláusula 10.2 — No conformidades</strong>Ciclo BUG/INC → KB: detectar, investigar, corregir, aprender, prevenir.</div>
+      </div>
+      <p style="margin-top:.875rem"><strong>Brecha a cerrar:</strong> formalizar objetivos de calidad medibles (% entregas sin regresiones, tiempo de resolución de incidentes) y revisión periódica del sistema.</p>
+    </div>
+  </div>
+</div>
+
+<div class="sec">
+  <div class="sec-hdr"><span class="sec-num">02</span><h2>ISO/IEC 27001 · Seguridad de la información</h2></div>
+  <div class="iso-card">
+    <div class="iso-hdr"><span class="iso-code">ISO/IEC 27001:2022</span><span class="iso-title">Seguridad de la Información</span><span class="badge b-y">En progreso</span></div>
+    <div class="iso-body">
+      <p><strong>Qué exige:</strong> identificar activos de información, clasificarlos por criticidad y tener controles documentados para protegerlos.</p>
+      <p style="margin-top:.875rem"><strong>Controles implementados — aplicación (.NET 9):</strong></p>
+      <div class="grid g2">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:.75rem;font-size:.79rem;color:var(--text2)"><strong style="display:block;margin-bottom:.2rem;color:var(--text)">A.8 — Control de activos</strong>Data Protection API con claves en Vault. JWT con claims mínimos (principio de mínimo privilegio). Detección de robo de refresh token.</div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:.75rem;font-size:.79rem;color:var(--text2)"><strong style="display:block;margin-bottom:.2rem;color:var(--text)">A.9 — Control de acceso</strong>Rate limiting nativo .NET 9 por endpoint, por usuario y por IP. Validación de inputs en la frontera. BCrypt/PBKDF2 para credenciales.</div>
+      </div>
+      <p style="margin-top:.875rem"><strong>Controles implementados — infraestructura:</strong></p>
+      <div class="grid g2">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:.75rem;font-size:.79rem;color:var(--text2)"><strong style="display:block;margin-bottom:.2rem;color:var(--text)">A.13 — Seguridad de redes (Nginx)</strong>Headers hardened: HSTS, CSP, X-Frame-Options, Permissions-Policy. Rate limiting por IP. SSL/TLS con Certbot.</div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:.75rem;font-size:.79rem;color:var(--text2)"><strong style="display:block;margin-bottom:.2rem;color:var(--text)">A.12 — Seguridad operacional</strong>fail2ban (servidor simple) o CrowdSec (multi-servidor / ISO formal) según el proyecto. SonarQube + OWASP Dep-Check en CI/CD.</div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:.75rem;font-size:.79rem;color:var(--text2)"><strong style="display:block;margin-bottom:.2rem;color:var(--text)">A.10 — Criptografía</strong>HashiCorp Vault para secretos en producción. dotnet user-secrets en desarrollo. GitGuardian detecta automáticamente leaks de credenciales en el repositorio.</div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:.75rem;font-size:.79rem;color:var(--text2)"><strong style="display:block;margin-bottom:.2rem;color:var(--text)">A.16 — Gestión de incidentes</strong>Ciclo INC → KB documenta cada incidente. 12-security/vulnerabilities.md registra vectores conocidos y mitigaciones activas.</div>
+      </div>
+      <div class="alert al-y" style="margin-top:1rem"><span class="ai">⚠️</span><div><strong>Brechas a cerrar:</strong> inventario formal de activos de información por proyecto (qué datos se procesan, clasificación público/interno/confidencial), y el proceso de revocación de accesos y rotación de secretos cuando un desarrollador sale del equipo.</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="sec">
+  <div class="sec-hdr"><span class="sec-num">03</span><h2>ISO/IEC 90003 · Ingeniería de software</h2></div>
+  <div class="iso-card">
+    <div class="iso-hdr"><span class="iso-code">ISO/IEC 90003:2018</span><span class="iso-title">Guía ISO 9001 para software</span><span class="badge b-g">Implementando</span></div>
+    <div class="iso-body">
+      <p><strong>Qué es:</strong> la guía oficial de cómo aplicar ISO 9001 a desarrollo de software. Define qué significa documentar el diseño, verificar y validar en el contexto de un equipo técnico.</p>
+      <p><strong>Alineación actual:</strong> ADRs (diseño), ciclo de ticket (gestión de cambios), code review (verificación), QA independiente (validación), Git (control de versiones), docs/ (información documentada).</p>
+    </div>
+  </div>
+</div>
+
+<div class="sec">
+  <div class="sec-hdr"><span class="sec-num">04</span><h2>ISO/IEC 25010 · Calidad del producto</h2></div>
+  <div class="iso-card">
+    <div class="iso-hdr"><span class="iso-code">ISO/IEC 25010:2023</span><span class="iso-title">Modelo de calidad del producto</span><span class="badge b-b">Referencia activa</span></div>
+    <div class="iso-body">
+      <p><strong>Qué define:</strong> las características que debe tener un producto de software de calidad. Funciona como criterio técnico para evaluar cada entrega.</p>
+      <table class="tbl" style="margin-top:.75rem">
+        <thead><tr><th>Característica</th><th>Cómo se mide</th><th>Herramienta</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Eficiencia de rendimiento</strong></td><td>Tiempo de respuesta bajo carga real</td><td>NBomber / k6. EXPLAIN ANALYZE.</td></tr>
+          <tr><td><strong>Seguridad</strong></td><td>Controles documentados y verificados</td><td>SonarQube, fail2ban/CrowdSec, OWASP Dep-Check.</td></tr>
+          <tr><td><strong>Mantenibilidad</strong></td><td>Modificable sin introducir regresiones</td><td>Clean Architecture. Tests de regresión. ADRs.</td></tr>
+          <tr><td><strong>Confiabilidad</strong></td><td>Operación continua sin fallos</td><td>Health endpoints. Runbooks. Grafana + alertas.</td></tr>
+          <tr><td><strong>Portabilidad</strong></td><td>Movible a otro entorno sin cambios de código</td><td>Docker. Variables de entorno. Sin secrets en código.</td></tr>
+          <tr><td><strong>Adecuación funcional</strong></td><td>Hace lo que el cliente necesita</td><td>Criterios de aceptación por ticket. QA independiente.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="sec">
+  <div class="sec-hdr"><span class="sec-num">05</span><h2>ISO/IEC 12207 · Ciclo de vida del software</h2></div>
+  <div class="iso-card">
+    <div class="iso-hdr"><span class="iso-code">ISO/IEC 12207:2017</span><span class="iso-title">Procesos del ciclo de vida</span><span class="badge b-s">Referencia futura</span></div>
+    <div class="iso-body">
+      <p>Define los procesos completos del ciclo de vida del software. El sistema actual es compatible. Se formaliza cuando el equipo crezca o cuando un cliente lo exija como requisito contractual.</p>
+    </div>
+  </div>
+</div>
+
+<hr class="div">
+
+<div class="sec">
+  <div class="sec-hdr"><span class="sec-num">—</span><h2>Estado por norma</h2></div>
+  <table class="tbl">
+    <thead><tr><th>Norma</th><th>Estado</th><th>Lo que ya tenemos</th><th>Brecha principal</th></tr></thead>
+    <tbody>
+      <tr><td><strong>ISO 9001</strong></td><td><span class="badge b-g">Implementando</span></td><td>docs/, ADR, ciclo tickets, KB, QA</td><td>Objetivos medibles formales, revisión periódica</td></tr>
+      <tr><td><strong>ISO/IEC 27001</strong></td><td><span class="badge b-y">En progreso</span></td><td>JWT, Data Protection, Nginx hardened, Vault, fail2ban/CrowdSec, SonarQube</td><td>Inventario de activos, clasificación de datos, gestión de salida de desarrolladores</td></tr>
+      <tr><td><strong>ISO/IEC 90003</strong></td><td><span class="badge b-g">Implementando</span></td><td>ADRs, code review, Git, ciclo de cambios</td><td>Trazabilidad formal de requisitos</td></tr>
+      <tr><td><strong>ISO/IEC 25010</strong></td><td><span class="badge b-b">Referencia activa</span></td><td>Health endpoints, Docker, Clean Architecture, security docs</td><td>Load testing sistemático por release</td></tr>
+      <tr><td><strong>ISO/IEC 12207</strong></td><td><span class="badge b-s">Referencia futura</span></td><td>Gestión de cambios, releases, configuración compatibles</td><td>Formalizar procesos de adquisición y retiro</td></tr>
+    </tbody>
+  </table>
+</div></main>
+<script>
+function filterNav(q){document.querySelectorAll('nav a').forEach(a=>{a.style.display=a.textContent.toLowerCase().includes(q.toLowerCase())?'':'none';});}
+document.querySelectorAll('.eh').forEach(h=>{h.addEventListener('click',()=>{const b=h.nextElementSibling;const o=b.classList.toggle('open');h.classList.toggle('open',o);});});
+document.querySelectorAll('.phase-hdr').forEach(h=>{h.addEventListener('click',()=>{h.nextElementSibling.classList.toggle('open');});});
+function copyTmpl(id){const el=document.getElementById(id);if(!el)return;navigator.clipboard.writeText(el.innerText||el.textContent).then(()=>{const btn=event.target;btn.textContent='✓ Copiado';setTimeout(()=>btn.textContent='Copiar',1600);});}
+</script>
+</body>
+</html>
