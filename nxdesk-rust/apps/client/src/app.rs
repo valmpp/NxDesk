@@ -51,7 +51,12 @@ pub struct NxDeskApp {
     last_mouse_pos: (f32, f32),
     last_mouse_time: Instant,
     session_start_time: Option<Instant>,
+    recording_start_time: Option<Instant>,
     selected_screen_index: i32,
+    /// Modo de visualización de pantalla remota: true = Ajustar a Ventana (Letterbox), false = 1:1 Nativo Original
+    is_view_fit: bool,
+    /// Suscripción al broadcast de salida de terminal (local + llegada del par remoto)
+    terminal_rx: tokio::sync::broadcast::Receiver<String>,
 }
 
 impl NxDeskApp {
@@ -75,6 +80,9 @@ impl NxDeskApp {
             .unwrap_or_else(|_| "C:\\".to_string());
 
         state.set_egui_ctx(cc.egui_ctx.clone());
+
+        // Suscribirse ANTES de mover `state` al literal del struct (orden de evaluación de campos)
+        let terminal_rx = state.terminal_broadcast_tx.subscribe();
 
         Self {
             state,
@@ -101,12 +109,25 @@ impl NxDeskApp {
             last_mouse_pos: (-1.0, -1.0),
             last_mouse_time: Instant::now(),
             session_start_time: None,
+            recording_start_time: None,
             selected_screen_index: 0,
+            is_view_fit: true,
+            terminal_rx,
         }
     }
 
     fn send_select_screen(&mut self, index: i32) {
         self.selected_screen_index = index;
+        self.state.active_screen_index.store(index, std::sync::atomic::Ordering::Relaxed);
+        let name = match index {
+            0 => "Pantalla 1".to_string(),
+            1 => "Pantalla 2".to_string(),
+            -1 => "Mosaico".to_string(),
+            _ => format!("Pantalla {}", index + 1),
+        };
+        if let Ok(mut lock) = self.state.active_screen_name.try_write() {
+            *lock = name;
+        }
         if let Ok(sig_opt) = self.state.signaling_client.try_read() {
             if let Some(sig) = sig_opt.as_ref() {
                 let sig_clone = Arc::clone(sig);
@@ -119,6 +140,30 @@ impl NxDeskApp {
         self.remote_texture = None;
     }
 
+    fn send_view_mode(&mut self, is_fit: bool) {
+        if let Ok(sig_opt) = self.state.signaling_client.try_read() {
+            if let Some(sig) = sig_opt.as_ref() {
+                let sig_clone = Arc::clone(sig);
+                let mode = if is_fit {
+                    let lw = self.state.local_width.load(std::sync::atomic::Ordering::Relaxed);
+                    let lh = self.state.local_height.load(std::sync::atomic::Ordering::Relaxed);
+                    let max_d = lw.max(lh);
+                    if max_d > 0 {
+                        max_d.to_string()
+                    } else {
+                        "fit".to_string()
+                    }
+                } else {
+                    "native".to_string()
+                };
+                tokio::spawn(async move {
+                    let msg = nxdesk_core::SignalingMessage::new("view_mode", &mode);
+                    let _ = sig_clone.send_message(&msg).await;
+                });
+            }
+        }
+    }
+
     fn show_toast(&mut self, msg: impl Into<String>) {
         self.toast_message = Some((msg.into(), Instant::now()));
     }
@@ -128,6 +173,7 @@ impl NxDeskApp {
         self.show_toast(format!("📋 {} copiado al portapapeles.", label));
     }
 
+    //primer cambio de app.rs
     fn initiate_connect(&mut self, target: String) {
         let clean_target = target.trim().replace(' ', "");
         if clean_target.is_empty() {
@@ -137,6 +183,8 @@ impl NxDeskApp {
 
         let state_clone = self.state.clone();
         let target_clone = clean_target.clone();
+       
+       
         tokio::spawn(async move {
             state_clone
                 .set_active_remote_peer(Some(target_clone.clone()))
@@ -169,23 +217,156 @@ impl NxDeskApp {
                 // Solicitar catálogo de pantallas remotas al anfitrión
                 let query_screens = nxdesk_core::SignalingMessage::new("query_screens", "");
                 let _ = sig.send_message(&query_screens).await;
+
+                // Notificar resolución y modo de visualización inicial (Fit adaptativo para 60 FPS estables)
+                let lw = state_clone.local_width.load(std::sync::atomic::Ordering::Relaxed);
+                let lh = state_clone.local_height.load(std::sync::atomic::Ordering::Relaxed);
+                let max_d = lw.max(lh);
+                let initial_mode = if max_d > 1366 { "1366".to_string() } else if max_d > 0 { max_d.to_string() } else { "fit".to_string() };
+                let view_mode = nxdesk_core::SignalingMessage::new("view_mode", &initial_mode);
+                let _ = sig.send_message(&view_mode).await;
+
+                // Anunciar endpoint UDP para enlace P2P directo de ultra baja latencia
+                if let Some(local_ep) = sig.p2p_local_endpoint() {
+                    let ep_msg = nxdesk_core::SignalingMessage::new("udp_endpoint", &local_ep);
+                    let _ = sig.send_message(&ep_msg).await;
+                }
             }
         });
 
         self.session_start_time = Some(Instant::now());
         self.show_toast(format!("Conectando a {}...", clean_target));
     }
-
-    fn disconnect_session(&mut self) {
-        let state_clone = self.state.clone();
-        tokio::spawn(async move {
-            state_clone.set_active_remote_peer(None).await;
-            let _ = state_clone.terminate_session().await;
-        });
+    //2do cambio
+    fn reset_session_ui(&mut self) {
+        // Si había una grabación en curso, cerrar el AVI antes de desconectar (si no,
+        // quedaría abierto y sin índice para siempre).
+        if self.is_recording {
+            self.stop_recording();
+        }
         self.remote_texture = None;
+        self.last_rendered_frame_seq = 0;
+        self.last_mouse_pos = (-1.0, -1.0);
         self.session_start_time = None;
-        self.show_toast("Sesión finalizada.");
+        self.selected_screen_index = 0;
+        self.is_files_open = false;
+        self.is_terminal_open = false;
+        self.is_recording = false;
+        self.recording_start_time = None;
+        self.is_screen_locked = false;
+        self.terminal_output.clear();
+        self.terminal_input.clear();
     }
+
+    /// 🔴 Inicia la grabación de la sesión actual a un AVI MJPEG en Documentos\NxDesk Recordings.
+    #[allow(dead_code)]
+    fn start_recording(&mut self) {
+        let dir = std::env::var("USERPROFILE")
+            .map(|p| std::path::PathBuf::from(p).join("Documents").join("NxDesk Recordings"))
+            .unwrap_or_else(|_| std::path::PathBuf::from("."));
+
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        let out_path = dir.join(format!("NxDesk_Grabacion_{}.avi", stamp));
+
+        let (rw, rh) = self.state.get_telemetry_snapshot().remote_resolution;
+        let (lw, lh) = self.state.get_telemetry_snapshot().local_resolution;
+        let (w, h) = if rw > 0 && rh > 0 {
+            (rw, rh)
+        } else if lw > 0 && lh > 0 {
+            (lw, lh)
+        } else {
+            (1280, 720)
+        };
+
+        match crate::recorder::SessionRecorder::start_with_dimensions(out_path.clone(), w, h) {
+            Ok(rec) => {
+                // Intercambio atómico sin retener el lock en llamadas a métodos de self.
+                let recorder_slot = self.state.session_recorder.clone();
+                let previous = match recorder_slot.lock() {
+                    Ok(mut g) => std::mem::replace(&mut *g, Some(rec)),
+                    Err(_) => {
+                        self.show_toast("⛔ No se pudo iniciar la grabación (estado bloqueado).");
+                        return;
+                    }
+                };
+                if let Some(old) = previous {
+                    std::thread::Builder::new()
+                        .name("nxdesk-rec-config".to_string())
+                        .spawn(move || {
+                            if let Ok(p) = old.finish() {
+                                tracing::info!("[RecAnterior] Cerrado en {}", p.display());
+                            }
+                        })
+                        .ok();
+                }
+                self.is_recording = true;
+                self.recording_start_time = Some(Instant::now());
+                self.show_toast(format!(
+                    "🔴 Grabando sesión → {}",
+                    out_path.file_name().unwrap_or_default().to_string_lossy()
+                ));
+            }
+            Err(e) => {
+                self.show_toast(format!("⛔ Error al iniciar grabación: {}", e));
+            }
+        }
+    }
+
+    /// ⏹ Detiene la grabación y ensambla el AVI en segundo plano (no congela la UI).
+    fn stop_recording(&mut self) {
+        let recorder = match self.state.session_recorder.lock() {
+            Ok(mut guard) => guard.take(),
+            Err(_) => None,
+        };
+        self.is_recording = false;
+        self.recording_start_time = None;
+        if let Some(rec) = recorder {
+            self.show_toast("⏹ Grabación finalizada. Ensamblando video AVI...");
+            let state = self.state.clone();
+            std::thread::Builder::new()
+                .name("nxdesk-rec-finalize".to_string())
+                .spawn(move || {
+                    let note = match rec.finish() {
+                        Ok(path) => {
+                            let mb = std::fs::metadata(&path)
+                                .map(|m| m.len() / (1024 * 1024))
+                                .unwrap_or(0)
+                                .max(1);
+                            format!("✅ Grabación guardada: {} ({} MB)", path.display(), mb)
+                        }
+                        Err(e) => {
+                            let s = e.to_string();
+                            if s.contains("ningún frame") {
+                                "⚠️ La grabación se detuvo sin fotogramas capturados.".to_string()
+                            } else {
+                                format!("⛔ Error al guardar la grabación: {}", e)
+                            }
+                        }
+                    };
+                    if let Ok(mut n) = state.recording_note.lock() {
+                        *n = Some(note);
+                    }
+                })
+                .ok();
+        }
+    }
+
+ fn disconnect_session(&mut self, ctx: &egui::Context) {   
+    self.reset_session_ui();
+    let state_clone = self.state.clone();
+    tokio::spawn(async move {
+        // Garantizar el regreso al menú principal incluso si el aviso de red falla:
+        // primero se libera TODO el estado local, después se notifica al par (session_end).
+        state_clone.clear_pending_session().await;
+        state_clone.set_active_remote_peer(None).await;
+        let _ = state_clone.end_session(true).await;      // avisa al otro con session_end
+    });
+    self.show_toast("Sesión finalizada.");
+    ctx.request_repaint();
+}
 
     /// Renderiza la barra superior (MainWindow.axaml Header)
     fn render_header(&mut self, ui: &mut egui::Ui, is_session_active: bool, active_peer: Option<String>) {
@@ -265,6 +446,12 @@ impl NxDeskApp {
                                         self.is_files_open = !self.is_files_open;
                                     }
 
+                                    // Terminal remota interactiva
+                                    let term_color = if self.is_terminal_open { theme::PRIMARY } else { theme::TEXT };
+                                    if ui.button(RichText::new("💻 Terminal").color(term_color)).on_hover_text("Terminal remota segura").clicked() {
+                                        self.is_terminal_open = !self.is_terminal_open;
+                                    }
+
                                     // Bloqueo de pantalla (compacto)
                                     let lock_color = if self.is_screen_locked { theme::PRIMARY } else { theme::TEXT_MUTED };
                                     if ui.button(RichText::new("🔒").color(lock_color)).on_hover_text("Bloquear pantalla remota").clicked() {
@@ -272,32 +459,42 @@ impl NxDeskApp {
                                         self.show_toast(if self.is_screen_locked { "Pantalla remota bloqueada." } else { "Pantalla remota desbloqueada." });
                                     }
 
-                                    // Grabación de sesión (compacto)
-                                    let rec_label = if self.is_recording { "⏹" } else { "🔴" };
-                                    if ui.button(RichText::new(rec_label).color(theme::ERROR)).on_hover_text("Grabar sesión").clicked() {
-                                        self.is_recording = !self.is_recording;
-                                        self.show_toast(if self.is_recording { "Iniciando grabación de sesión..." } else { "Grabación finalizada y guardada." });
+                                    // Grabación de pantalla con temporizador compacto
+                                    if self.is_recording {
+                                        let elapsed = self.recording_start_time.map(|t| t.elapsed()).unwrap_or_default();
+                                        let mins = elapsed.as_secs() / 60;
+                                        let secs = elapsed.as_secs() % 60;
+                                        let rec_label = format!("⏹ REC {:02}:{:02}", mins, secs);
+                                        if ui.button(RichText::new(rec_label).strong().color(Color32::from_rgb(239, 68, 68))).on_hover_text("Detener y guardar video AVI").clicked() {
+                                            self.stop_recording();
+                                        }
+                                        ui.ctx().request_repaint_after(Duration::from_millis(500));
+                                    } else {
+                                        let rec_btn = egui::Button::new(RichText::new("🔴 Grabar").color(theme::TEXT_MUTED));
+                                        if ui.add(rec_btn).on_hover_text("Grabación pausada temporalmente para optimizar latencia (<120ms)").clicked() {
+                                            self.show_toast("ℹ️ Grabación desactivada temporalmente para lograr latencia ultrabaja.");
+                                        }
                                     }
 
                                     ui.separator();
 
-                                    // Selector de Pantallas / Multimonitor dinámico y adaptativo
+                                    // Selector de Pantallas / Multimonitor dinámico y ordenado
                                     let remote_screens = self
-                                         .state
-                                         .remote_screens
-                                         .try_read()
-                                         .map(|s| s.clone())
-                                         .unwrap_or_default();
+                                        .state
+                                        .remote_screens
+                                        .try_read()
+                                        .map(|s| s.clone())
+                                        .unwrap_or_default();
                                     let active_idx = self
-                                         .state
-                                         .active_screen_index
-                                         .load(std::sync::atomic::Ordering::Relaxed);
+                                        .state
+                                        .active_screen_index
+                                        .load(std::sync::atomic::Ordering::Relaxed);
                                     let active_name = self
-                                         .state
-                                         .active_screen_name
-                                         .try_read()
-                                         .map(|n| n.clone())
-                                         .unwrap_or_else(|_| "Pantalla 1".to_string());
+                                        .state
+                                        .active_screen_name
+                                        .try_read()
+                                        .map(|n| n.clone())
+                                        .unwrap_or_else(|_| "Pantalla 1".to_string());
 
                                     let scr_label = format!("🖥️ {} ▾", active_name);
                                     ui.menu_button(RichText::new(scr_label).strong().color(theme::PRIMARY), |ui| {
@@ -328,12 +525,37 @@ impl NxDeskApp {
                                                     ui.close();
                                                 }
                                             }
+                                            if ui.selectable_label(active_idx == -1, "  🖥️ Todas las Pantallas (Mosaico)").clicked() {
+                                                self.send_select_screen(-1);
+                                                self.show_toast("Conmutando a Mosaico completo...");
+                                                ui.close();
+                                            }
                                         }
                                     });
 
                                     ui.separator();
 
-                                    // Botón rojo desconectar idéntico a Avalonia
+                                    // Selector de Modo de Visualización (1:1 Nativo vs Ajustar a Ventana)
+                                    let (fit_label, fit_tooltip) = if self.is_view_fit {
+                                        ("🔍 1:1", "Conmutar a Modo 1:1 Original (Pixel-Perfect sin borrosidad, con desplazamiento)")
+                                    } else {
+                                        ("⛶ Ajustar", "Conmutar a Modo Ajustar a Ventana (Escala automática)")
+                                    };
+                                    let fit_color = if self.is_view_fit { theme::TEXT } else { theme::PRIMARY };
+                                    if ui.button(RichText::new(fit_label).color(fit_color)).on_hover_text(fit_tooltip).clicked() {
+                                        self.is_view_fit = !self.is_view_fit;
+                                        self.remote_texture = None;
+                                        self.send_view_mode(self.is_view_fit);
+                                        self.show_toast(if self.is_view_fit {
+                                            "Visualización: Ajustada a ventana (60 FPS fluidos)"
+                                        } else {
+                                            "Visualización: 1:1 Pixel-Perfect Original"
+                                        });
+                                    }
+
+                                    ui.separator();
+
+                                    // Botón rojo desconectar idéntico a Avalonia - SIEMPRE VISIBLE Y ACCESIBLE
                                     let dc_btn = egui::Button::new(
                                         RichText::new("🚪 Desconectar")
                                             .strong()
@@ -342,7 +564,7 @@ impl NxDeskApp {
                                     .fill(theme::ERROR);
 
                                     if ui.add(dc_btn).on_hover_text("Finalizar sesión").clicked() {
-                                        self.disconnect_session();
+                                        self.disconnect_session(ui.ctx());
                                     }
                                 });
                             });
@@ -566,6 +788,11 @@ impl NxDeskApp {
     }
 
     fn send_remote_input(&self, event: InputEvent) {
+        // Botón 🎮 Control / checkbox de la configuración: si el control está en pausa,
+        // NINGÚN evento de ratón o teclado sale hacia el anfitrión remoto.
+        if !self.allow_input {
+            return;
+        }
         if let Ok(sig_opt) = self.state.signaling_client.try_read() {
             if let Some(sig) = sig_opt.as_ref() {
                 let _ = sig.send_input_direct(&event);
@@ -593,46 +820,53 @@ impl NxDeskApp {
         if needs_update {
             if let Ok(guard) = self.state.latest_decoded_image.try_read() {
                 if let Some(ref arc_img) = *guard {
+                    // Sonda de RENDER: costo de subida a textura GPU (TeX set/load) +
+                    // edad del frame al pintarse (decode→primer frame que lo contiene)
+                    let t_upload = Instant::now();
+                    let painted_age_ms = {
+                        let now_seen = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_millis() as u64;
+                        let decoded_at = self.state.last_decoded_unix_ms.load(Ordering::Relaxed);
+                        now_seen
+                            .saturating_sub(decoded_at)
+                            .min(10_000)
+                            as u32
+                    };
                     self.last_rendered_frame_seq = current_seq;
                     let size = arc_img.size;
                     let image_data = egui::ImageData::Color(std::sync::Arc::clone(arc_img));
+                    let tex_options = if self.is_view_fit {
+                        egui::TextureOptions::LINEAR
+                    } else {
+                        egui::TextureOptions::NEAREST
+                    };
                     if let Some(ref mut tex) = self.remote_texture {
                         if tex.size() == size {
-                            tex.set(image_data, egui::TextureOptions::LINEAR);
+                            tex.set(image_data, tex_options);
                         } else {
                             *tex = ui.ctx().load_texture(
                                 "remote_screen_texture",
                                 image_data,
-                                egui::TextureOptions::LINEAR,
+                                tex_options,
                             );
                         }
                     } else {
                         self.remote_texture = Some(ui.ctx().load_texture(
                             "remote_screen_texture",
                             image_data,
-                            egui::TextureOptions::LINEAR,
+                            tex_options,
                         ));
                     }
+                    self.state.record_render_timing(
+                        t_upload.elapsed().as_micros() as u32,
+                        painted_age_ms,
+                    );
                 }
             }
 
-            // Fallback síncrono si aún no hay remote_texture pero tenemos latest_jpeg_frame
-            if self.remote_texture.is_none() {
-                if let Ok(jpeg_guard) = self.state.latest_jpeg_frame.try_read() {
-                    if let Some(ref bytes) = *jpeg_guard {
-                        if let Ok(img) = image::load_from_memory(bytes) {
-                            let rgba = img.to_rgba8();
-                            let size = [rgba.width() as usize, rgba.height() as usize];
-                            let color_img = egui::ColorImage::from_rgba_unmultiplied(size, &rgba);
-                            self.remote_texture = Some(ui.ctx().load_texture(
-                                "remote_screen_texture",
-                                color_img,
-                                egui::TextureOptions::LINEAR,
-                            ));
-                        }
-                    }
-                }
-            }
+
         }
 
         if let Some(ref tex) = self.remote_texture {
@@ -640,31 +874,64 @@ impl NxDeskApp {
             let tex_aspect = tex_size.x / tex_size.y.max(1.0);
             let avail = ui.available_size();
             let avail_aspect = avail.x / avail.y.max(1.0);
-            let target_size = if avail_aspect > tex_aspect {
-                egui::vec2((avail.y * tex_aspect).floor(), avail.y)
+
+            let (rect, interact_resp) = if self.is_view_fit {
+                // Encaje proporcional (letterbox) SIEMPRE: la imagen ocupa el máximo dentro del
+                // panel respetando 1:1 con la pantalla remota y queda CENTRADA
+                let target_size = if avail_aspect > tex_aspect {
+                    egui::vec2((avail.y * tex_aspect).floor(), avail.y)
+                } else {
+                    egui::vec2(avail.x, (avail.x / tex_aspect).floor())
+                };
+                let (full_rect, _) = ui.allocate_exact_size(avail, egui::Sense::hover());
+                ui.painter().rect_filled(full_rect, 0.0, theme::BACKGROUND_DARK);
+
+                let r = egui::Rect::from_center_size(full_rect.center(), target_size);
+                ui.painter().image(
+                    tex.id(),
+                    r,
+                    egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
+                    Color32::WHITE,
+                );
+                let resp = ui.interact(r, ui.auto_id_with("remote_screen_interact"), egui::Sense::click_and_drag());
+                (r, resp)
             } else {
-                egui::vec2(avail.x, (avail.x / tex_aspect).floor())
+                // Modo 1:1 Pixel-Perfect Nativo: renderizado a tamaño real con ScrollArea bidireccional
+                let mut inner_r = egui::Rect::NOTHING;
+                let mut inner_resp = None;
+                egui::ScrollArea::both()
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| {
+                        let (r, resp) = ui.allocate_exact_size(tex_size, egui::Sense::click_and_drag());
+                        ui.painter().image(
+                            tex.id(),
+                            r,
+                            egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
+                            Color32::WHITE,
+                        );
+                        inner_r = r;
+                        inner_resp = Some(resp);
+                    });
+                (inner_r, inner_resp.unwrap_or_else(|| ui.interact(egui::Rect::NOTHING, ui.auto_id_with("remote_screen_interact_empty"), egui::Sense::hover())))
             };
-            let (rect, img_resp) = ui.allocate_exact_size(target_size, egui::Sense::click_and_drag());
-            ui.painter().image(
-                tex.id(),
-                rect,
-                egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
-                Color32::WHITE,
-            );
-            let interact_resp = img_resp;
 
             // 2. Captura y despacho de eventos de ratón con coordenadas normalizadas (0.0 - 1.0)
-            if interact_resp.hovered() {
-                if let Some(hover_pos) = interact_resp.hover_pos() {
+            let is_pointer_active = interact_resp.hovered() || interact_resp.dragged();
+            let pointer_pos = interact_resp
+                .hover_pos()
+                .or_else(|| ui.input(|i| i.pointer.interact_pos()))
+                .or_else(|| ui.input(|i| i.pointer.latest_pos()));
+
+            if is_pointer_active {
+                if let Some(hover_pos) = pointer_pos {
                     let norm_x = ((hover_pos.x - rect.min.x) / rect.width()).clamp(0.0, 1.0);
                     let norm_y = ((hover_pos.y - rect.min.y) / rect.height()).clamp(0.0, 1.0);
 
-                    // Throttling de 25ms para movimiento de ratón (40 Hz de ultra fluidez sin saturar el canal de control)
+                    // Cadencia fluida a 60 Hz (~16 ms): seguimiento suave sin saturar el canal de control
                     let now = Instant::now();
-                    if now.duration_since(self.last_mouse_time) >= Duration::from_millis(25)
-                        && ((norm_x - self.last_mouse_pos.0).abs() > 0.0012
-                            || (norm_y - self.last_mouse_pos.1).abs() > 0.0012)
+                    if now.duration_since(self.last_mouse_time) >= Duration::from_millis(16)
+                        && ((norm_x - self.last_mouse_pos.0).abs() > 0.0008
+                            || (norm_y - self.last_mouse_pos.1).abs() > 0.0008)
                     {
                         self.last_mouse_pos = (norm_x, norm_y);
                         self.last_mouse_time = now;
@@ -772,7 +1039,7 @@ impl NxDeskApp {
             } else {
                 "<5 ms".to_string()
             };
-            let bitrate_str = if telem.rx_kbps >= 1000 {
+            let _bitrate_str = if telem.rx_kbps >= 1000 {
                 format!("{:.1} Mbps", telem.rx_kbps as f32 / 1000.0)
             } else {
                 format!("{} kbps", telem.rx_kbps)
@@ -784,10 +1051,11 @@ impl NxDeskApp {
                 "720p".to_string()
             };
 
-            let hud_width = 280.0;
+            let hud_width = 540.0;
             let hud_height = 28.0;
+            let clip_rect = ui.clip_rect();
             let hud_rect = egui::Rect::from_min_size(
-                egui::pos2(rect.max.x - hud_width - 16.0, rect.min.y + 12.0),
+                egui::pos2(clip_rect.max.x - hud_width - 16.0, clip_rect.min.y + 12.0),
                 egui::vec2(hud_width, hud_height),
             );
 
@@ -800,8 +1068,10 @@ impl NxDeskApp {
                 egui::StrokeKind::Inside,
             );
 
-            let dot_color = if telem.rtt_ms <= 80 {
-                Color32::from_rgb(34, 197, 94) // Verde suave
+            let dot_color = if telem.rtt_ms <= 60 {
+                Color32::from_rgb(34, 197, 94) // Verde suave (<60 ms)
+            } else if telem.rtt_ms <= 120 {
+                Color32::from_rgb(34, 197, 94) // Verde (<120 ms)
             } else if telem.rtt_ms <= 180 {
                 Color32::from_rgb(234, 179, 8) // Amarillo
             } else {
@@ -815,9 +1085,16 @@ impl NxDeskApp {
                 dot_color,
             );
 
+            let stages_str = if telem.net_ms > 0.0 {
+                format!("Cap:{:.1}m|Enc:{:.1}m|Net:{:.1}m|Dec:{:.1}m", telem.cap_ms, telem.enc_ms, telem.net_ms, telem.dec_ms)
+            } else {
+                format!("Cap:{:.1}m|Enc:{:.1}m|Dec:{:.1}m", telem.cap_ms, telem.enc_ms, telem.dec_ms)
+            };
+            let mode_str = if self.is_view_fit { "Ajustar" } else { "1:1 Nativo" };
+            let mem_str = format!("{:.0} MB RAM", telem.ram_mb);
             let hud_text = format!(
-                "{} FPS   •   {}   •   {}   •   {}",
-                telem.rx_fps, ping_str, bitrate_str, res_str
+                "{} FPS  •  {}  •  {}  •  {}  •  {} [{}]",
+                telem.rx_fps, ping_str, mem_str, stages_str, res_str, mode_str
             );
             ui.painter().text(
                 egui::pos2(hud_rect.min.x + 28.0, hud_rect.center().y),
@@ -856,7 +1133,7 @@ impl NxDeskApp {
                             }
                             ui.add_space(16.0);
                             if ui.add(egui::Button::new(RichText::new("❌ Cancelar").color(Color32::WHITE)).fill(theme::ERROR)).clicked() {
-                                self.disconnect_session();
+                                self.disconnect_session(ui.ctx());
                             }
                         });
                     });
@@ -937,34 +1214,102 @@ impl NxDeskApp {
             });
     }
 
-    /// Modal de Terminal Remota Segura
-    fn render_terminal_dialog(&mut self, ctx: &egui::Context) {
+    /// Terminal Remota Segura (bidireccional): envía comandos al par por la red y muestra
+/// la salida local y la del par remoto (canal "terminal_out").
+fn render_terminal_dialog(&mut self, ctx: &egui::Context) {
         if !self.is_terminal_open {
             return;
         }
 
+        // Bombear la salida (local y del par) al buffer visible, con límite de scroll-back
+        // para que la UI nunca degenere en memoria tras sesiones largas.
+        while let Ok(chunk) = self.terminal_rx.try_recv() {
+            self.terminal_output.push_str(&chunk);
+        }
+        if self.terminal_output.len() > 128_000 {
+            let cut = self.terminal_output.len() - 96_000;
+            let safe_cut = self.terminal_output.floor_char_boundary(cut);
+            let boundary = self.terminal_output[safe_cut..]
+                .find('\n')
+                .map(|p| safe_cut + p + 1)
+                .unwrap_or(safe_cut);
+            self.terminal_output.drain(..boundary);
+        }
+
         egui::Window::new("💻 Terminal Remota Segura [VUL-01 Verificada]")
             .collapsible(false)
-            .default_size([600.0, 440.0])
+            .default_size([680.0, 480.0])
             .anchor(egui::Align2::CENTER_CENTER, Vec2::ZERO)
             .show(ctx, |ui| {
-                egui::ScrollArea::vertical().stick_to_bottom(true).show(ui, |ui| {
-                    ui.label(RichText::new(&self.terminal_output).monospace().color(theme::TEXT));
-                });
+                // Salida con altura FIJA: el window nunca crece con el contenido;
+                // el scroll vertical sube/baja por el histórico (pegado al final).
+                egui::ScrollArea::vertical()
+                    .auto_shrink([false, false])
+                    .max_height(320.0)
+                    .min_scrolled_height(320.0)
+                    .stick_to_bottom(true)
+                    .show(ui, |ui| {
+                        ui.label(
+                            RichText::new(&self.terminal_output)
+                                .monospace()
+                                .color(theme::TEXT)
+                                .size(12.0),
+                        );
+                    });
 
                 ui.separator();
 
                 ui.horizontal(|ui| {
-                    let cmd_edit = ui.add(egui::TextEdit::singleline(&mut self.terminal_input).hint_text("Comando..."));
-                    if (ui.button("Enviar").clicked() || (cmd_edit.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter))))
-                        && !self.terminal_input.trim().is_empty()
-                    {
+                    // Entrada de UNA línea de altura fija: comandos largos se desplazan
+                    // horizontalmente dentro del cuadro (nunca agranda el cuadro).
+                    let cmd_edit = ui.add(
+                        egui::TextEdit::singleline(&mut self.terminal_input)
+                            .hint_text("Comando... (Enter para enviar al equipo remoto)")
+                            .desired_width(ui.available_width() - 260.0)
+                            .min_size(egui::Vec2::new(0.0, 24.0))
+                            .clip_text(true),
+                    );
+                    let send_clicked = ui.button("Enviar ➔").clicked();
+                    let enter_pressed =
+                        cmd_edit.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
+                    if (send_clicked || enter_pressed) && !self.terminal_input.trim().is_empty() {
                         let cmd = self.terminal_input.trim().to_string();
+                        // Echo local + envío real por la red al par autorizado
                         self.terminal_output.push_str(&format!("> {}\r\n", cmd));
                         self.terminal_input.clear();
+                        if let Ok(sig_opt) = self.state.signaling_client.try_read() {
+                            if let Some(sig) = sig_opt.as_ref() {
+                                let sig = std::sync::Arc::clone(sig);
+                                let msg = nxdesk_core::SignalingMessage::new("terminal_cmd", &cmd);
+                                tokio::spawn(async move {
+                                    let _ = sig.send_message(&msg).await;
+                                });
+                            }
+                        }
+                    }
+
+                    // Botón para interrupción inmediata del proceso en ejecución
+                    if ui.button("⏹ Ctrl+C").clicked() {
+                        self.terminal_output.push_str("^C\r\n[Enviando interrupción Ctrl+C...]\r\n");
+                        if let Ok(sig_opt) = self.state.signaling_client.try_read() {
+                            if let Some(sig) = sig_opt.as_ref() {
+                                let sig = std::sync::Arc::clone(sig);
+                                let msg = nxdesk_core::SignalingMessage::new("terminal_ctrl_c", "");
+                                tokio::spawn(async move {
+                                    let _ = sig.send_message(&msg).await;
+                                });
+                            }
+                        }
+                    }
+
+                    // Botón para limpiar pantalla
+                    if ui.button("🗑 Limpiar").clicked() {
+                        self.terminal_output.clear();
+                        self.terminal_output.push_str("NxDesk Terminal Remota Segura [VUL-01 Activa]\r\n");
                     }
                 });
 
+                ui.add_space(4.0);
                 if ui.button("Cerrar").clicked() {
                     self.is_terminal_open = false;
                 }
@@ -1161,27 +1506,35 @@ impl NxDeskApp {
                         });
                 });
 
-            if disconnect {
-                let state_clone = self.state.clone();
-                tokio::spawn(async move {
-                    let _ = state_clone.terminate_session().await;
-                });
-                self.show_toast("Sesión finalizada.");
-            }
+         if disconnect {
+             // Limpiar el estado visual local inmediatamente.
+             // ctx es el parámetro de la función (fuera del closure de egui::Area no existe `ui`).
+             self.disconnect_session(ctx);
+         }
         }
     }
 }
 
 impl eframe::App for NxDeskApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        self.render_app_ui(ui);
+    }
+}
+
+/// Cuerpo de render de la app (Header + Toasts + Vista principal + Modales).
+/// Separado de `ui` para mantener la paridad con el layout original.
+impl NxDeskApp {
+    fn render_app_ui(&mut self, ui: &mut egui::Ui) {
         let active_peer = self
             .state
             .active_remote_peer
             .try_read()
             .ok()
-            .and_then(|p| p.clone());
-        let is_session_active = active_peer.is_some() || self.state.is_host_active() || self.state.get_room_occupancy() > 1;
-
+            .and_then(|p| p.clone());   
+       let is_session_active = active_peer.is_some()
+    || self.state.is_host_active()
+    || self.state.is_viewer_active();
+        
         // Solicitar repintado periódico: 16ms (60 FPS) si hay sesión activa (anfitrión o visor); 80ms en reposo
         let repaint_interval = if is_session_active {
             Duration::from_millis(16)
@@ -1192,6 +1545,17 @@ impl eframe::App for NxDeskApp {
 
         // 1. Barra superior (Header idéntico a MainWindow.axaml)
         self.render_header(ui, is_session_active, active_peer.clone());
+
+        // 1b. Nota diferida de grabación (resultado del ensamblado AVI en background).
+        if let Some(msg) = self
+            .state
+            .recording_note
+            .lock()
+            .ok()
+            .and_then(|mut n| n.take())
+        {
+            self.show_toast(msg);
+        }
 
         // 2. Notificaciones Toast temporales
         if let Some((ref msg, time)) = self.toast_message {

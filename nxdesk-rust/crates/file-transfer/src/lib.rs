@@ -9,15 +9,24 @@ use tracing::info;
 
 /// Obtiene el directorio seguro por defecto en Downloads/NxDesk_Transfers
 pub fn get_safe_transfers_dir() -> PathBuf {
-    let base = if let Ok(profile) = std::env::var("USERPROFILE") {
-        PathBuf::from(profile)
-    } else if let Ok(home) = std::env::var("HOME") {
-        PathBuf::from(home)
-    } else {
-        std::env::temp_dir()
-    };
-
-    base.join("Downloads").join("NxDesk_Transfers")
+    if let Ok(dir) = std::env::var("NXDESK_TRANSFERS_DIR") {
+        return PathBuf::from(dir);
+    }
+    if let Ok(profile) = std::env::var("USERPROFILE") {
+        let p = PathBuf::from(profile).join("Downloads").join("NxDesk_Transfers");
+        if std::fs::create_dir_all(&p).is_ok() {
+            return p;
+        }
+    }
+    if let Ok(home) = std::env::var("HOME") {
+        let p = PathBuf::from(home).join("Downloads").join("NxDesk_Transfers");
+        if std::fs::create_dir_all(&p).is_ok() {
+            return p;
+        }
+    }
+    let temp = std::env::temp_dir().join("NxDesk_Transfers");
+    let _ = std::fs::create_dir_all(&temp);
+    temp
 }
 
 /// Sanea y valida estrictamente una ruta para prevenir Path Traversal

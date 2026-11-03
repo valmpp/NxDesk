@@ -9,7 +9,9 @@ nxdesk-core = { path = "../core" }
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.52", features = [
     "Win32_Graphics_Gdi",
+    "Win32_Graphics_Dwm",
     "Win32_UI_WindowsAndMessaging",
     "Win32_Foundation",
-    "Win32_System_StationsAndDesktops"
+    "Win32_System_StationsAndDesktops",
+    "Win32_System_LibraryLoader"
 ] }

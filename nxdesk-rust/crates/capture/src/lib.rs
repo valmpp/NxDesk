@@ -1,3 +1,5 @@
+pub mod dxgi;
+
 use nxdesk_core::ScreenInfoDto;
 
 /// Representa un fotograma crudo capturado de la pantalla
@@ -98,6 +100,12 @@ pub struct ScreenCapturer {
     last_hotspot_x: i32,
     #[cfg(windows)]
     last_hotspot_y: i32,
+    #[cfg(windows)]
+    dib_bits: usize,
+    pub last_dwm_flush_us: u32,
+    pub last_bitblt_us: u32,
+    pub last_scale_us: u32,
+    pub dxgi: Option<dxgi::DxgiCapturer>,
 }
 
 impl Drop for ScreenCapturer {
@@ -149,6 +157,11 @@ impl ScreenCapturer {
                 last_cursor: 0,
                 last_hotspot_x: 0,
                 last_hotspot_y: 0,
+                dib_bits: 0,
+                last_dwm_flush_us: 0,
+                last_bitblt_us: 0,
+                last_scale_us: 0,
+                dxgi: None,
             };
             let screens = capturer.get_screens();
             if let Some(primary) = screens
@@ -162,6 +175,7 @@ impl ScreenCapturer {
                 capturer.origin_y = primary.y;
                 capturer.active_index = primary.index;
             }
+            capturer.dxgi = None;
             capturer
         }
         #[cfg(not(windows))]
@@ -177,8 +191,16 @@ impl ScreenCapturer {
                 x_map: Vec::new(),
                 last_mapped_dw: 0,
                 last_mapped_src_w: 0,
+                last_dwm_flush_us: 0,
+                last_bitblt_us: 0,
+                last_scale_us: 0,
+                dxgi: None,
             }
         }
+    }
+
+    pub fn last_timings_us(&self) -> (u32, u32, u32) {
+        (self.last_dwm_flush_us, self.last_bitblt_us, self.last_scale_us)
     }
 
     pub fn dimensions(&self) -> (u32, u32) {
@@ -276,6 +298,10 @@ impl ScreenCapturer {
             self.origin_x = target.x;
             self.origin_y = target.y;
             self.active_index = target.index;
+            #[cfg(windows)]
+            {
+                self.dxgi = None; // Reinicialización perezosa en el siguiente cuadro de captura
+            }
             Ok(target)
         } else {
             Err(format!("Monitor con índice {} no encontrado", index))
@@ -303,6 +329,26 @@ impl ScreenCapturer {
 
     /// Captura un fotograma instantáneo de la pantalla con resistencia a bloqueos de Windows y UAC
     pub fn capture_frame(&mut self) -> Result<CapturedFrame, String> {
+        #[cfg(windows)]
+        {
+            if self.dxgi.is_none() && self.active_index >= 0 {
+                self.dxgi = dxgi::DxgiCapturer::new(self.active_index as u32).ok();
+            }
+            if let Some(ref mut dxgi) = self.dxgi {
+                if dxgi.width == self.width && dxgi.height == self.height {
+                    if let Ok(_) = dxgi.capture_to_bgra(2) {
+                        let frame = CapturedFrame {
+                            width: dxgi.width,
+                            height: dxgi.height,
+                            data: dxgi.raw_bgra.clone(),
+                        };
+                        self.last_frame = Some(frame.clone());
+                        return Ok(frame);
+                    }
+                }
+            }
+        }
+
         #[cfg(windows)]
         {
             use windows_sys::Win32::Graphics::Gdi::*;
@@ -520,21 +566,62 @@ impl ScreenCapturer {
                 if self.hdc_mem != 0
                     && (self.h_bitmap == 0
                         || self.allocated_w != self.width
-                        || self.allocated_h != self.height)
+                        || self.allocated_h != self.height
+                        || self.dib_bits == 0)
                 {
                     if self.h_bitmap != 0 {
                         SelectObject(self.hdc_mem, self.old_bitmap);
                         DeleteObject(self.h_bitmap);
+                        self.h_bitmap = 0;
+                        self.dib_bits = 0;
                     }
-                    self.h_bitmap =
-                        CreateCompatibleBitmap(self.hdc_screen, self.width as i32, self.height as i32);
-                    self.old_bitmap = SelectObject(self.hdc_mem, self.h_bitmap);
-                    self.allocated_w = self.width;
-                    self.allocated_h = self.height;
+
+                    let bi = BITMAPINFO {
+                        bmiHeader: BITMAPINFOHEADER {
+                            biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+                            biWidth: self.width as i32,
+                            biHeight: -(self.height as i32), // Top-down DIB
+                            biPlanes: 1,
+                            biBitCount: 32,
+                            biCompression: BI_RGB,
+                            biSizeImage: self.width * self.height * 4,
+                            biXPelsPerMeter: 0,
+                            biYPelsPerMeter: 0,
+                            biClrUsed: 0,
+                            biClrImportant: 0,
+                        },
+                        bmiColors: [RGBQUAD {
+                            rgbBlue: 0,
+                            rgbGreen: 0,
+                            rgbRed: 0,
+                            rgbReserved: 0,
+                        }],
+                    };
+
+                    let mut p_bits: *mut std::ffi::c_void = std::ptr::null_mut();
+                    let h_bmp = CreateDIBSection(
+                        self.hdc_screen,
+                        &bi,
+                        DIB_RGB_COLORS,
+                        &mut p_bits,
+                        0,
+                        0,
+                    );
+
+                    if h_bmp != 0 && !p_bits.is_null() {
+                        self.h_bitmap = h_bmp;
+                        self.old_bitmap = SelectObject(self.hdc_mem, self.h_bitmap);
+                        self.allocated_w = self.width;
+                        self.allocated_h = self.height;
+                        self.dib_bits = p_bits as usize;
+                    }
                 }
 
                 let mut bitblt_ok = 0;
                 if self.h_bitmap != 0 {
+                    self.last_dwm_flush_us = 0;
+
+                    let t_blt = std::time::Instant::now();
                     bitblt_ok = BitBlt(
                         self.hdc_mem,
                         0,
@@ -546,6 +633,7 @@ impl ScreenCapturer {
                         self.origin_y,
                         SRCCOPY,
                     );
+                    self.last_bitblt_us = t_blt.elapsed().as_micros() as u32;
                 }
 
                 if bitblt_ok != 0 {
@@ -594,52 +682,11 @@ impl ScreenCapturer {
                         }
                     }
 
-                    let mut bi = BITMAPINFO {
-                        bmiHeader: BITMAPINFOHEADER {
-                            biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
-                            biWidth: self.width as i32,
-                            biHeight: -(self.height as i32),
-                            biPlanes: 1,
-                            biBitCount: 32,
-                            biCompression: BI_RGB,
-                            biSizeImage: self.width * self.height * 4,
-                            biXPelsPerMeter: 0,
-                            biYPelsPerMeter: 0,
-                            biClrUsed: 0,
-                            biClrImportant: 0,
-                        },
-                        bmiColors: [RGBQUAD {
-                            rgbBlue: 0,
-                            rgbGreen: 0,
-                            rgbRed: 0,
-                            rgbReserved: 0,
-                        }],
-                    };
-
-                    let req_len = (self.width * self.height * 4) as usize;
-                    if self.raw_buffer.len() != req_len {
-                        self.raw_buffer.resize(req_len, 0);
-                    }
-
-                    GetDIBits(
-                        self.hdc_mem,
-                        self.h_bitmap,
-                        0,
-                        self.height,
-                        self.raw_buffer.as_mut_ptr() as *mut _,
-                        &mut bi,
-                        DIB_RGB_COLORS,
-                    );
                 } else if self.hdc_screen != 0 {
                     ReleaseDC(0, self.hdc_screen);
                     self.hdc_screen = 0;
                 }
             }
-        }
-
-        let req_len = (self.width * self.height * 4) as usize;
-        if self.raw_buffer.len() != req_len {
-            self.raw_buffer.resize(req_len, 35);
         }
 
         Ok(())
@@ -649,6 +696,15 @@ impl ScreenCapturer {
     /// Cero conversiones intermedias, cero reescalado, máxima nitidez y rendimiento ultra rápido (~3 ms).
     pub fn capture_native_bgra(&mut self) -> Result<(&[u8], u32, u32), String> {
         self.capture_raw_bgra_internal()?;
+        let req_len = (self.width * self.height * 4) as usize;
+        #[cfg(windows)]
+        if self.dib_bits != 0 {
+            let slice = unsafe { std::slice::from_raw_parts(self.dib_bits as *const u8, req_len) };
+            return Ok((slice, self.width, self.height));
+        }
+        if self.raw_buffer.len() != req_len {
+            self.raw_buffer.resize(req_len, 35);
+        }
         Ok((&self.raw_buffer, self.width, self.height))
     }
 
@@ -659,13 +715,51 @@ impl ScreenCapturer {
         max_dim: u32,
         dst: &mut Vec<u8>,
     ) -> Result<(u32, u32), String> {
+        #[cfg(windows)]
+        {
+            if self.dxgi.is_none() && self.active_index >= 0 {
+                self.dxgi = dxgi::DxgiCapturer::new(self.active_index as u32).ok();
+            }
+            if let Some(ref mut dxgi) = self.dxgi {
+                if dxgi.width == self.width && dxgi.height == self.height {
+                    match dxgi.capture_rgb_scaled_into(max_dim, dst) {
+                        Ok((w, h)) => {
+                            let (acq, cpy, scl) = dxgi.last_timings_us();
+                            self.last_dwm_flush_us = acq;
+                            self.last_bitblt_us = cpy;
+                            self.last_scale_us = scl;
+                            return Ok((w, h));
+                        }
+                        Err(_) => {
+                            self.dxgi = None;
+                        }
+                    }
+                }
+            }
+        }
+
         self.capture_raw_bgra_internal()?;
 
-        // Asegurar que raw_buffer tenga tamaño adecuado
+        let t_scale = std::time::Instant::now();
+
+        // Acceso directo Zero-Copy a la memoria mapeada de la DIBSection sin memcpy intermedio
         let req_len = (self.width * self.height * 4) as usize;
-        if self.raw_buffer.len() != req_len {
-            self.raw_buffer.resize(req_len, 35);
-        }
+        #[cfg(windows)]
+        let src: &[u8] = if self.dib_bits != 0 {
+            unsafe { std::slice::from_raw_parts(self.dib_bits as *const u8, req_len) }
+        } else {
+            if self.raw_buffer.len() != req_len {
+                self.raw_buffer.resize(req_len, 35);
+            }
+            &self.raw_buffer
+        };
+        #[cfg(not(windows))]
+        let src: &[u8] = {
+            if self.raw_buffer.len() != req_len {
+                self.raw_buffer.resize(req_len, 35);
+            }
+            &self.raw_buffer
+        };
 
         // Calcular resolución optimizada conservando relación de aspecto
         let src_w = self.width as usize;
@@ -687,18 +781,21 @@ impl ScreenCapturer {
             dst.resize(dst_len, 0);
         }
 
-        let src = &self.raw_buffer;
         let src_len = src.len();
 
         if dw == src_w && dh == src_h {
             let pixel_count = dw * dh;
-            for i in 0..pixel_count {
-                let src_idx = i * 4;
-                let dst_idx = i * 3;
-                if src_idx + 2 < src_len {
-                    dst[dst_idx] = src[src_idx + 2];     // R
-                    dst[dst_idx + 1] = src[src_idx + 1]; // G
-                    dst[dst_idx + 2] = src[src_idx];     // B
+            let src_ptr = src.as_ptr();
+            let dst_ptr = dst.as_mut_ptr();
+            unsafe {
+                for i in 0..pixel_count {
+                    let src_idx = i * 4;
+                    let dst_idx = i * 3;
+                    if src_idx + 2 < src_len {
+                        *dst_ptr.add(dst_idx) = *src_ptr.add(src_idx + 2);     // R
+                        *dst_ptr.add(dst_idx + 1) = *src_ptr.add(src_idx + 1); // G
+                        *dst_ptr.add(dst_idx + 2) = *src_ptr.add(src_idx);     // B
+                    }
                 }
             }
         } else {
@@ -709,26 +806,31 @@ impl ScreenCapturer {
                 self.last_mapped_src_w = self.width;
             }
 
+            let src_ptr = src.as_ptr();
+            let dst_ptr = dst.as_mut_ptr();
             let x_map = &self.x_map;
-            for dy in 0..dh {
-                let sy = (dy * src_h) / dh;
-                let src_row = sy * src_w * 4;
-                let dst_row = dy * dw * 3;
+            unsafe {
+                for dy in 0..dh {
+                    let sy = (dy * src_h) / dh;
+                    let src_row = sy * src_w * 4;
+                    let dst_row = dy * dw * 3;
 
-                for dx in 0..dw {
-                    let sx = x_map[dx];
-                    let src_idx = src_row + sx * 4;
-                    let dst_idx = dst_row + dx * 3;
+                    for dx in 0..dw {
+                        let sx = *x_map.get_unchecked(dx);
+                        let src_idx = src_row + sx * 4;
+                        let dst_idx = dst_row + dx * 3;
 
-                    if src_idx + 2 < src_len {
-                        dst[dst_idx] = src[src_idx + 2];     // R
-                        dst[dst_idx + 1] = src[src_idx + 1]; // G
-                        dst[dst_idx + 2] = src[src_idx];     // B
+                        if src_idx + 2 < src_len {
+                            *dst_ptr.add(dst_idx) = *src_ptr.add(src_idx + 2);     // R
+                            *dst_ptr.add(dst_idx + 1) = *src_ptr.add(src_idx + 1); // G
+                            *dst_ptr.add(dst_idx + 2) = *src_ptr.add(src_idx);     // B
+                        }
                     }
                 }
             }
         }
 
+        self.last_scale_us = t_scale.elapsed().as_micros() as u32;
         Ok((enc_w, enc_h))
     }
 }
@@ -804,12 +906,16 @@ mod tests {
         }
 
         let (w, h) = capturer.capture_rgb_scaled_into(1280, &mut rgb_buf).unwrap();
+        let (f_us, b_us, s_us) = capturer.last_timings_us();
 
         let avg_cap: std::time::Duration = capture_times.iter().sum::<std::time::Duration>() / capture_times.len() as u32;
 
         println!("============================================================");
         println!("📊 BENCHMARK CAPTURA (Resolución {}x{}, RGB {} bytes):", w, h, rgb_buf.len());
-        println!("   1. GDI BitBlt + GetDIBits + Reescalado: {:.2} ms", avg_cap.as_secs_f64() * 1000.0);
+        println!("   1. GDI BitBlt + GetDIBits + Reescalado TOTAL: {:.2} ms", avg_cap.as_secs_f64() * 1000.0);
+        println!("      - DwmFlush: {:.2} ms", f_us as f64 / 1000.0);
+        println!("      - BitBlt:   {:.2} ms", b_us as f64 / 1000.0);
+        println!("      - Reescalado RGB: {:.2} ms", s_us as f64 / 1000.0);
         println!("   Teórico sólo captura: {:.1} FPS", 1.0 / avg_cap.as_secs_f64());
         println!("============================================================");
     }

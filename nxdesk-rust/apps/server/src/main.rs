@@ -62,10 +62,37 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn handle_connection(
-    mut stream: TcpStream,
+    stream: TcpStream,
     peer_addr: SocketAddr,
     state: Arc<RwLock<HubState>>,
 ) {
+    // Desactivar Nagle y acotar los buffers del kernel (192 KiB/dirección): el servidor no debe
+    // acumular MBs de frames viejos por conexión cuando el túnel del visor es lento. El
+    // backpressure real hace que cada watch de sala descarte en el origen.
+    // (tokio no expone el tope de buffers: se ajusta vía socket2 sobre el socket nativo.)
+    let std_stream = match stream.into_std() {
+        Ok(s) => s,
+        Err(e) => {
+            warn!("No se pudo obtener el socket nativo: {}", e);
+            return;
+        }
+    };
+    {
+        let sock = socket2::SockRef::from(&std_stream);
+        let _ = sock.set_nodelay(true);
+        // Búfer optimizado (128 KiB send / 256 KiB recv): relay rápido sin fragmentación para fotogramas Q>=80
+        let _ = sock.set_send_buffer_size(128 * 1024);
+        let _ = sock.set_recv_buffer_size(256 * 1024);
+        let _ = std_stream.set_nonblocking(true);
+    }
+    let mut stream: TcpStream = match TcpStream::from_std(std_stream) {
+        Ok(s) => s,
+        Err(e) => {
+            warn!("No se pudo reenvolver el socket ajustado: {}", e);
+            return;
+        }
+    };
+
     // Inspección de encabezados HTTP: /health, descarga de ZIP o WebSocket
     let mut peek_buf = [0u8; 1024];
     let n = match stream.peek(&mut peek_buf).await {
@@ -248,6 +275,9 @@ async fn handle_connection(
 
     // Tarea para enviar mensajes al WebSocket desde el canal de salida con equidad justa
     // Control / Ping / Entrada y Video se intercalan sin inanición (Zero Starvation, Zero Bufferbloat).
+    // Descarte anti-cola: si una escritura de video tarda >120 ms, los frames frescos se descartan
+    // en el watch (en vez de encolarse en TCP) mientras la ventana de drenado aguanta; el RTT de
+    // control del par no se arrastra por detrás de frames obsoletos en sesiones largas.
     let conn_id_tx = conn_id.clone();
     tokio::spawn(async move {
         loop {

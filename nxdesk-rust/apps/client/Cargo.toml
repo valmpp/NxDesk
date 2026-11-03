@@ -21,8 +21,17 @@ tracing-subscriber = "0.3"
 rand = "0.8"
 eframe = { version = "0.37.0", default-features = false, features = ["glow", "default_fonts", "accesskit"] }
 jpeg-encoder = { version = "0.7.1", features = ["simd"] }
+# Decodificación JPEG acelerada por SIMD (SSE/AVX2): sustituye al decoder del crate `image`
+# que era el cuello de botella del FPS en el visor (decodificaba 2560x1440 a ~10 FPS).
+zune-jpeg = "0.4"
+vt100 = "0.15"
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.52", features = ["Win32_UI_HiDpi"] }
+windows-sys = { version = "0.52", features = [
+    "Win32_UI_HiDpi",
+    "Win32_Media",
+    "Win32_System_ProcessStatus",
+    "Win32_System_Threading",
+] }
 
 

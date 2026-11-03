@@ -100,7 +100,7 @@ impl Default for AppConfig {
             web_port: 8080,
             auto_share: true,
             signaling_server_url: "ws://127.0.0.1:5000/signalinghub".to_string(),
-            max_fps: 30,
+            max_fps: 60,
             quality: 75,
         }
     }
@@ -325,4 +325,162 @@ pub struct ActiveSessionInfo {
     pub allow_clipboard: bool,
     pub allow_file_transfer: bool,
     pub start_time: u64,
+}
+
+/// Máquina de estados canónica de la sesión remota.
+/// IDLE → CONNECTING → CONNECTED → DISCONNECTING → IDLE
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "PascalCase")]
+pub enum SessionState {
+    #[default]
+    Idle,
+    Connecting,
+    Connected,
+    Disconnecting,
+}
+
+/// Desglose de latencia por etapa (ms), calculado en el visor.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct LatencyBreakdown {
+    pub capture_ms: f32,
+    pub encode_ms: f32,
+    /// Estimación de tránsito de red = RTT/2 (inmune al desfase de relojes entre equipos)
+    pub network_ms: f32,
+    pub decode_ms: f32,
+    /// Medio intervalo de refresco de la UI (latencia media de presentación)
+    pub render_ms: f32,
+    pub total_ms: f32,
+}
+
+/// Protocolo de control de sesión y terminal (viaja por el canal de control, separado del video).
+pub mod protocol {
+    use serde::{Deserialize, Serialize};
+
+    pub const SESSION_REQUEST: &str = "session_request";
+    pub const SESSION_DECISION: &str = "session_decision";
+    /// BYE explícito: cualquiera de los dos extremos termina la sesión
+    pub const SESSION_END: &str = "session_end";
+    pub const SESSION_END_ACK: &str = "session_end_ack";
+    /// Heartbeat (1 Hz) y su respuesta; también miden RTT
+    pub const HEARTBEAT: &str = "ping_rtt";
+    pub const HEARTBEAT_ACK: &str = "pong_rtt";
+    pub const PEER_OFFLINE: &str = "peer_offline";
+
+    pub const TERMINAL_OPEN: &str = "terminal_open";
+    pub const TERMINAL_OPENED: &str = "terminal_opened";
+    pub const TERMINAL_DENIED: &str = "terminal_denied";
+    /// Salida del PTY (host → visor)
+    pub const TERMINAL_DATA: &str = "terminal_data";
+    /// Pulsaciones del usuario (visor → host)
+    pub const TERMINAL_INPUT: &str = "terminal_input";
+    pub const TERMINAL_RESIZE: &str = "terminal_resize";
+    /// Cierre o revocación (cualquier extremo)
+    pub const TERMINAL_CLOSE: &str = "terminal_close";
+
+    /// Sin heartbeat del par durante este tiempo ⇒ par caído ⇒ sesión terminada
+    pub const HEARTBEAT_TIMEOUT_MS: u64 = 6_000;
+    pub const END_ACK_TIMEOUT_MS: u64 = 3_000;
+
+    #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct SessionEndDto {
+        pub from: String,
+        pub to: String,
+        pub reason: String,
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct TerminalOpenDto {
+        pub from: String,
+        pub to: String,
+        pub cols: u16,
+        pub rows: u16,
+    }
+
+    /// Mensaje genérico de terminal dirigido (data / input / resize / close / opened / denied)
+    #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct TerminalMsgDto {
+        pub from: String,
+        pub to: String,
+        #[serde(default)]
+        pub data: String,
+        #[serde(default)]
+        pub cols: u16,
+        #[serde(default)]
+        pub rows: u16,
+    }
+}
+
+/// Cabecera binaria de timing antepuesta a cada fotograma JPEG enviado por la red.
+/// Formato (20 bytes, little-endian): `b"NXV1" | send_ts_ms:u64 | capture_us:u32 | encode_us:u32`
+pub mod frame_header {
+    pub const MAGIC: &[u8; 4] = b"NXV1";
+    pub const LEN: usize = 24;
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+    pub struct FrameTiming {
+        pub send_ts_ms: u64,
+        pub capture_us: u32,
+        pub encode_us: u32,
+        pub seq: u32,
+    }
+
+    pub fn wrap(payload: &[u8], t: FrameTiming) -> Vec<u8> {
+        let mut out = Vec::with_capacity(LEN + payload.len());
+        out.extend_from_slice(MAGIC);
+        out.extend_from_slice(&t.send_ts_ms.to_le_bytes());
+        out.extend_from_slice(&t.capture_us.to_le_bytes());
+        out.extend_from_slice(&t.encode_us.to_le_bytes());
+        out.extend_from_slice(&t.seq.to_le_bytes());
+        out.extend_from_slice(payload);
+        out
+    }
+
+    /// Devuelve (timing, payload). Compatible con fotogramas antiguos sin cabecera.
+    pub fn unwrap(buf: &[u8]) -> (Option<FrameTiming>, &[u8]) {
+        if buf.len() > LEN && &buf[..4] == MAGIC {
+            let send_ts_ms = u64::from_le_bytes(buf[4..12].try_into().unwrap_or_default());
+            let capture_us = u32::from_le_bytes(buf[12..16].try_into().unwrap_or_default());
+            let encode_us = u32::from_le_bytes(buf[16..20].try_into().unwrap_or_default());
+            let seq = u32::from_le_bytes(buf[20..24].try_into().unwrap_or_default());
+            (
+                Some(FrameTiming { send_ts_ms, capture_us, encode_us, seq }),
+                &buf[LEN..],
+            )
+        } else {
+            (None, buf)
+        }
+    }
+}
+
+#[cfg(test)]
+mod protocol_tests {
+    use super::*;
+
+    #[test]
+    fn frame_header_roundtrip() {
+        let jpeg = [0xFFu8, 0xD8, 1, 2, 3];
+        let t = frame_header::FrameTiming { send_ts_ms: 42, capture_us: 1500, encode_us: 9000, seq: 1 };
+        let wrapped = frame_header::wrap(&jpeg, t);
+        let (got, payload) = frame_header::unwrap(&wrapped);
+        assert_eq!(got, Some(t));
+        assert_eq!(payload, &jpeg);
+    }
+
+    #[test]
+    fn frame_header_legacy_passthrough() {
+        let jpeg = [0xFFu8, 0xD8, 0xFF, 0xE0];
+        let (got, payload) = frame_header::unwrap(&jpeg);
+        assert!(got.is_none());
+        assert_eq!(payload, &jpeg);
+    }
+
+    #[test]
+    fn session_end_serializes_pascal_case() {
+        let dto = protocol::SessionEndDto { from: "a".into(), to: "b".into(), reason: "user".into() };
+        let json = serde_json::to_string(&dto).unwrap();
+        assert!(json.contains("\"From\":\"a\"") && json.contains("\"To\":\"b\""));
+    }
 }
