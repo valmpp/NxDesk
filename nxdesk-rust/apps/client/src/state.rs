@@ -570,31 +570,77 @@ impl AppState {
             .min(100.0);
         let loss = self.take_window_packet_loss();
         let mem = query_process_memory();
+        let transport_desc = self
+            .try_get_signaling_client()
+            .map(|s| s.transport_summary())
+            .unwrap_or_else(|| "Desconectado".to_string());
+
+        let bottleneck_eval = if net_avg > 50.0 || self.rtt_ms.load(Ordering::Relaxed) > 120 {
+            "⚠️ CUELLO DE BOTELLA: Red lenta / Latencia RTT elevada"
+        } else if enc_avg > 14.0 {
+            "⚠️ CUELLO DE BOTELLA: CPU del Host sobrecargada (Compresión JPEG >14ms)"
+        } else if cap_avg > 16.0 {
+            "⚠️ CUELLO DE BOTELLA: Captura de Pantalla en Host lenta (DWM/GDI >16ms)"
+        } else if dec_avg > 14.0 {
+            "⚠️ CUELLO DE BOTELLA: CPU del Visor lenta (Descompresión SIMD >14ms)"
+        } else if loss > 0 {
+            "⚠️ ADVERTENCIA: Paquetes perdidos en el enlace"
+        } else {
+            "✅ RENDIMIENTO: Óptimo y Fluido"
+        };
+
+        let role_desc = if self.is_host_active() {
+            "📡 ANFITRIÓN (Transmitiendo escritorio local)"
+        } else if self.is_viewer_active() {
+            "🖥️ VISOR REMOTO (Recibiendo y mostrando pantalla)"
+        } else {
+            "⏸️ EN REPOSO (Esperando conexión)"
+        };
+
+        let tx_str = if self.is_viewer_active() && !self.is_host_active() {
+            "0 FPS (En reposo: este equipo actúa como Visor)".to_string()
+        } else {
+            format!(
+                "{} FPS · {} Kbps · res {}x{} · Q{} · cadencia {} · max_dim {}{}",
+                self.tx_fps.load(Ordering::Relaxed),
+                self.tx_kbps.load(Ordering::Relaxed),
+                self.local_width.load(Ordering::Relaxed),
+                self.local_height.load(Ordering::Relaxed),
+                self.current_quality.load(Ordering::Relaxed),
+                self.current_fps.load(Ordering::Relaxed),
+                self.current_max_dim.load(Ordering::Relaxed),
+                if self.current_max_dim.load(Ordering::Relaxed) > 0 { " (escalado)" } else { " (100% nativo)" }
+            )
+        };
+
+        let rx_str = if self.is_host_active() && !self.is_viewer_active() {
+            "0 FPS (En reposo: este equipo actúa como Anfitrión)".to_string()
+        } else {
+            format!(
+                "{} FPS · {} Kbps · res {}x{}",
+                self.rx_fps.load(Ordering::Relaxed),
+                self.rx_kbps.load(Ordering::Relaxed),
+                self.remote_width.load(Ordering::Relaxed),
+                self.remote_height.load(Ordering::Relaxed)
+            )
+        };
 
         format!(
             "🩺 [DiagNX 5s] ───────────────────────────────────────────────────────────────\n\
+             🩺 ROL ACTIVO: {}\n\
              🩺 MEMORIA (RAM): Física (Working Set): {:.1} MB · Privada: {:.1} MB · Pico: {:.1} MB\n\
-             🩺 TX: {} FPS · {} Kbps · res {}x{} · Q{} · cadencia {} · max_dim {}{}\n\
-             🩺 RX: {} FPS · {} Kbps · res {}x{}\n\
+             🩺 TX: {}\n\
+             🩺 RX: {}\n\
              🩺 ETAPAS media|máx ms → Cap {:.1}|{:.1} · Enc {:.1}|{:.1} · Send {:.2}|{:.2} · Net(RTT/2) {:.1}|{:.1} · Dec {:.1}|{:.1} · Render(subida) {:.2}|{:.2} · Edad al pintar {:.1}|{:.1} ms\n\
              🩺 RTT: {} ms (EMA) · Jitter RX: {:.1}|{:.1} ms · Secuencia perdida (5 s): {} · Ocupación TX {}% · Decoder {}%\n\
-             🩺 Transporte: TCP+WebSocket RELAY vía servidor (sin UDP/P2P) · NODELAY sí · SNDBUF 32 KiB (1 frame máx) · Decodificación: zune-jpeg SIMD · Captura: GDI DIBSection persistente · V-Sync: Desactivado (0 ms lag)\n\
+             🩺 Transporte: {} · Diagnóstico: {}\n\
              🩺 ─────────────────────────────────────────────────────────────────────────",
+            role_desc,
             mem.working_set_mb,
             mem.private_usage_mb,
             mem.peak_working_set_mb,
-            self.tx_fps.load(Ordering::Relaxed),
-            self.tx_kbps.load(Ordering::Relaxed),
-            self.local_width.load(Ordering::Relaxed),
-            self.local_height.load(Ordering::Relaxed),
-            self.current_quality.load(Ordering::Relaxed),
-            self.current_fps.load(Ordering::Relaxed),
-            self.current_max_dim.load(Ordering::Relaxed),
-            if self.current_max_dim.load(Ordering::Relaxed) > 0 { " (100% nativo)" } else { " (100% nativo)" },
-            self.rx_fps.load(Ordering::Relaxed),
-            self.rx_kbps.load(Ordering::Relaxed),
-            self.remote_width.load(Ordering::Relaxed),
-            self.remote_height.load(Ordering::Relaxed),
+            tx_str,
+            rx_str,
             cap_avg, cap_max,
             enc_avg, enc_max,
             send_avg, send_max,
@@ -605,7 +651,9 @@ impl AppState {
             self.rtt_ms.load(Ordering::Relaxed),
             jit_avg, jit_max,
             loss,
-            tx_busy_pct, dec_busy_pct
+            tx_busy_pct, dec_busy_pct,
+            transport_desc,
+            bottleneck_eval
         )
     }
 
@@ -822,6 +870,7 @@ impl AppState {
                 allow_input: decision.allow_input,
                 allow_clipboard: decision.allow_clipboard,
                 allow_file_transfer: decision.allow_file_transfer,
+                allow_terminal: decision.allow_terminal,
                 start_time: now,
             };
 
@@ -830,7 +879,10 @@ impl AppState {
                 *active = Some(session_info);
             }
             self.is_host_active.store(true, Ordering::Relaxed);
+            self.is_screen_sharing.store(true, Ordering::Relaxed);
+            self.connected_viewers.fetch_add(1, Ordering::Relaxed);
             self.allow_remote_input.store(decision.allow_input, Ordering::Relaxed);
+            self.set_remote_terminal_allowed(decision.allow_terminal).await;
             // En el anfitrión no asignamos active_remote_peer para que permanezca en su pantalla local
             // con el widget flotante de desconexión, y solo el cliente remoto abra el visor (RemoteView).
 
@@ -842,11 +894,13 @@ impl AppState {
                 allow_input: decision.allow_input,
                 allow_clipboard: decision.allow_clipboard,
                 allow_file_transfer: decision.allow_file_transfer,
+                allow_terminal: decision.allow_terminal,
                 error_message: None,
             }
         } else {
             self.is_host_active.store(false, Ordering::Relaxed);
             self.allow_remote_input.store(false, Ordering::Relaxed);
+            self.set_remote_terminal_allowed(false).await;
             SessionResponseDto {
                 success: false,
                 request_id: req.request_id.clone(),
@@ -855,6 +909,7 @@ impl AppState {
                 allow_input: false,
                 allow_clipboard: false,
                 allow_file_transfer: false,
+                allow_terminal: false,
                 error_message: Some(
                     decision
                         .rejection_reason
@@ -894,6 +949,8 @@ impl AppState {
 
         let was_host_active = self.is_host_active.swap(false, Ordering::SeqCst);
         let was_viewer_active = self.is_viewer_active.swap(false, Ordering::SeqCst);
+        self.is_screen_sharing.store(false, Ordering::SeqCst);
+        self.connected_viewers.store(0, Ordering::SeqCst);
         self.allow_remote_input.store(false, Ordering::SeqCst);
 
         let had_remote_peer = {
@@ -943,25 +1000,48 @@ impl AppState {
         self.session_epoch.fetch_add(1, Ordering::SeqCst);
 
         let my_id = self.config.read().await.device_id.clone();
-        let was_viewer = self.active_remote_peer.read().await.is_some();
-        let was_host = self.active_session.read().await.is_some();
+        let old_remote = self.active_remote_peer.read().await.clone();
+        let host_session = self.active_session.read().await.clone();
+        let was_viewer = old_remote.is_some() || self.is_viewer_active.load(Ordering::Relaxed);
+        let was_host = host_session.is_some() || self.is_host_active.load(Ordering::Relaxed);
+
+        let target_peer = if let Some(ref r) = old_remote {
+            Some(r.clone())
+        } else if let Some(ref s) = host_session {
+            Some(s.peer_id.clone())
+        } else {
+            None
+        };
 
         // 1) Avisar al par ANTES de salir de la sala (el canal de control preserva el orden).
         if notify_peer && (was_viewer || was_host) {
             if let Some(sig) = self.get_signaling_client().await {
-                let msg = nxdesk_core::SignalingMessage::new("session_end", &my_id);
+                let mut msg = nxdesk_core::SignalingMessage::new("session_end", &my_id);
+                if let Some(ref t) = target_peer {
+                    msg = msg.with_target(t);
+                }
                 let _ = sig.send_message(&msg).await;
+                tracing::info!("📢 [Señalización] Notificación 'session_end' enviada a {:?}", target_peer);
             }
         }
 
-        // 2) Limpiar todo el estado local.
+        // 2) Reseteo inmediato y completo del socket y keepalive UDP P2P para no dejar puertos ni pings activos
+        if let Some(sig) = self.get_signaling_client().await {
+            sig.reset_p2p();
+        }
+
+        // 3) Limpiar todo el estado local (texturas, buffers, sesiones activas, flags).
         let had_state = self.terminate_session().await;
 
-        // 3) El visor abandona la sala del anfitrión y vuelve a su sala propia.
-        if was_viewer {
-            if let Some(sig) = self.get_signaling_client().await {
-                let _ = sig.join_room(&my_id).await;
+        // 4) El visor o anfitrión abandona las salas compartidas y regresa a su sala propia
+        if let Some(sig) = self.get_signaling_client().await {
+            if let Some(ref remote) = old_remote {
+                let _ = sig.leave_room(remote).await;
             }
+            if let Some(ref s) = host_session {
+                let _ = sig.leave_room(&s.peer_id).await;
+            }
+            let _ = sig.join_room(&my_id).await;
         }
 
         self.request_ui_repaint();
@@ -1057,6 +1137,7 @@ mod tests {
             request_id: "req-123".to_string(),
             client_id: "client-456".to_string(),
             client_alias: "Soporte-TI".to_string(),
+            target_id: Some("host-999".to_string()),
             requested_role: SessionRole::FullControl,
             allow_input: true,
             allow_clipboard: true,
@@ -1074,11 +1155,14 @@ mod tests {
         // 3. Anfitrión acepta la solicitud
         let decision = SessionDecisionDto {
             request_id: "req-123".to_string(),
+            client_id: Some("client-456".to_string()),
+            target_id: Some("client-456".to_string()),
             accept: true,
             granted_role: Some(SessionRole::FullControl),
             allow_input: true,
             allow_clipboard: true,
             allow_file_transfer: false,
+            allow_terminal: true,
             rejection_reason: None,
         };
 

@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Minimalist 'N' Commercial Logo Brand Identity</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Plus Jakarta Sans', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Keyframes puros en CSS para asegurar fluidez y ejecución instantánea sin fallos */
+    
+    /* 1. Barra Izquierda 'I': Cae con elegancia desde arriba */
+    @keyframes enterPillarLeft {
+      0% {
+        transform: translateY(-220px);
+        opacity: 0;
+      }
+      20% {
+        transform: translateY(0);
+        opacity: 1;
+      }
+      80% {
+        transform: translateY(0);
+        opacity: 1;
+      }
+      94% {
+        transform: translateY(-220px);
+        opacity: 0;
+      }
+      100% {
+        transform: translateY(-220px);
+        opacity: 0;
+      }
+    }
+
+    /* 2. Diagonal '\': Se desliza en su ángulo natural hacia la esquina inferior derecha */
+    @keyframes enterDiagonal {
+      0%, 10% {
+        transform: translate(-180px, -180px);
+        opacity: 0;
+      }
+      30% {
+        transform: translate(0, 0);
+        opacity: 1;
+      }
+      80% {
+        transform: translate(0, 0);
+        opacity: 1;
+      }
+      94% {
+        transform: translate(-180px, -180px);
+        opacity: 0;
+      }
+      100% {
+        transform: translate(-180px, -180px);
+        opacity: 0;
+      }
+    }
+
+    /* 3. Barra Derecha 'I': Asciende desde abajo */
+    @keyframes enterPillarRight {
+      0%, 20% {
+        transform: translateY(220px);
+        opacity: 0;
+      }
+      40% {
+        transform: translateY(0);
+        opacity: 1;
+      }
+      80% {
+        transform: translateY(0);
+        opacity: 1;
+      }
+      94% {
+        transform: translateY(220px);
+        opacity: 0;
+      }
+      100% {
+        transform: translateY(220px);
+        opacity: 0;
+      }
+    }
+
+    /* 4. Sello cinético final con micro-impacto de consolidación */
+    @keyframes brandLockPulse {
+      0%, 38% {
+        transform: scale(1);
+        filter: drop-shadow(0 0 0 rgba(255,255,255,0));
+      }
+      44% {
+        transform: scale(1.03);
+        filter: drop-shadow(0 12px 28px var(--brand-glow));
+      }
+      52% {
+        transform: scale(1);
+        filter: drop-shadow(0 4px 14px var(--brand-glow-subtle));
+      }
+      80% {
+        transform: scale(1);
+      }
+      90% {
+        transform: scale(0.98);
+        filter: drop-shadow(0 0 0 rgba(255,255,255,0));
+      }
+      100% {
+        transform: scale(1);
+      }
+    }
+
+    /* Asignación de clases activas */
+    .anim-active #pillar-left {
+      animation: enterPillarLeft var(--anim-cycle) cubic-bezier(0.16, 1, 0.3, 1) var(--anim-iteration);
+    }
+    .anim-active #pillar-diagonal {
+      animation: enterDiagonal var(--anim-cycle) cubic-bezier(0.16, 1, 0.3, 1) var(--anim-iteration);
+    }
+    .anim-active #pillar-right {
+      animation: enterPillarRight var(--anim-cycle) cubic-bezier(0.16, 1, 0.3, 1) var(--anim-iteration);
+    }
+    .anim-active #monogram-assembly {
+      animation: brandLockPulse var(--anim-cycle) ease-out var(--anim-iteration);
+    }
+
+    /* Variables dinámicas */
+    :root {
+      --anim-cycle: 5.2s;
+      --anim-iteration: infinite;
+      --brand-glow: rgba(99, 102, 241, 0.5);
+      --brand-glow-subtle: rgba(99, 102, 241, 0.2);
+    }
+
+    .theme-color-target {
+      transition: fill 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+  </style>
+</head>
+<body class="bg-[#0B0F19] text-slate-100 min-h-screen flex flex-col justify-between items-center p-4 sm:p-6 font-sans antialiased selection:bg-indigo-500/30 selection:text-white">
+
+  <!-- Header / Barra de Identidad -->
+  <header class="w-full max-w-5xl flex items-center justify-between pb-4 border-b border-slate-800/80">
+    <div class="flex items-center space-x-3">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-500 via-indigo-600 to-sky-400 flex items-center justify-center font-black text-white text-base shadow-lg shadow-indigo-500/25 tracking-tighter">
+        N
+      </div>
+      <div>
+        <h1 class="text-sm font-bold tracking-wide text-white uppercase font-sans">NyxDesk Bold Monogram</h1>
+        <p class="text-[11px] font-mono text-slate-400">Minimal N · 3 piezas · hendidura 8px</p>
+      </div>
+    </div>
+
+    <!-- Indicador de estado -->
+    <div class="flex items-center space-x-2">
+      <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5 animate-pulse"></span>
+        CSS Animated
+      </span>
+    </div>
+  </header>
+
+  <!-- Escenario Central del Monograma -->
+  <main class="w-full flex-1 flex flex-col items-center justify-center my-6">
+    <div class="relative w-full max-w-[420px] sm:max-w-[460px] aspect-[4/4.3] rounded-3xl bg-slate-900/70 border border-slate-800 shadow-2xl shadow-black/80 flex flex-col items-center justify-between p-8 backdrop-blur-xl overflow-hidden">
+      
+      <!-- Fondo con cuadrícula sutil -->
+      <div class="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:20px_20px] opacity-40 pointer-events-none"></div>
+
+      <!-- Tag de categoría superior -->
+      <div class="w-full flex justify-between items-center z-10">
+        <span class="text-[10px] font-mono tracking-widest text-slate-400 uppercase">Commercial Mark • 8px Slit</span>
+        <span id="loop-badge" class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700/50">LOOP: AUTO</span>
+      </div>
+
+      <!-- Contenedor del Monograma N -->
+      <div class="relative z-10 my-auto flex items-center justify-center">
+        <!--
+          N MINIMALISTA (3 piezas, hendidura uniforme de 8px):
+          - Pilar izquierdo: X=36-78, Y=28-212.
+          - Diagonal: nace en la esquina superior izquierda (86,28) y muere en la
+            esquina inferior derecha (154,212), recorriendo TODA la caja.
+            Esto es lo que cierra la lectura de "N" (antes quedaba casi vertical = "I \ I").
+          - Pilar derecho: X=162-204, Y=28-212.
+        -->
+        <svg id="monogram-svg" class="anim-active w-52 h-52 sm:w-60 sm:h-60 overflow-visible" viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <g id="monogram-assembly">
+            
+            <!-- 1. Columna Izquierda 'I' (Baja de arriba) -->
+            <path id="pillar-left"
+                  d="M 36 28 H 78 V 212 H 36 Z" 
+                  fill="#FFFFFF"
+                  class="theme-color-target" />
+
+            <!-- 2. Diagonal Auténtica '\' (Cruza contundente de esquina superior a inferior con bisel horizontal) -->
+            <path id="pillar-diagonal"
+                  d="M 86 28 L 150 130 L 154 212 L 90 110 Z" 
+                  fill="#FFFFFF"
+                  class="theme-color-target" />
+
+            <!-- 3. Columna Derecha 'I' (Sube desde abajo) -->
+            <path id="pillar-right"
+                  d="M 162 28 H 204 V 212 H 162 Z" 
+                  fill="#FFFFFF"
+                  class="theme-color-target" />
+
+          </g>
+        </svg>
+      </div>
+
+      <!-- Mockup de Identidad de Marca -->
+      <div class="relative z-10 text-center flex flex-col items-center">
+        <h2 id="brand-name-display" class="text-2xl font-black tracking-[0.35em] uppercase text-white font-sans ml-[0.35em]">
+          NyxDesk
+        </h2>
+        <span class="text-[10px] tracking-[0.28em] text-slate-400 font-mono mt-1 uppercase">
+          ENTERPRISE ARCHITECTURE
+        </span>
+      </div>
+    </div>
+
+    <!-- Indicador de Secuencia Coreografiada -->
+    <div class="mt-6 flex flex-wrap justify-center items-center gap-2 sm:gap-4 text-xs font-mono text-slate-400">
+      <div class="flex items-center space-x-1.5 bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-800">
+        <span class="text-indigo-400 font-bold">1</span>
+        <span>Columna I ↓</span>
+      </div>
+      <span class="text-slate-600">→</span>
+      <div class="flex items-center space-x-1.5 bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-800">
+        <span class="text-indigo-400 font-bold">2</span>
+        <span>Diagonal \ ↘</span>
+      </div>
+      <span class="text-slate-600">→</span>
+      <div class="flex items-center space-x-1.5 bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-800">
+        <span class="text-indigo-400 font-bold">3</span>
+        <span>Columna I ↑</span>
+      </div>
+      <span class="text-slate-600">→</span>
+      <div class="flex items-center space-x-1.5 bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-800">
+        <span class="text-emerald-400 font-bold">✓</span>
+        <span>Forma 'N'</span>
+      </div>
+    </div>
+  </main>
+
+  <!-- Panel de Control Profesional -->
+  <footer class="w-full max-w-4xl bg-slate-900/90 border border-slate-800/90 rounded-2xl p-4 shadow-xl flex flex-col md:flex-row items-center justify-between gap-4 backdrop-blur-md">
+    
+    <!-- Modos de Color del Logo -->
+    <div class="flex flex-wrap items-center gap-2">
+      <span class="text-xs font-mono text-slate-400 mr-1">Estilo:</span>
+      
+      <!-- Monocromo Sólido Comercial (Imagen de Referencia) -->
+      <button data-color="pure-white" title="Pure White Solid (Como tu referencia)" class="palette-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-white text-slate-950 border-2 border-white shadow-sm transition active:scale-95">
+        Blanco Sólido
+      </button>
+
+      <!-- Diagonal Resaltada (Tech Indigo) -->
+      <button data-color="tech-indigo" title="Diagonal en Azul Tech" class="palette-btn px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700 hover:text-white transition active:scale-95">
+        Azul Eléctrico
+      </button>
+      
+      <!-- 3 Colores de Diagnóstico / Partes -->
+      <button data-color="tri-part" title="3 Partes Diferenciadas" class="palette-btn px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700 hover:text-white transition active:scale-95">
+        3 Colores
+      </button>
+
+      <!-- Esmeralda FinTech -->
+      <button data-color="emerald" title="FinTech Esmeralda" class="palette-btn px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700 hover:text-white transition active:scale-95">
+        Esmeralda
+      </button>
+    </div>
+
+    <!-- Controles de Velocidad, Bucle y Exportación -->
+    <div class="flex items-center space-x-2">
+      <!-- Selector de Velocidad -->
+      <select id="speed-select" class="text-xs font-mono bg-slate-800 text-slate-300 border border-slate-700 rounded-xl px-2.5 py-2 outline-none focus:border-indigo-500 transition">
+        <option value="5.2s">1.0x Normal</option>
+        <option value="3.5s">1.5x Rápido</option>
+        <option value="7.5s">0.7x Lento</option>
+      </select>
+
+      <button id="btn-loop-toggle" class="text-xs font-mono px-3 py-2 rounded-xl border border-slate-700 hover:bg-slate-800 transition text-slate-300 flex items-center gap-1.5">
+        <svg class="w-3.5 h-3.5 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="17 1 21 5 17 9"></polyline>
+          <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
+          <polyline points="7 23 3 19 7 15"></polyline>
+          <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
+        </svg>
+        <span id="loop-label">Bucle: ON</span>
+      </button>
+
+      <button id="btn-replay" class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs tracking-wide flex items-center space-x-1.5 shadow-lg shadow-indigo-600/30 transition active:scale-95">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+        </svg>
+        <span>Replay</span>
+      </button>
+
+      <!-- Botón Exportar SVG -->
+      <button id="btn-copy-svg" class="text-xs font-mono px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 transition flex items-center gap-1.5" title="Copiar código SVG para Illustrator, Figma o Web">
+        <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" stroke-width="2"></rect>
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke-width="2"></path>
+        </svg>
+        <span class="hidden sm:inline">Copiar SVG</span>
+      </button>
+    </div>
+  </footer>
+
+  <!-- Toast de Notificación -->
+  <div id="toast" class="fixed bottom-24 bg-emerald-500 text-slate-950 px-4 py-2 rounded-xl text-xs font-bold tracking-wide shadow-lg transition-all duration-300 opacity-0 translate-y-4 pointer-events-none z-50">
+    ✓ SVG comercial copiado al portapapeles
+  </div>
+
+  <script>
+    // Paletas de color corporativas para el logo
+    const colorThemes = {
+      'pure-white': {
+        left: '#FFFFFF',
+        diagonal: '#FFFFFF',
+        right: '#FFFFFF',
+        glow: 'rgba(255, 255, 255, 0.45)',
+        glowSubtle: 'rgba(255, 255, 255, 0.2)'
+      },
+      'tech-indigo': {
+        left: '#FFFFFF',
+        diagonal: '#6366F1',
+        right: '#FFFFFF',
+        glow: 'rgba(99, 102, 241, 0.55)',
+        glowSubtle: 'rgba(99, 102, 241, 0.25)'
+      },
+      'tri-part': {
+        left: '#38BDF8',     // Sky Blue
+        diagonal: '#6366F1', // Indigo
+        right: '#A855F7',    // Purple
+        glow: 'rgba(168, 85, 247, 0.5)',
+        glowSubtle: 'rgba(99, 102, 241, 0.25)'
+      },
+      'emerald': {
+        left: '#FFFFFF',
+        diagonal: '#10B981',
+        right: '#FFFFFF',
+        glow: 'rgba(16, 185, 129, 0.55)',
+        glowSubtle: 'rgba(16, 185, 129, 0.25)'
+      }
+    };
+
+    const monogramSvg = document.getElementById('monogram-svg');
+    const pillarLeft = document.getElementById('pillar-left');
+    const pillarDiagonal = document.getElementById('pillar-diagonal');
+    const pillarRight = document.getElementById('pillar-right');
+    const btnReplay = document.getElementById('btn-replay');
+    const btnLoop = document.getElementById('btn-loop-toggle');
+    const loopLabel = document.getElementById('loop-label');
+    const loopBadge = document.getElementById('loop-badge');
+    const speedSelect = document.getElementById('speed-select');
+    const btnCopySvg = document.getElementById('btn-copy-svg');
+    const toast = document.getElementById('toast');
+
+    let isLooping = true;
+    let currentThemeKey = 'pure-white';
+
+    // Aplicar paleta de color
+    function setBrandTheme(themeKey) {
+      currentThemeKey = themeKey;
+      const theme = colorThemes[themeKey];
+      pillarLeft.setAttribute('fill', theme.left);
+      pillarDiagonal.setAttribute('fill', theme.diagonal);
+      pillarRight.setAttribute('fill', theme.right);
+
+      document.documentElement.style.setProperty('--brand-glow', theme.glow);
+      document.documentElement.style.setProperty('--brand-glow-subtle', theme.glowSubtle);
+    }
+
+    // Botones de temas en la UI
+    document.querySelectorAll('.palette-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.palette-btn').forEach(b => {
+          b.className = 'palette-btn px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700 hover:text-white transition active:scale-95';
+        });
+        btn.className = 'palette-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-white text-slate-950 border-2 border-white shadow-sm transition active:scale-95';
+        setBrandTheme(btn.dataset.color);
+      });
+    });
+
+    // Control de velocidad
+    speedSelect.addEventListener('change', (e) => {
+      document.documentElement.style.setProperty('--anim-cycle', e.target.value);
+      triggerReplay();
+    });
+
+    // Reiniciar animación forzando reflow inmediato de CSS
+    function triggerReplay() {
+      monogramSvg.classList.remove('anim-active');
+      void monogramSvg.offsetWidth; // Forzar reflow del DOM
+      monogramSvg.classList.add('anim-active');
+    }
+
+    btnReplay.addEventListener('click', triggerReplay);
+
+    // Toggle de bucle infinito vs una sola vez
+    btnLoop.addEventListener('click', () => {
+      isLooping = !isLooping;
+      if (isLooping) {
+        document.documentElement.style.setProperty('--anim-iteration', 'infinite');
+        loopLabel.textContent = 'Bucle: ON';
+        loopBadge.textContent = 'LOOP: AUTO';
+        loopBadge.className = 'text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700/50';
+      } else {
+        document.documentElement.style.setProperty('--anim-iteration', '1');
+        loopLabel.textContent = 'Bucle: OFF';
+        loopBadge.textContent = 'LOOP: ONCE';
+        loopBadge.className = 'text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20';
+      }
+      triggerReplay();
+    });
+
+    // Copiar código SVG en formato limpio para exportación
+    btnCopySvg.addEventListener('click', () => {
+      const theme = colorThemes[currentThemeKey];
+      const svgCode = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240" fill="none">
+  <!-- Left Pillar 'I' -->
+  <path d="M 36 28 H 78 V 212 H 36 Z" fill="${theme.left}"/>
+  <!-- Diagonal Slash '\\' -->
+  <path d="M 86 28 L 150 130 L 154 212 L 90 110 Z" fill="${theme.diagonal}"/>
+  <!-- Right Pillar 'I' -->
+  <path d="M 162 28 H 204 V 212 H 162 Z" fill="${theme.right}"/>
+</svg>`;
+
+      const tempArea = document.createElement('textarea');
+      tempArea.value = svgCode;
+      document.body.appendChild(tempArea);
+      tempArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(tempArea);
+
+      // Toast feedback
+      toast.classList.remove('opacity-0', 'translate-y-4');
+      toast.classList.add('opacity-100', 'translate-y-0');
+      setTimeout(() => {
+        toast.classList.remove('opacity-100', 'translate-y-0');
+        toast.classList.add('opacity-0', 'translate-y-4');
+      }, 2500);
+    });
+
+    // Iniciar con Blanco Sólido idéntico a la referencia
+    window.onload = function () {
+      setBrandTheme('pure-white');
+    };
+  </script>
+</body>
+</html>

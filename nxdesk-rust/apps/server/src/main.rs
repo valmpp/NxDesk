@@ -425,13 +425,50 @@ async fn join_room(conn_id: &str, room_id: &str, state: &Arc<RwLock<HubState>>) 
     }
 
     let mut s = state.write().await;
+    let my_peer_id = s.online_peers.get(conn_id).map(|p| p.id.clone());
+
     let HubState {
         ref mut rooms,
         ref clients,
         ref mut client_rooms,
-        ref mut peer_tracker,
         ..
     } = *s;
+
+    // Auto-limpieza de salas previas de invitado: evitar que un cliente acumule salas
+    // ajenas al navegar o reconectarse entre diferentes equipos remotos.
+    let mut rooms_to_leave = Vec::new();
+    if let Some(existing_rooms) = client_rooms.get(conn_id) {
+        for r in existing_rooms {
+            if r != trimmed && Some(r) != my_peer_id.as_ref() {
+                rooms_to_leave.push(r.clone());
+            }
+        }
+    }
+    for old_room in rooms_to_leave {
+        if let Some(r_set) = client_rooms.get_mut(conn_id) {
+            r_set.remove(&old_room);
+        }
+        let remaining = if let Some(members) = rooms.get_mut(&old_room) {
+            members.remove(conn_id);
+            members.retain(|mid| clients.contains_key(mid));
+            members.len()
+        } else {
+            0
+        };
+        info!("🚪 [Auto-Limpieza] Cliente {} desvinculado de sala previa '{}'", conn_id, old_room);
+        if remaining > 0 {
+            let notify_msg = format!("{{\"Type\":\"RoomOccupancyChanged\",\"Payload\":\"{}\"}}\u{1e}", remaining);
+            if let Some(members) = rooms.get(&old_room) {
+                for member_id in members {
+                    if let Some(client) = clients.get(member_id) {
+                        let _ = client.control_tx.send(Message::Text(notify_msg.clone()));
+                    }
+                }
+            }
+        } else {
+            rooms.remove(&old_room);
+        }
+    }
 
     // 1. Limpieza proactiva de sockets desconectados en la sala
     if let Some(members) = rooms.get_mut(trimmed) {
@@ -455,8 +492,6 @@ async fn join_room(conn_id: &str, room_id: &str, state: &Arc<RwLock<HubState>>) 
         .entry(conn_id.to_string())
         .or_default()
         .insert(trimmed.to_string());
-    peer_tracker
-        .insert(trimmed.to_string(), conn_id.to_string());
 
     let count = rooms.get(trimmed).map(|set| set.len()).unwrap_or(0);
     info!(
@@ -526,6 +561,62 @@ async fn relay_message_to_room(
     state: &Arc<RwLock<HubState>>,
 ) {
     let s = state.read().await;
+
+    // 1. Enrutamiento directo punto a punto (P2P Direct Routing):
+    // Si el mensaje tiene un destinatario explícito (TargetId), entregar ÚNICAMENTE a ese equipo.
+    let mut direct_target_id = msg.target_id.clone();
+
+    if direct_target_id.is_none() && msg.msg_type == "session_request" {
+        if let Ok(req) = serde_json::from_str::<nxdesk_core::SessionRequestDto>(&msg.payload) {
+            direct_target_id = req.target_id;
+        }
+    }
+
+    if direct_target_id.is_none() && msg.msg_type == "session_decision" {
+        if let Ok(dec) = serde_json::from_str::<nxdesk_core::SessionDecisionDto>(&msg.payload) {
+            direct_target_id = dec.target_id.or(dec.client_id).or_else(|| {
+                // Formato de request_id: "req-{client_id}-{timestamp}"
+                if let Some(rest) = dec.request_id.strip_prefix("req-") {
+                    if let Some((cid, _ts)) = rest.rsplit_once('-') {
+                        return Some(cid.to_string());
+                    }
+                }
+                None
+            });
+        }
+    }
+
+    if let Some(ref target) = direct_target_id {
+        let clean_target = target.trim().replace('-', "").to_lowercase();
+        let target_conn = s.peer_tracker.get(target).cloned().or_else(|| {
+            s.peer_tracker.iter().find_map(|(k, v)| {
+                if k.trim().replace('-', "").to_lowercase() == clean_target {
+                    Some(v.clone())
+                } else {
+                    None
+                }
+            })
+        });
+
+        if let Some(ref dest_conn_id) = target_conn {
+            if let Some(client) = s.clients.get(dest_conn_id) {
+                let json_str = format!("{}\u{1e}", serde_json::to_string(msg).unwrap_or_default());
+                let _ = client.control_tx.send(Message::Text(json_str));
+                info!(
+                    "🎯 [Enrutamiento P2P] Mensaje '{}' entregado exclusivamente a {} ({})",
+                    msg.msg_type, target, dest_conn_id
+                );
+                return;
+            }
+        } else {
+            warn!(
+                "⚠️ [Enrutamiento P2P] Destinatario '{}' no hallado en peer_tracker para '{}'. Procediendo a sala...",
+                target, msg.msg_type
+            );
+        }
+    }
+
+    // 2. Retransmisión por sala si no hay destinatario específico
     if let Some(rooms) = s.client_rooms.get(sender_id) {
         let json_str = format!("{}\u{1e}", serde_json::to_string(msg).unwrap_or_default());
         let mut recipients = HashSet::new();

@@ -86,7 +86,13 @@ pub struct SignalingClient {
     p2p_remote_addr: Arc<std::sync::RwLock<Option<std::net::SocketAddr>>>,
     p2p_public_addr: Arc<std::sync::RwLock<Option<std::net::SocketAddr>>>,
     is_p2p_active: Arc<AtomicBool>,
+    p2p_epoch: Arc<std::sync::atomic::AtomicU64>,
     local_ip: Option<std::net::IpAddr>,
+    pub udp_tx_frames: Arc<std::sync::atomic::AtomicU64>,
+    pub udp_rx_frames: Arc<std::sync::atomic::AtomicU64>,
+    pub tcp_tx_frames: Arc<std::sync::atomic::AtomicU64>,
+    pub tcp_rx_frames: Arc<std::sync::atomic::AtomicU64>,
+    pub last_tcp_send_ts: Arc<std::sync::atomic::AtomicU64>,
 }
 
 pub enum SignalingEvent {
@@ -155,6 +161,13 @@ impl SignalingClient {
         let room_id = Arc::new(Mutex::new(None));
         let last_socket_send_us = Arc::new(std::sync::atomic::AtomicU32::new(0));
         let sock_metric = last_socket_send_us.clone();
+
+        let udp_tx_frames = Arc::new(std::sync::atomic::AtomicU64::new(0));
+        let udp_rx_frames = Arc::new(std::sync::atomic::AtomicU64::new(0));
+        let tcp_tx_frames = Arc::new(std::sync::atomic::AtomicU64::new(0));
+        let tcp_rx_frames = Arc::new(std::sync::atomic::AtomicU64::new(0));
+        let last_tcp_send_ts = Arc::new(std::sync::atomic::AtomicU64::new(0));
+        let tcp_rx_frames_clone = tcp_rx_frames.clone();
 
         // Tarea dedicada de ultra baja latencia para el envío por socket (Equidad justa: Control y Video sin starvation).
         // Descarte anti-cola: si una escritura de video tarda más de un frame (~33 ms), la cola TCP
@@ -247,6 +260,7 @@ impl SignalingClient {
                         }
                     }
                     Ok(Message::Binary(bin)) => {
+                        tcp_rx_frames_clone.fetch_add(1, Ordering::Relaxed);
                         // Enrutamiento directo al canal watch de video: CERO cola FIFO y CERO delay acumulado
                         let _ = incoming_video_tx_ws.send(Some(bin));
                     }
@@ -263,14 +277,25 @@ impl SignalingClient {
             }
         });
 
-        // Inicializar socket UDP para canal P2P de ultra baja latencia
-        let udp_sock = match tokio::net::UdpSocket::bind("0.0.0.0:0").await {
-            Ok(s) => Some(Arc::new(s)),
-            Err(_) => None,
-        };
+        // Inicializar socket UDP con búferes ampliados (4 MB) para ráfagas de fotogramas sin pérdidas
+        let udp_sock: Option<Arc<tokio::net::UdpSocket>> = (|| {
+            let socket = socket2::Socket::new(
+                socket2::Domain::IPV4,
+                socket2::Type::DGRAM,
+                Some(socket2::Protocol::UDP),
+            ).ok()?;
+            let _ = socket.set_nonblocking(true);
+            let _ = socket.set_send_buffer_size(4 * 1024 * 1024);
+            let _ = socket.set_recv_buffer_size(4 * 1024 * 1024);
+            let bind_addr: std::net::SocketAddr = "0.0.0.0:0".parse().ok()?;
+            socket.bind(&bind_addr.into()).ok()?;
+            let std_sock: std::net::UdpSocket = socket.into();
+            tokio::net::UdpSocket::from_std(std_sock).ok().map(Arc::new)
+        })();
         let p2p_remote_addr = Arc::new(std::sync::RwLock::new(None));
         let p2p_public_addr = Arc::new(std::sync::RwLock::new(None));
         let is_p2p_active = Arc::new(AtomicBool::new(false));
+        let p2p_epoch = Arc::new(std::sync::atomic::AtomicU64::new(0));
 
         if let Some(ref sock) = udp_sock {
             // Sondeo STUN en segundo plano para descubrir IP pública y puerto NAT WAN (RFC 5389)
@@ -301,6 +326,8 @@ impl SignalingClient {
             let p2p_public_clone = p2p_public_addr.clone();
             let p2p_active_clone = is_p2p_active.clone();
             let video_tx_udp = incoming_video_tx.clone();
+            let event_tx_udp = event_tx.clone();
+            let udp_rx_frames_clone = udp_rx_frames.clone();
 
             tokio::spawn(async move {
                 let mut buf = [0u8; 65535];
@@ -342,21 +369,39 @@ impl SignalingClient {
                         if let Ok(mut lock) = p2p_addr_clone.write() {
                             *lock = Some(from_addr);
                         }
-                        p2p_active_clone.store(true, Ordering::Relaxed);
-                        tracing::info!("⚡ [P2P UDP] NXP2P_PING recibido de {}. Enlace activo.", from_addr);
+                        let was_active = p2p_active_clone.swap(true, Ordering::Relaxed);
+                        if !was_active {
+                            tracing::info!("⚡ [P2P UDP] Enlace bidireccional establecido con {}", from_addr);
+                        }
+                        tracing::debug!("⚡ [P2P UDP] NXP2P_PING recibido de {}. Enlace activo.", from_addr);
                     } else if len >= 10 && &buf[..10] == b"NXP2P_PONG" {
                         if let Ok(mut lock) = p2p_addr_clone.write() {
                             *lock = Some(from_addr);
                         }
-                        p2p_active_clone.store(true, Ordering::Relaxed);
-                        tracing::info!("⚡ [P2P UDP] NXP2P_PONG recibido de {}. Enlace activo.", from_addr);
+                        let was_active = p2p_active_clone.swap(true, Ordering::Relaxed);
+                        if !was_active {
+                            tracing::info!("⚡ [P2P UDP] Enlace bidireccional confirmado con {}", from_addr);
+                        }
+                        tracing::debug!("⚡ [P2P UDP] NXP2P_PONG recibido de {}. Enlace activo.", from_addr);
                     } else if len >= 13 && &buf[..5] == b"NXVID" {
+                        if !p2p_active_clone.load(Ordering::Relaxed) {
+                            if let Ok(mut lock) = p2p_addr_clone.write() {
+                                *lock = Some(from_addr);
+                            }
+                            p2p_active_clone.store(true, Ordering::Relaxed);
+                            tracing::info!("⚡ [P2P UDP] Tráfico de video recibido de {}. Enlace activo.", from_addr);
+                        }
                         let seq = u32::from_be_bytes([buf[5], buf[6], buf[7], buf[8]]);
                         let chunk_idx = u16::from_be_bytes([buf[9], buf[10]]) as usize;
                         let total_chunks = u16::from_be_bytes([buf[11], buf[12]]) as usize;
                         if let Some(full_frame) = assembler.add_chunk(seq, chunk_idx, total_chunks, &buf[13..len]) {
+                            udp_rx_frames_clone.fetch_add(1, Ordering::Relaxed);
                             let _ = video_tx_udp.send(Some(full_frame));
                         }
+                    } else if len == 13 && &buf[..5] == b"NXINP" {
+                        let x = f32::from_le_bytes([buf[5], buf[6], buf[7], buf[8]]);
+                        let y = f32::from_le_bytes([buf[9], buf[10], buf[11], buf[12]]);
+                        let _ = event_tx_udp.try_send(SignalingEvent::Input(nxdesk_core::InputEvent::MouseMove { x, y }));
                     }
                 }
             });
@@ -372,7 +417,13 @@ impl SignalingClient {
             p2p_remote_addr,
             p2p_public_addr,
             is_p2p_active,
+            p2p_epoch,
             local_ip,
+            udp_tx_frames,
+            udp_rx_frames,
+            tcp_tx_frames,
+            tcp_rx_frames,
+            last_tcp_send_ts,
         };
 
         Ok((client, event_rx))
@@ -423,18 +474,90 @@ impl SignalingClient {
     /// Envía paquetes UDP punch para abrir NAT y establecer enlace P2P directo (soporta múltiples candidatos)
     pub async fn punch_p2p(&self, remote_endpoints_str: &str) {
         if let Some(ref sock) = self.p2p_socket {
+            let mut addrs = Vec::new();
             for ep in remote_endpoints_str.split('|') {
                 let clean = ep.trim();
                 if let Ok(addr) = clean.parse::<std::net::SocketAddr>() {
-                    if let Ok(mut lock) = self.p2p_remote_addr.write() {
-                        *lock = Some(addr);
-                    }
-                    for _ in 0..4 {
-                        let _ = sock.send_to(b"NXP2P_PING", addr).await;
-                        tokio::time::sleep(std::time::Duration::from_millis(15)).await;
-                    }
+                    addrs.push(addr);
                 }
             }
+            if addrs.is_empty() {
+                return;
+            }
+
+            if let Ok(mut lock) = self.p2p_remote_addr.write() {
+                if lock.is_none() {
+                    *lock = Some(addrs[0]);
+                }
+            }
+
+            tracing::info!("🥊 [P2P UDP Punch] Perforando NAT activamente contra {} endpoints: {:?}", addrs.len(), addrs);
+
+            let my_epoch = self.p2p_epoch.fetch_add(1, Ordering::SeqCst) + 1;
+            let p2p_epoch_clone = self.p2p_epoch.clone();
+            let sock_clone = sock.clone();
+            let is_active_clone = self.is_p2p_active.clone();
+            let remote_addr_clone = self.p2p_remote_addr.clone();
+
+            tokio::spawn(async move {
+                // Ráfaga intensiva: 20 sondeos continuos (1 segundo) para forzar la apertura NAT en routers y firewalls
+                for _ in 0..20 {
+                    if p2p_epoch_clone.load(Ordering::Relaxed) != my_epoch {
+                        return;
+                    }
+                    for &addr in &addrs {
+                        let _ = sock_clone.send_to(b"NXP2P_PING", addr).await;
+                    }
+                    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+                    if is_active_clone.load(Ordering::Relaxed) {
+                        break;
+                    }
+                }
+
+                // Keepalive UDP constante: cada 1.5s envía un ping para mantener la sesión abierta
+                loop {
+                    tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+                    if p2p_epoch_clone.load(Ordering::Relaxed) != my_epoch {
+                        break;
+                    }
+                    let target_opt = remote_addr_clone.read().ok().and_then(|g| *g);
+                    if let Some(target) = target_opt {
+                        let _ = sock_clone.send_to(b"NXP2P_PING", target).await;
+                    } else {
+                        for &addr in &addrs {
+                            let _ = sock_clone.send_to(b"NXP2P_PING", addr).await;
+                        }
+                    }
+                }
+            });
+        }
+    }
+
+    /// Resetea y apaga limpiamente el enlace P2P UDP al desconectar la sesión
+    pub fn reset_p2p(&self) {
+        self.p2p_epoch.fetch_add(1, Ordering::SeqCst);
+        self.is_p2p_active.store(false, Ordering::SeqCst);
+        if let Ok(mut lock) = self.p2p_remote_addr.write() {
+            *lock = None;
+        }
+        let _ = self.video_tx.send(None);
+        self.udp_tx_frames.store(0, Ordering::Relaxed);
+        self.udp_rx_frames.store(0, Ordering::Relaxed);
+        tracing::info!("🛑 [P2P UDP] Enlace y bucles P2P reseteados limpiamente.");
+    }
+
+    /// Retorna una descripción clara y diagnóstica del transporte actualmente en uso
+    pub fn transport_summary(&self) -> String {
+        if self.is_p2p_active() {
+            if let Some(addr) = self.p2p_remote_addr() {
+                format!("⚡ UDP P2P DIRECTO (Peer: {})", addr)
+            } else {
+                "⚡ UDP P2P DIRECTO (Activo)".to_string()
+            }
+        } else if let Some(addr) = self.p2p_remote_addr() {
+            format!("⚡ UDP P2P NEGOCIANDO (Punching hacia {})", addr)
+        } else {
+            "⚠️ TCP WEBSOCKET (Fallback de Reenvío)".to_string()
         }
     }
 
@@ -460,6 +583,20 @@ impl SignalingClient {
         self.send_message(&join_msg).await
     }
 
+    /// Abandona una sala de conexión remota
+    pub async fn leave_room(
+        &self,
+        room_id: &str,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let mut room_lock = self.room_id.lock().await;
+        if room_lock.as_deref() == Some(room_id) {
+            *room_lock = None;
+        }
+
+        let leave_msg = SignalingMessage::new("leave", room_id);
+        self.send_message(&leave_msg).await
+    }
+
     /// Envía un mensaje de señalización (ofertas SDP, respuestas, etc.)
     pub async fn send_message(
         &self,
@@ -482,11 +619,24 @@ impl SignalingClient {
         self.send_input_direct(event)
     }
 
-    /// Envía un evento de ratón o teclado exclusivamente por el canal WebSocket TCP (cero HoL blocking)
+    /// Envía un evento de ratón o teclado: MouseMove usa datagramas UDP ultrarrápidos (cero delay TCP)
     pub fn send_input_direct(
         &self,
         event: &InputEvent,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        if let InputEvent::MouseMove { x, y } = event {
+            if self.is_p2p_active() || self.p2p_remote_addr().is_some() {
+                if let (Some(ref sock), Some(addr)) = (&self.p2p_socket, self.p2p_remote_addr()) {
+                    let mut packet = [0u8; 13];
+                    packet[0..5].copy_from_slice(b"NXINP");
+                    packet[5..9].copy_from_slice(&x.to_le_bytes());
+                    packet[9..13].copy_from_slice(&y.to_le_bytes());
+                    let _ = sock.try_send_to(&packet, addr);
+                    return Ok(());
+                }
+            }
+        }
+
         let sig_msg = SignalingMessage::new_input(event)?;
         let json = serde_json::to_string(&sig_msg)?;
         let formatted = format!("{}\u{1e}", json);
@@ -496,10 +646,15 @@ impl SignalingClient {
         Ok(())
     }
 
-    /// Envía un fotograma de video: vía UDP si el enlace P2P directo está activo, con fallback a WebSocket TCP
+    /// Envía un fotograma de video: PRIORIZA ESTRICTAMENTE UDP sobre datagramas.
+    /// Solo si UDP no tiene dirección se envía un preview limitado a max 5 FPS por TCP para no saturar.
     pub fn send_video_frame_direct(&self, frame_bytes: Vec<u8>) {
-        if self.is_p2p_active() {
-            if let (Some(ref sock), Some(addr)) = (&self.p2p_socket, self.p2p_remote_addr()) {
+        let p2p_active = self.is_p2p_active();
+        let remote_addr = self.p2p_remote_addr();
+
+        // 1. PRIORIDAD ESTRICTA A UDP
+        if (p2p_active || remote_addr.is_some()) && self.p2p_socket.is_some() {
+            if let (Some(ref sock), Some(addr)) = (&self.p2p_socket, remote_addr) {
                 let seq = UDP_FRAME_SEQ.fetch_add(1, Ordering::Relaxed);
                 let chunk_size = 1200;
                 let total_chunks = (frame_bytes.len() + chunk_size - 1) / chunk_size;
@@ -511,15 +666,41 @@ impl SignalingClient {
                         packet.extend_from_slice(&(idx as u16).to_be_bytes());
                         packet.extend_from_slice(&(total_chunks as u16).to_be_bytes());
                         packet.extend_from_slice(chunk);
-                        let _ = sock.try_send_to(&packet, addr);
+
+                        // Pacing suave cada 12 paquetes para drenar el buffer del SO
+                        if idx > 0 && idx % 12 == 0 {
+                            std::thread::yield_now();
+                        }
+
+                        // Reintento con micro-espera si el búfer UDP de Windows reporta WouldBlock
+                        for _ in 0..20 {
+                            match sock.try_send_to(&packet, addr) {
+                                Ok(_) => break,
+                                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                                    std::thread::yield_now();
+                                }
+                                Err(_) => break,
+                            }
+                        }
                     }
+                    self.udp_tx_frames.fetch_add(1, Ordering::Relaxed);
                     return;
                 }
             }
         }
 
-        // Fallback al canal WebSocket TCP si P2P UDP no está disponible
-        let _ = self.video_tx.send(Some(frame_bytes));
+        // 2. RESTRICCIÓN DE TCP FALLBACK: Capped a 4-5 FPS mientras se negocia UDP
+        // Evita saturación de buffers de red en TCP para que los pings UDP y los inputs fluyan
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64;
+        let last_ts = self.last_tcp_send_ts.load(Ordering::Relaxed);
+        if now_ms.saturating_sub(last_ts) >= 200 {
+            self.last_tcp_send_ts.store(now_ms, Ordering::Relaxed);
+            self.tcp_tx_frames.fetch_add(1, Ordering::Relaxed);
+            let _ = self.video_tx.send(Some(frame_bytes));
+        }
     }
 
     /// Envía un fotograma de video con descarte automático de fotogramas atrasados (Zero Bufferbloat)

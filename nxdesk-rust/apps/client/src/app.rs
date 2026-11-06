@@ -40,7 +40,10 @@ pub struct NxDeskApp {
     files_list: Vec<DirectoryItemDto>,
     terminal_input: String,
     terminal_output: String,
-    _terminal_allowed: bool,
+    terminal_history: Vec<String>,
+    terminal_history_idx: Option<usize>,
+    allow_terminal: bool,
+    terminal_focus_requested: bool,
     toast_message: Option<(String, Instant)>,
     selected_role: SessionRole,
     allow_input: bool,
@@ -98,7 +101,10 @@ impl NxDeskApp {
             files_list: Vec::new(),
             terminal_input: String::new(),
             terminal_output: "NxDesk Terminal Remota Segura [VUL-01 Activa]\r\n".to_string(),
-            _terminal_allowed: false,
+            terminal_history: Vec::new(),
+            terminal_history_idx: None,
+            allow_terminal: true,
+            terminal_focus_requested: false,
             toast_message: None,
             selected_role: SessionRole::FullControl,
             allow_input: true,
@@ -204,6 +210,7 @@ impl NxDeskApp {
                     request_id: format!("req-{}-{}", my_id, now_ts),
                     client_id: my_id,
                     client_alias: my_alias,
+                    target_id: Some(target_clone.clone()),
                     requested_role: nxdesk_core::SessionRole::FullControl,
                     allow_input: true,
                     allow_clipboard: true,
@@ -211,11 +218,13 @@ impl NxDeskApp {
                     timestamp: now_ts,
                 };
                 if let Ok(json_str) = serde_json::to_string(&req_dto) {
-                    let msg = nxdesk_core::SignalingMessage::new("session_request", &json_str);
+                    let msg = nxdesk_core::SignalingMessage::new("session_request", &json_str)
+                        .with_target(&target_clone);
                     let _ = sig.send_message(&msg).await;
                 }
                 // Solicitar catálogo de pantallas remotas al anfitrión
-                let query_screens = nxdesk_core::SignalingMessage::new("query_screens", "");
+                let query_screens = nxdesk_core::SignalingMessage::new("query_screens", "")
+                    .with_target(&target_clone);
                 let _ = sig.send_message(&query_screens).await;
 
                 // Notificar resolución y modo de visualización inicial (Fit adaptativo para 60 FPS estables)
@@ -223,12 +232,14 @@ impl NxDeskApp {
                 let lh = state_clone.local_height.load(std::sync::atomic::Ordering::Relaxed);
                 let max_d = lw.max(lh);
                 let initial_mode = if max_d > 1366 { "1366".to_string() } else if max_d > 0 { max_d.to_string() } else { "fit".to_string() };
-                let view_mode = nxdesk_core::SignalingMessage::new("view_mode", &initial_mode);
+                let view_mode = nxdesk_core::SignalingMessage::new("view_mode", &initial_mode)
+                    .with_target(&target_clone);
                 let _ = sig.send_message(&view_mode).await;
 
                 // Anunciar endpoint UDP para enlace P2P directo de ultra baja latencia
                 if let Some(local_ep) = sig.p2p_local_endpoint() {
-                    let ep_msg = nxdesk_core::SignalingMessage::new("udp_endpoint", &local_ep);
+                    let ep_msg = nxdesk_core::SignalingMessage::new("udp_endpoint", &local_ep)
+                        .with_target(&target_clone);
                     let _ = sig.send_message(&ep_msg).await;
                 }
             }
@@ -358,11 +369,8 @@ impl NxDeskApp {
     self.reset_session_ui();
     let state_clone = self.state.clone();
     tokio::spawn(async move {
-        // Garantizar el regreso al menú principal incluso si el aviso de red falla:
-        // primero se libera TODO el estado local, después se notifica al par (session_end).
         state_clone.clear_pending_session().await;
-        state_clone.set_active_remote_peer(None).await;
-        let _ = state_clone.end_session(true).await;      // avisa al otro con session_end
+        let _ = state_clone.end_session(true).await; // Notifica session_end con target_id, resetea P2P y limpia estado
     });
     self.show_toast("Sesión finalizada.");
     ctx.request_repaint();
@@ -450,6 +458,9 @@ impl NxDeskApp {
                                     let term_color = if self.is_terminal_open { theme::PRIMARY } else { theme::TEXT };
                                     if ui.button(RichText::new("💻 Terminal").color(term_color)).on_hover_text("Terminal remota segura").clicked() {
                                         self.is_terminal_open = !self.is_terminal_open;
+                                        if self.is_terminal_open {
+                                            self.terminal_focus_requested = true;
+                                        }
                                     }
 
                                     // Bloqueo de pantalla (compacto)
@@ -583,6 +594,7 @@ impl NxDeskApp {
                             self.is_admin_mode = !self.is_admin_mode;
                             if self.is_admin_mode {
                                 self.is_terminal_open = true;
+                                self.terminal_focus_requested = true;
                             }
                         }
 
@@ -1001,15 +1013,25 @@ impl NxDeskApp {
                 }
             }
 
-            // 3. Captura y despacho de eventos de teclado y portapapeles
-            if interact_resp.hovered() || interact_resp.has_focus() {
+            // 3. Captura y despacho de eventos de teclado y portapapeles hacia la PC remota
+            // Activo siempre que la terminal integrada de la app no esté abierta
+            if (interact_resp.hovered() || interact_resp.has_focus()) && !self.is_terminal_open {
+                // Tecla Windows (Super): Garantizar ciclo completo KeyDown + KeyUp para abrir Menú Inicio en el Host
+                if ui.input(|i| i.key_pressed(egui::Key::SuperLeft) || i.key_pressed(egui::Key::SuperRight)) {
+                    self.send_remote_input(InputEvent::KeyDown {
+                        key_code: 0x5B, // VK_LWIN
+                        key_char: None,
+                    });
+                    self.send_remote_input(InputEvent::KeyUp { key_code: 0x5B });
+                }
+
                 let events = ui.input(|i| i.events.clone());
                 for event in events {
                     match event {
                         egui::Event::Key {
                             key,
                             pressed,
-                            repeat: false,
+                            repeat: _,
                             ..
                         } => {
                             let vk = egui_key_to_vk(key);
@@ -1024,8 +1046,50 @@ impl NxDeskApp {
                                 }
                             }
                         }
-                        egui::Event::Paste(text) if self.allow_clipboard => {
-                            self.send_clipboard_sync(&text);
+                        egui::Event::Copy => {
+                            // Usuario pulsó Ctrl+C en la pantalla remota (interrumpir o copiar en PC remota)
+                            self.send_remote_input(InputEvent::KeyDown {
+                                key_code: 0x43, // VK_C
+                                key_char: None,
+                            });
+                            self.send_remote_input(InputEvent::KeyUp { key_code: 0x43 });
+                        }
+                        egui::Event::Cut => {
+                            // Usuario pulsó Ctrl+X en la pantalla remota
+                            self.send_remote_input(InputEvent::KeyDown {
+                                key_code: 0x58, // VK_X
+                                key_char: None,
+                            });
+                            self.send_remote_input(InputEvent::KeyUp { key_code: 0x58 });
+                        }
+                        egui::Event::Paste(text) => {
+                            if self.allow_clipboard {
+                                self.send_clipboard_sync(&text);
+                            }
+                            // Inyectar combinación física Ctrl+V en el host remoto
+                            self.send_remote_input(InputEvent::KeyDown {
+                                key_code: 0x56, // VK_V
+                                key_char: None,
+                            });
+                            self.send_remote_input(InputEvent::KeyUp { key_code: 0x56 });
+                        }
+                        egui::Event::Text(ref text) => {
+                            for ch in text.chars() {
+                                // No duplicar caracteres básicos ASCII que ya viajan por egui::Event::Key
+                                // pero permitir símbolos internacionales o compuestos: ñ, ¿, ¡, @, #, $, %, &, á, etc.
+                                if !ch.is_control() && !ch.is_ascii_alphanumeric() && ch != ' ' {
+                                    let is_direct_oem_key = matches!(
+                                        ch,
+                                        '.' | ',' | '-' | '+' | '=' | ';' | ':' | '/' | '?' | '\\' | '|' | '`' | '[' | '{' | ']' | '}' | '\'' | '"'
+                                    );
+                                    if !is_direct_oem_key {
+                                        self.send_remote_input(InputEvent::KeyDown {
+                                            key_code: 0,
+                                            key_char: Some(ch.to_string()),
+                                        });
+                                    }
+                                }
+                            }
                         }
                         _ => {}
                     }
@@ -1215,8 +1279,8 @@ impl NxDeskApp {
     }
 
     /// Terminal Remota Segura (bidireccional): envía comandos al par por la red y muestra
-/// la salida local y la del par remoto (canal "terminal_out").
-fn render_terminal_dialog(&mut self, ctx: &egui::Context) {
+    /// la salida local y la del par remoto (canal "terminal_out").
+    fn render_terminal_dialog(&mut self, ctx: &egui::Context) {
         if !self.is_terminal_open {
             return;
         }
@@ -1236,32 +1300,53 @@ fn render_terminal_dialog(&mut self, ctx: &egui::Context) {
             self.terminal_output.drain(..boundary);
         }
 
+        let target_peer = {
+            if let Ok(r) = self.state.active_remote_peer.try_read() {
+                r.clone()
+            } else {
+                None
+            }
+        }
+        .or_else(|| {
+            if let Ok(s) = self.state.active_session.try_read() {
+                s.as_ref().map(|x| x.peer_id.clone())
+            } else {
+                None
+            }
+        });
+
         egui::Window::new("💻 Terminal Remota Segura [VUL-01 Verificada]")
             .collapsible(false)
-            .default_size([680.0, 480.0])
+            .resizable(true)
+            .default_size([720.0, 480.0])
+            .min_size([450.0, 320.0])
             .anchor(egui::Align2::CENTER_CENTER, Vec2::ZERO)
             .show(ctx, |ui| {
-                // Salida con altura FIJA: el window nunca crece con el contenido;
-                // el scroll vertical sube/baja por el histórico (pegado al final).
-                egui::ScrollArea::vertical()
+                // Salida con scroll vertical/horizontal adaptativo y wrap de texto:
+                // nunca desborda la caja ni se sale de los márgenes de la ventana.
+                let avail_height = (ui.available_height() - 56.0).max(180.0);
+                egui::ScrollArea::both()
                     .auto_shrink([false, false])
-                    .max_height(320.0)
-                    .min_scrolled_height(320.0)
+                    .max_height(avail_height)
+                    .min_scrolled_height(avail_height)
                     .stick_to_bottom(true)
                     .show(ui, |ui| {
-                        ui.label(
-                            RichText::new(&self.terminal_output)
-                                .monospace()
-                                .color(theme::TEXT)
-                                .size(12.0),
+                        ui.add(
+                            egui::Label::new(
+                                RichText::new(&self.terminal_output)
+                                    .monospace()
+                                    .color(theme::TEXT)
+                                    .size(12.0),
+                            )
+                            .selectable(true)
+                            .wrap_mode(egui::TextWrapMode::Wrap),
                         );
                     });
 
                 ui.separator();
 
                 ui.horizontal(|ui| {
-                    // Entrada de UNA línea de altura fija: comandos largos se desplazan
-                    // horizontalmente dentro del cuadro (nunca agranda el cuadro).
+                    // Entrada de comandos: altura fija, horizontalmente contenido
                     let cmd_edit = ui.add(
                         egui::TextEdit::singleline(&mut self.terminal_input)
                             .hint_text("Comando... (Enter para enviar al equipo remoto)")
@@ -1269,18 +1354,71 @@ fn render_terminal_dialog(&mut self, ctx: &egui::Context) {
                             .min_size(egui::Vec2::new(0.0, 24.0))
                             .clip_text(true),
                     );
+
+                    if self.terminal_focus_requested {
+                        cmd_edit.request_focus();
+                        self.terminal_focus_requested = false;
+                    }
+
+                    if cmd_edit.has_focus() {
+                        // Navegación de historial con Flechas Arriba/Abajo
+                        if ui.input(|i| i.key_pressed(egui::Key::ArrowUp)) && !self.terminal_history.is_empty() {
+                            let new_idx = match self.terminal_history_idx {
+                                Some(idx) => if idx > 0 { idx - 1 } else { 0 },
+                                None => self.terminal_history.len() - 1,
+                            };
+                            self.terminal_history_idx = Some(new_idx);
+                            if let Some(cmd) = self.terminal_history.get(new_idx) {
+                                self.terminal_input = cmd.clone();
+                            }
+                        } else if ui.input(|i| i.key_pressed(egui::Key::ArrowDown)) {
+                            if let Some(idx) = self.terminal_history_idx {
+                                if idx + 1 < self.terminal_history.len() {
+                                    let new_idx = idx + 1;
+                                    self.terminal_history_idx = Some(new_idx);
+                                    if let Some(cmd) = self.terminal_history.get(new_idx) {
+                                        self.terminal_input = cmd.clone();
+                                    }
+                                } else {
+                                    self.terminal_history_idx = None;
+                                    self.terminal_input.clear();
+                                }
+                            }
+                        }
+
+                        // Escape: Limpiar entrada actual
+                        if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+                            self.terminal_input.clear();
+                            self.terminal_history_idx = None;
+                        }
+                    }
+
                     let send_clicked = ui.button("Enviar ➔").clicked();
-                    let enter_pressed =
-                        cmd_edit.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
+                    let enter_pressed = (cmd_edit.has_focus() || cmd_edit.lost_focus())
+                        && ui.input(|i| i.key_pressed(egui::Key::Enter));
+
                     if (send_clicked || enter_pressed) && !self.terminal_input.trim().is_empty() {
                         let cmd = self.terminal_input.trim().to_string();
+                        if self.terminal_history.last() != Some(&cmd) {
+                            self.terminal_history.push(cmd.clone());
+                            if self.terminal_history.len() > 100 {
+                                self.terminal_history.remove(0);
+                            }
+                        }
+                        self.terminal_history_idx = None;
+
                         // Echo local + envío real por la red al par autorizado
                         self.terminal_output.push_str(&format!("> {}\r\n", cmd));
                         self.terminal_input.clear();
+                        cmd_edit.request_focus();
+
                         if let Ok(sig_opt) = self.state.signaling_client.try_read() {
                             if let Some(sig) = sig_opt.as_ref() {
                                 let sig = std::sync::Arc::clone(sig);
-                                let msg = nxdesk_core::SignalingMessage::new("terminal_cmd", &cmd);
+                                let mut msg = nxdesk_core::SignalingMessage::new("terminal_cmd", &cmd);
+                                if let Some(ref target) = target_peer {
+                                    msg = msg.with_target(target);
+                                }
                                 tokio::spawn(async move {
                                     let _ = sig.send_message(&msg).await;
                                 });
@@ -1288,13 +1426,24 @@ fn render_terminal_dialog(&mut self, ctx: &egui::Context) {
                         }
                     }
 
-                    // Botón para interrupción inmediata del proceso en ejecución
-                    if ui.button("⏹ Ctrl+C").clicked() {
+                    // Interrupción inmediata: Botón [⏹ Ctrl+C] o Atajo físico Ctrl+C
+                    let ctrl_c_clicked = ui.button("⏹ Ctrl+C").clicked();
+                    let ctrl_c_key = cmd_edit.has_focus()
+                        && ui.input(|i| (i.modifiers.command || i.modifiers.ctrl) && i.key_pressed(egui::Key::C));
+
+                    if ctrl_c_clicked || ctrl_c_key {
+                        self.terminal_input.clear();
+                        self.terminal_history_idx = None;
                         self.terminal_output.push_str("^C\r\n[Enviando interrupción Ctrl+C...]\r\n");
+                        cmd_edit.request_focus();
+
                         if let Ok(sig_opt) = self.state.signaling_client.try_read() {
                             if let Some(sig) = sig_opt.as_ref() {
                                 let sig = std::sync::Arc::clone(sig);
-                                let msg = nxdesk_core::SignalingMessage::new("terminal_ctrl_c", "");
+                                let mut msg = nxdesk_core::SignalingMessage::new("terminal_ctrl_c", "");
+                                if let Some(ref target) = target_peer {
+                                    msg = msg.with_target(target);
+                                }
                                 tokio::spawn(async move {
                                     let _ = sig.send_message(&msg).await;
                                 });
@@ -1302,8 +1451,12 @@ fn render_terminal_dialog(&mut self, ctx: &egui::Context) {
                         }
                     }
 
-                    // Botón para limpiar pantalla
-                    if ui.button("🗑 Limpiar").clicked() {
+                    // Limpiar pantalla: Botón [🗑 Limpiar] o Atajo físico Ctrl+L
+                    let clear_clicked = ui.button("🗑 Limpiar").clicked();
+                    let ctrl_l_key = cmd_edit.has_focus()
+                        && ui.input(|i| (i.modifiers.command || i.modifiers.ctrl) && i.key_pressed(egui::Key::L));
+
+                    if clear_clicked || ctrl_l_key {
                         self.terminal_output.clear();
                         self.terminal_output.push_str("NxDesk Terminal Remota Segura [VUL-01 Activa]\r\n");
                     }
@@ -1391,6 +1544,7 @@ fn render_terminal_dialog(&mut self, ctx: &egui::Context) {
                     ui.checkbox(&mut self.allow_input, "Permitir entrada de ratón y teclado");
                     ui.checkbox(&mut self.allow_clipboard, "Permitir portapapeles bidireccional");
                     ui.checkbox(&mut self.allow_files, "Permitir transferencia de archivos");
+                    ui.checkbox(&mut self.allow_terminal, "Permitir terminal remota interactiva [VUL-01]");
 
                     ui.add_space(16.0);
                     ui.horizontal(|ui| {
@@ -1419,21 +1573,34 @@ fn render_terminal_dialog(&mut self, ctx: &egui::Context) {
             if accept || reject {
                 let state_clone = self.state.clone();
                 let role = self.selected_role;
+                let requester_id = req.client_id.clone();
                 let decision = SessionDecisionDto {
                     request_id: req.request_id.clone(),
+                    client_id: Some(requester_id.clone()),
+                    target_id: Some(requester_id.clone()),
                     accept,
                     granted_role: Some(role),
                     allow_input: self.allow_input,
                     allow_clipboard: self.allow_clipboard,
                     allow_file_transfer: self.allow_files,
+                    allow_terminal: self.allow_terminal,
                     rejection_reason: if accept { None } else { Some("Conexión rechazada por el anfitrión.".to_string()) },
                 };
 
                 tokio::spawn(async move {
                     if let Some(sig) = state_clone.get_signaling_client().await {
                         if let Ok(json_str) = serde_json::to_string(&decision) {
-                            let msg = nxdesk_core::SignalingMessage::new("session_decision", &json_str);
+                            let msg = nxdesk_core::SignalingMessage::new("session_decision", &json_str)
+                                .with_target(&requester_id);
                             let _ = sig.send_message(&msg).await;
+                        }
+                        if accept {
+                            // Enviar inmediatamente endpoint UDP para acelerar handshake directo
+                            if let Some(local_ep) = sig.p2p_local_endpoint() {
+                                let ep_msg = nxdesk_core::SignalingMessage::new("udp_endpoint", &local_ep)
+                                    .with_target(&requester_id);
+                                let _ = sig.send_message(&ep_msg).await;
+                            }
                         }
                     }
                     let _ = state_clone.decide_session(decision).await;
@@ -1612,21 +1779,55 @@ pub fn run_desktop_app(state: AppState) -> Result<(), eframe::Error> {
 /// Mapea teclas de egui a códigos virtuales Win32 VK para inyección nativa
 fn egui_key_to_vk(key: egui::Key) -> i32 {
     match key {
-        egui::Key::ArrowDown => 0x28,
-        egui::Key::ArrowLeft => 0x25,
-        egui::Key::ArrowRight => 0x27,
-        egui::Key::ArrowUp => 0x26,
-        egui::Key::Escape => 0x1B,
-        egui::Key::Tab => 0x09,
-        egui::Key::Backspace => 0x08,
-        egui::Key::Enter => 0x0D,
-        egui::Key::Space => 0x20,
-        egui::Key::Insert => 0x2D,
-        egui::Key::Delete => 0x2E,
-        egui::Key::Home => 0x24,
-        egui::Key::End => 0x23,
-        egui::Key::PageUp => 0x21,
-        egui::Key::PageDown => 0x22,
+        // Flechas de navegación
+        egui::Key::ArrowDown => 0x28,  // VK_DOWN
+        egui::Key::ArrowLeft => 0x25,  // VK_LEFT
+        egui::Key::ArrowRight => 0x27, // VK_RIGHT
+        egui::Key::ArrowUp => 0x26,    // VK_UP
+
+        // Teclas de control básicas
+        egui::Key::Escape => 0x1B,     // VK_ESCAPE
+        egui::Key::Tab => 0x09,        // VK_TAB
+        egui::Key::Backspace => 0x08,  // VK_BACK
+        egui::Key::Enter => 0x0D,      // VK_RETURN
+        egui::Key::Space => 0x20,      // VK_SPACE
+        egui::Key::Insert => 0x2D,     // VK_INSERT
+        egui::Key::Delete => 0x2E,     // VK_DELETE
+        egui::Key::Home => 0x24,       // VK_HOME
+        egui::Key::End => 0x23,        // VK_END
+        egui::Key::PageUp => 0x21,     // VK_PRIOR
+        egui::Key::PageDown => 0x22,   // VK_NEXT
+
+        // Teclas modificadoras
+        egui::Key::ShiftLeft => 0xA0,   // VK_LSHIFT
+        egui::Key::ShiftRight => 0xA1,  // VK_RSHIFT
+        egui::Key::ControlLeft => 0xA2, // VK_LCONTROL
+        egui::Key::ControlRight => 0xA3,// VK_RCONTROL
+        egui::Key::AltLeft => 0xA4,     // VK_LMENU
+        egui::Key::AltRight => 0xA5,    // VK_RMENU
+        egui::Key::SuperLeft => 0x5B,   // VK_LWIN
+        egui::Key::SuperRight => 0x5C,  // VK_RWIN
+
+        // Símbolos y puntuación OEM estándar
+        egui::Key::Colon => 0xBA,            // VK_OEM_1 (: / ;)
+        egui::Key::Semicolon => 0xBA,        // VK_OEM_1 (; / :)
+        egui::Key::Comma => 0xBC,            // VK_OEM_COMMA (,)
+        egui::Key::Period => 0xBE,           // VK_OEM_PERIOD (.)
+        egui::Key::Minus => 0xBD,            // VK_OEM_MINUS (-)
+        egui::Key::Plus => 0xBB,             // VK_OEM_PLUS (+)
+        egui::Key::Equals => 0xBB,           // VK_OEM_PLUS (=)
+        egui::Key::Slash => 0xBF,            // VK_OEM_2 (/ / ?)
+        egui::Key::Questionmark => 0xBF,     // VK_OEM_2 (?)
+        egui::Key::Backslash => 0xDC,        // VK_OEM_5 (\ / |)
+        egui::Key::Pipe => 0xDC,             // VK_OEM_5 (|)
+        egui::Key::Backtick => 0xC0,         // VK_OEM_3 (` / ~)
+        egui::Key::OpenBracket => 0xDB,      // VK_OEM_4 ([ / {)
+        egui::Key::OpenCurlyBracket => 0xDB, // VK_OEM_4 ({)
+        egui::Key::CloseBracket => 0xDD,     // VK_OEM_6 (] / })
+        egui::Key::CloseCurlyBracket => 0xDD,// VK_OEM_6 (})
+        egui::Key::Quote => 0xDE,            // VK_OEM_7 (' / ")
+
+        // Números 0-9
         egui::Key::Num0 => 0x30,
         egui::Key::Num1 => 0x31,
         egui::Key::Num2 => 0x32,
@@ -1637,6 +1838,8 @@ fn egui_key_to_vk(key: egui::Key) -> i32 {
         egui::Key::Num7 => 0x37,
         egui::Key::Num8 => 0x38,
         egui::Key::Num9 => 0x39,
+
+        // Letras A-Z
         egui::Key::A => 0x41,
         egui::Key::B => 0x42,
         egui::Key::C => 0x43,
@@ -1663,6 +1866,8 @@ fn egui_key_to_vk(key: egui::Key) -> i32 {
         egui::Key::X => 0x58,
         egui::Key::Y => 0x59,
         egui::Key::Z => 0x5A,
+
+        // Teclas de función F1-F12
         egui::Key::F1 => 0x70,
         egui::Key::F2 => 0x71,
         egui::Key::F3 => 0x72,

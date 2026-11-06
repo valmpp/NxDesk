@@ -185,6 +185,14 @@ impl TerminalSession {
         self.is_running.store(false, Ordering::SeqCst);
         let mut child_lock = self.child.lock().await;
         if let Some(mut child) = child_lock.take() {
+            #[cfg(windows)]
+            if let Some(pid) = child.id() {
+                use std::os::windows::process::CommandExt;
+                let _ = std::process::Command::new("taskkill")
+                    .args(&["/F", "/T", "/PID", &pid.to_string()])
+                    .creation_flags(0x08000000) // CREATE_NO_WINDOW
+                    .output();
+            }
             let _ = child.kill().await;
             info!("🛑 [TerminalSession] Shell terminado y recursos liberados.");
         }
@@ -198,6 +206,14 @@ impl Drop for TerminalSession {
         self.is_running.store(false, Ordering::SeqCst);
         if let Ok(mut child_lock) = self.child.try_lock() {
             if let Some(mut child) = child_lock.take() {
+                #[cfg(windows)]
+                if let Some(pid) = child.id() {
+                    use std::os::windows::process::CommandExt;
+                    let _ = std::process::Command::new("taskkill")
+                        .args(&["/F", "/T", "/PID", &pid.to_string()])
+                        .creation_flags(0x08000000)
+                        .output();
+                }
                 let _ = child.start_kill();
                 tracing::info!("🛑 [TerminalSession] Proceso hijo terminado automáticamente en Drop.");
             }

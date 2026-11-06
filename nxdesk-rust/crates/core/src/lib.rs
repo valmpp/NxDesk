@@ -96,12 +96,12 @@ impl Default for AppConfig {
             device_id: "111-222-333".to_string(),
             device_alias: "NxDesk-Host".to_string(),
             access_password: None,
-            allow_remote_terminal: false,
+            allow_remote_terminal: true,
             web_port: 8080,
             auto_share: true,
-            signaling_server_url: "ws://127.0.0.1:5000/signalinghub".to_string(),
-            max_fps: 60,
-            quality: 75,
+            signaling_server_url: "ws://10.10.40.11:5000/signalinghub".to_string(),
+            max_fps: 30,
+            quality: 64,
         }
     }
 }
@@ -169,6 +169,8 @@ pub struct SignalingMessage {
     pub byte_data: Option<Vec<u8>>,
     pub sender_id: Option<String>,
     pub sender_alias: Option<String>,
+    #[serde(default)]
+    pub target_id: Option<String>,
     pub metadata: Option<HashMap<String, String>>,
 }
 
@@ -180,6 +182,7 @@ impl SignalingMessage {
             byte_data: None,
             sender_id: None,
             sender_alias: None,
+            target_id: None,
             metadata: None,
         }
     }
@@ -191,6 +194,7 @@ impl SignalingMessage {
             byte_data: Some(data),
             sender_id: None,
             sender_alias: None,
+            target_id: None,
             metadata: None,
         }
     }
@@ -203,8 +207,14 @@ impl SignalingMessage {
             byte_data: None,
             sender_id: None,
             sender_alias: None,
+            target_id: None,
             metadata: None,
         })
+    }
+
+    pub fn with_target(mut self, target: impl Into<String>) -> Self {
+        self.target_id = Some(target.into());
+        self
     }
 }
 
@@ -263,6 +273,8 @@ pub struct SessionRequestDto {
     pub request_id: String,
     pub client_id: String,
     pub client_alias: String,
+    #[serde(default)]
+    pub target_id: Option<String>,
     #[serde(default = "default_session_role")]
     pub requested_role: SessionRole,
     #[serde(default = "default_true")]
@@ -288,6 +300,10 @@ fn default_true() -> bool {
 #[serde(rename_all = "PascalCase")]
 pub struct SessionDecisionDto {
     pub request_id: String,
+    #[serde(default)]
+    pub client_id: Option<String>,
+    #[serde(default)]
+    pub target_id: Option<String>,
     pub accept: bool,
     pub granted_role: Option<SessionRole>,
     #[serde(default = "default_true")]
@@ -296,6 +312,8 @@ pub struct SessionDecisionDto {
     pub allow_clipboard: bool,
     #[serde(default)]
     pub allow_file_transfer: bool,
+    #[serde(default = "default_true")]
+    pub allow_terminal: bool,
     pub rejection_reason: Option<String>,
 }
 
@@ -310,6 +328,8 @@ pub struct SessionResponseDto {
     pub allow_input: bool,
     pub allow_clipboard: bool,
     pub allow_file_transfer: bool,
+    #[serde(default = "default_true")]
+    pub allow_terminal: bool,
     pub error_message: Option<String>,
 }
 
@@ -324,6 +344,7 @@ pub struct ActiveSessionInfo {
     pub allow_input: bool,
     pub allow_clipboard: bool,
     pub allow_file_transfer: bool,
+    pub allow_terminal: bool,
     pub start_time: u64,
 }
 
@@ -482,5 +503,37 @@ mod protocol_tests {
         let dto = protocol::SessionEndDto { from: "a".into(), to: "b".into(), reason: "user".into() };
         let json = serde_json::to_string(&dto).unwrap();
         assert!(json.contains("\"From\":\"a\"") && json.contains("\"To\":\"b\""));
+    }
+
+    #[test]
+    fn session_request_preserves_target_id() {
+        let req = SessionRequestDto {
+            request_id: "req-1-100".into(),
+            client_id: "client-a".into(),
+            client_alias: "PC-A".into(),
+            target_id: Some("client-b".into()),
+            requested_role: SessionRole::FullControl,
+            allow_input: true,
+            allow_clipboard: true,
+            allow_file_transfer: true,
+            timestamp: 100,
+        };
+        let json = serde_json::to_string(&req).unwrap();
+        assert!(json.contains("\"TargetId\":\"client-b\""));
+
+        let de: SessionRequestDto = serde_json::from_str(&json).unwrap();
+        assert_eq!(de.target_id.as_deref(), Some("client-b"));
+    }
+
+    #[test]
+    fn signaling_message_target_id_builder() {
+        let msg = SignalingMessage::new("session_request", "{}").with_target("client-b");
+        assert_eq!(msg.target_id.as_deref(), Some("client-b"));
+
+        let json = serde_json::to_string(&msg).unwrap();
+        assert!(json.contains("\"TargetId\":\"client-b\""));
+
+        let de: SignalingMessage = serde_json::from_str(&json).unwrap();
+        assert_eq!(de.target_id.as_deref(), Some("client-b"));
     }
 }

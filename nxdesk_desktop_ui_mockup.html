@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NxDesk - Remote Control & Assistance</title>
+  <style>
+    /* Reset & Base System */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      /* Obsidian / Monochrome Palette (Dark Default) */
+      --bg-app: #0D0F12;
+      --bg-window: #13161C;
+      --bg-header: rgba(19, 22, 28, 0.88);
+      --bg-card: #181C24;
+      --bg-card-subtle: #14171E;
+      --bg-card-hover: #1E232E;
+      --border-main: rgba(255, 255, 255, 0.08);
+      --border-subtle: rgba(255, 255, 255, 0.05);
+      --border-strong: rgba(255, 255, 255, 0.16);
+
+      --text-primary: #F1F5F9;
+      --text-secondary: #94A3B8;
+      --text-muted: #64748B;
+
+      /* High-contrast Monochrome CTAs (Linear / Vercel style) */
+      --btn-primary-bg: #F8FAFC;
+      --btn-primary-text: #090B0E;
+      --btn-primary-hover: #E2E8F0;
+
+      --btn-secondary-bg: #202530;
+      --btn-secondary-text: #E2E8F0;
+      --btn-secondary-hover: #2A303F;
+      --btn-secondary-border: rgba(255, 255, 255, 0.1);
+
+      --badge-bg: #1F2430;
+      --badge-text: #CBD5E1;
+      --badge-border: rgba(255, 255, 255, 0.08);
+
+      --status-online: #10B981;
+      --status-online-bg: rgba(16, 185, 129, 0.12);
+
+      --nav-bg: #171A22;
+      --nav-border: rgba(255, 255, 255, 0.09);
+      --nav-active-bg: #232834;
+      --nav-active-text: #FFFFFF;
+      --nav-idle-text: #7E8B9F;
+
+      --shadow-window: 0 25px 60px -15px rgba(0, 0, 0, 0.7);
+      --shadow-floating: 0 10px 30px -5px rgba(0, 0, 0, 0.4);
+    }
+
+    /* Refined Neutral Light Palette */
+    [data-theme="light"] {
+      --bg-app: #ECEFF3;
+      --bg-window: #F8FAFC;
+      --bg-header: rgba(248, 250, 252, 0.92);
+      --bg-card: #FFFFFF;
+      --bg-card-subtle: #F1F4F8;
+      --bg-card-hover: #F8FAFC;
+      --border-main: #E2E8F0;
+      --border-subtle: #EEF2F6;
+      --border-strong: #CBD5E1;
+
+      --text-primary: #0F172A;
+      --text-secondary: #475569;
+      --text-muted: #94A3B8;
+
+      --btn-primary-bg: #0F172A;
+      --btn-primary-text: #FFFFFF;
+      --btn-primary-hover: #1E293B;
+
+      --btn-secondary-bg: #F1F5F9;
+      --btn-secondary-text: #1E293B;
+      --btn-secondary-hover: #E2E8F0;
+      --btn-secondary-border: #CBD5E1;
+
+      --badge-bg: #F1F5F9;
+      --badge-text: #334155;
+      --badge-border: #E2E8F0;
+
+      --status-online: #059669;
+      --status-online-bg: rgba(5, 150, 105, 0.1);
+
+      --nav-bg: #FFFFFF;
+      --nav-border: #E2E8F0;
+      --nav-active-bg: #0F172A;
+      --nav-active-text: #FFFFFF;
+      --nav-idle-text: #64748B;
+
+      --shadow-window: 0 20px 45px -12px rgba(15, 23, 42, 0.15);
+      --shadow-floating: 0 8px 24px -4px rgba(15, 23, 42, 0.08);
+    }
+
+    body {
+      background-color: var(--bg-app);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      transition: background-color 0.25s ease;
+    }
+
+    /* Window Container (simulating native desktop app) */
+    .app-window {
+      width: 100%;
+      max-width: 1080px;
+      background-color: var(--bg-window);
+      border: 1px solid var(--border-main);
+      border-radius: 12px;
+      box-shadow: var(--shadow-window);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: all 0.25s ease;
+    }
+
+    /* Desktop OS Titlebar */
+    .window-titlebar {
+      height: 36px;
+      padding: 0 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-subtle);
+      background: var(--bg-window);
+      user-select: none;
+    }
+
+    .titlebar-brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11.5px;
+      color: var(--text-muted);
+      font-weight: 500;
+      letter-spacing: 0.02em;
+    }
+
+    .titlebar-brand-icon {
+      width: 14px;
+      height: 14px;
+      background: var(--text-primary);
+      color: var(--bg-window);
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 8.5px;
+      font-weight: 800;
+    }
+
+    .window-controls {
+      display: flex;
+      gap: 7px;
+    }
+
+    .window-control-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      opacity: 0.8;
+      transition: opacity 0.15s ease;
+    }
+    .window-control-dot:hover { opacity: 1; }
+    .control-close { background-color: #EF4444; }
+    .control-min { background-color: #F59E0B; }
+    .control-max { background-color: #10B981; }
+
+    /* App Header & Floating Navigation */
+    .app-header {
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-subtle);
+      background-color: var(--bg-header);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+
+    .header-identity {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 220px;
+    }
+
+    .brand-avatar {
+      width: 34px;
+      height: 34px;
+      background: var(--btn-primary-bg);
+      color: var(--btn-primary-text);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 14px;
+      letter-spacing: -0.05em;
+    }
+
+    .brand-meta h1 {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      line-height: 1.1;
+      color: var(--text-primary);
+    }
+
+    .brand-meta span {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    /* Floating Navigation Rectangle with 10px Corners */
+    .nav-floating-rect {
+      display: flex;
+      align-items: center;
+      background-color: var(--nav-bg);
+      border: 1px solid var(--nav-border);
+      border-radius: 10px;
+      padding: 3px;
+      gap: 3px;
+      box-shadow: var(--shadow-floating);
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--nav-idle-text);
+      padding: 7px 10px;
+      border-radius: 7px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+    }
+
+    .nav-item svg {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+      stroke-width: 1.8;
+    }
+
+    /* Icon-only default; text expands smoothly on active */
+    .nav-item-label {
+      max-width: 0;
+      opacity: 0;
+      overflow: hidden;
+      white-space: nowrap;
+      margin-left: 0;
+      transition: max-width 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+                  opacity 0.2s ease,
+                  margin 0.2s ease;
+    }
+
+    .nav-item.active {
+      background-color: var(--nav-active-bg);
+      color: var(--nav-active-text);
+      border-color: var(--border-strong);
+      padding: 7px 14px;
+    }
+
+    .nav-item.active .nav-item-label {
+      max-width: 90px;
+      opacity: 1;
+      margin-left: 7px;
+      font-weight: 600;
+    }
+
+    .nav-item:not(.active):hover {
+      color: var(--text-primary);
+      background-color: var(--bg-card-hover);
+    }
+
+    /* Header Actions & Meta */
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 220px;
+      justify-content: flex-end;
+    }
+
+    .badge-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 500;
+      border-radius: 6px;
+      background: var(--badge-bg);
+      color: var(--badge-text);
+      border: 1px solid var(--badge-border);
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--status-online);
+      box-shadow: 0 0 8px var(--status-online);
+    }
+
+    .theme-toggle-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      border: 1px solid var(--border-main);
+      background: var(--bg-card);
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .theme-toggle-btn:hover {
+      color: var(--text-primary);
+      border-color: var(--border-strong);
+    }
+    .theme-toggle-btn svg {
+      width: 15px;
+      height: 15px;
+    }
+
+    /* Main Workspace */
+    .workspace {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* Two-column Hero */
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 820px) {
+      .hero-grid {
+        grid-template-columns: 1fr;
+      }
+      .app-header {
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+      .nav-floating-rect {
+        order: 3;
+        width: 100%;
+        justify-content: center;
+      }
+    }
+
+    .card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-main);
+      border-radius: 10px;
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: border-color 0.2s ease;
+      position: relative;
+    }
+    .card:hover {
+      border-color: var(--border-strong);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+    }
+
+    .card-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+    }
+
+    /* ID Display */
+    .id-showcase {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg-card-subtle);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin-bottom: 20px;
+    }
+
+    .id-digits {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: var(--text-primary);
+    }
+
+    .id-digits span.dot {
+      color: var(--text-muted);
+      margin: 0 4px;
+      font-size: 18px;
+    }
+
+    .btn-icon-subtle {
+      border: 1px solid var(--btn-secondary-border);
+      background: var(--btn-secondary-bg);
+      color: var(--btn-secondary-text);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn-icon-subtle:hover {
+      background: var(--btn-secondary-hover);
+      color: var(--text-primary);
+    }
+    .btn-icon-subtle svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    /* Password / Security row */
+    .security-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+    }
+
+    .password-box {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .password-token {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-weight: 600;
+      font-size: 13px;
+      letter-spacing: 0.12em;
+      color: var(--text-primary);
+      background: var(--bg-card-subtle);
+      padding: 3px 8px;
+      border-radius: 4px;
+      border: 1px solid var(--border-subtle);
+    }
+
+    .btn-link {
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 12px;
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      padding: 2px 4px;
+    }
+    .btn-link:hover {
+      color: var(--text-primary);
+    }
+
+    /* Target input & Connect box */
+    .input-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .text-input-wrapper {
+      position: relative;
+      flex: 1;
+    }
+
+    .text-input {
+      width: 100%;
+      height: 42px;
+      background: var(--bg-card-subtle);
+      border: 1px solid var(--border-main);
+      border-radius: 8px;
+      padding: 0 14px;
+      font-size: 14px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      color: var(--text-primary);
+      outline: none;
+      transition: all 0.15s ease;
+    }
+    .text-input:focus {
+      border-color: var(--border-strong);
+      box-shadow: 0 0 0 2px var(--border-subtle);
+    }
+    .text-input::placeholder {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    /* Primary CTA Button (High Contrast Solid) */
+    .btn-primary {
+      height: 42px;
+      padding: 0 22px;
+      background: var(--btn-primary-bg);
+      color: var(--btn-primary-text);
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+    .btn-primary:hover {
+      background: var(--btn-primary-hover);
+      transform: translateY(-1px);
+    }
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+
+    /* Mode Segmented Controls */
+    .mode-selector {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      background: var(--bg-card-subtle);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 3px;
+      gap: 4px;
+    }
+
+    .mode-tab {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      background: transparent;
+      border: none;
+      border-radius: 6px;
+      padding: 7px 10px;
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .mode-tab svg {
+      width: 14px;
+      height: 14px;
+    }
+    .mode-tab.active {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border-subtle);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+      font-weight: 600;
+    }
+    .mode-tab:not(.active):hover {
+      color: var(--text-primary);
+    }
+
+    /* Bottom Section: LAN Discovery */
+    .section-titlebar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .section-heading {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+    }
+
+    .section-heading h2 {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .section-heading span {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .lan-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 12px;
+    }
+
+    .device-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-main);
+      border-radius: 9px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: all 0.15s ease;
+    }
+    .device-card:hover {
+      border-color: var(--border-strong);
+      background-color: var(--bg-card-hover);
+    }
+
+    .device-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .device-icon-box {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: var(--bg-card-subtle);
+      border: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-secondary);
+    }
+    .device-icon-box svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .device-text h3 {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 2px;
+    }
+
+    .device-text p {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 11px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .device-text p span.badge-ip {
+      color: var(--text-secondary);
+    }
+
+    .btn-connect-sm {
+      border: 1px solid var(--btn-secondary-border);
+      background: var(--btn-secondary-bg);
+      color: var(--btn-secondary-text);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 11.5px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .device-card:hover .btn-connect-sm {
+      background: var(--btn-primary-bg);
+      color: var(--btn-primary-text);
+      border-color: transparent;
+    }
+
+    /* Toast Notification */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: #090B0E;
+      color: #F8FAFC;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 100;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+    .toast svg {
+      width: 14px;
+      height: 14px;
+      color: var(--status-online);
+    }
+
+    /* Footer info */
+    .app-footer {
+      padding: 12px 24px;
+      border-top: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-muted);
+      background: var(--bg-window);
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 16px;
+    }
+    .footer-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+    }
+    .footer-links a:hover {
+      color: var(--text-primary);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Simulated Desktop Native Application Window -->
+  <div class="app-window" id="appWindow">
+
+    <!-- OS Window Title Bar -->
+    <div class="window-titlebar">
+      <div class="titlebar-brand">
+        <div class="titlebar-brand-icon">N</div>
+        <span>NxDesk &bull; Control y Asistencia Remota</span>
+      </div>
+      <div class="window-controls">
+        <button class="window-control-dot control-min" title="Minimizar"></button>
+        <button class="window-control-dot control-max" title="Maximizar"></button>
+        <button class="window-control-dot control-close" title="Cerrar"></button>
+      </div>
+    </div>
+
+    <!-- Application Header with Centered Floating Rectangular Navigation -->
+    <header class="app-header">
+      
+      <!-- Brand & Machine Identity (Left) -->
+      <div class="header-identity">
+        <div class="brand-avatar">N</div>
+        <div class="brand-meta">
+          <h1>NxDesk</h1>
+          <span>DESKTOP-NX-PORTABLE</span>
+        </div>
+      </div>
+
+      <!-- Floating Navigation Rectangle (10px rounded corners, icon default -> expands label on select) -->
+      <nav class="nav-floating-rect" id="navBar">
+        <button class="nav-item active" data-tab="Inicio" title="Inicio" onclick="selectNav(this)">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+          </svg>
+          <span class="nav-item-label">Inicio</span>
+        </button>
+
+        <button class="nav-item" data-tab="Equipos" title="Equipos Guardados" onclick="selectNav(this)">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+          </svg>
+          <span class="nav-item-label">Equipos</span>
+        </button>
+
+        <button class="nav-item" data-tab="Recientes" title="Historial Reciente" onclick="selectNav(this)">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          <span class="nav-item-label">Recientes</span>
+        </button>
+
+        <button class="nav-item" data-tab="Archivos" title="Transferencia de Archivos" onclick="selectNav(this)">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+          </svg>
+          <span class="nav-item-label">Archivos</span>
+        </button>
+
+        <button class="nav-item" data-tab="Ajustes" title="Configuración" onclick="selectNav(this)">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+          </svg>
+          <span class="nav-item-label">Ajustes</span>
+        </button>
+      </nav>
+
+      <!-- Network Status & Palette Theme Switcher (Right) -->
+      <div class="header-actions">
+        <span class="badge-pill">
+          <span class="status-dot"></span>
+          Red local (LAN)
+        </span>
+        <span class="badge-pill">Admin</span>
+        <button class="theme-toggle-btn" id="themeBtn" title="Alternar tema claro/oscuro" onclick="toggleTheme()">
+          <svg id="themeIcon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Operational Workspace -->
+    <main class="workspace">
+      
+      <!-- Two-Column Operational Hero Grid -->
+      <div class="hero-grid">
+        
+        <!-- Left: Este puesto de trabajo (Inbound Access) -->
+        <div class="card">
+          <div>
+            <div class="card-header">
+              <span class="card-label">Este puesto de trabajo</span>
+              <span class="badge-pill" style="font-size: 10.5px;">Listo para recibir</span>
+            </div>
+
+            <!-- Grouped 9-digit Monospace ID -->
+            <div class="id-showcase">
+              <div class="id-digits" id="localIdText">
+                831<span class="dot">&bull;</span>083<span class="dot">&bull;</span>482
+              </div>
+              <button class="btn-icon-subtle" onclick="copyId('831 083 482')">
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                </svg>
+                Copiar ID
+              </button>
+            </div>
+          </div>
+
+          <!-- Masked temporary security token -->
+          <div class="security-row">
+            <span>Clave temporal:</span>
+            <div class="password-box">
+              <span class="password-token" id="pinDisplay">&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;</span>
+              <button class="btn-link" id="pinToggleBtn" onclick="togglePasswordVisibility()">Ver</button>
+              <span style="color: var(--text-muted);">&bull;</span>
+              <button class="btn-link" onclick="regeneratePin()">Regenerar</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Conectar a un equipo (Outbound Connection) -->
+        <div class="card">
+          <div>
+            <div class="card-header">
+              <span class="card-label">Conectar a un equipo</span>
+              <span style="font-size: 11px; color: var(--text-muted);">Direct TCP / WAN</span>
+            </div>
+
+            <!-- ID Input and Solid Monochrome CTA -->
+            <div class="input-group">
+              <div class="text-input-wrapper">
+                <input type="text" id="targetIdInput" class="text-input" placeholder="Ingresa el ID de sala o IP (ej. 505 229 743)" />
+              </div>
+              <button class="btn-primary" onclick="initiateConnection()">
+                <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                </svg>
+                Conectar
+              </button>
+            </div>
+          </div>
+
+          <!-- Segmented Mode Control -->
+          <div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 7px;">Modo de sesión:</div>
+            <div class="mode-selector">
+              <button class="mode-tab active" onclick="setMode(this, 'Control remoto')">
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"/>
+                </svg>
+                Control remoto
+              </button>
+              <button class="mode-tab" onclick="setMode(this, 'Solo ver')">
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                </svg>
+                Solo ver
+              </button>
+              <button class="mode-tab" onclick="setMode(this, 'Archivos')">
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"/>
+                </svg>
+                Archivos
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- LAN Detected Devices Section -->
+      <div>
+        <div class="section-titlebar">
+          <div class="section-heading">
+            <h2>Equipos detectados en red local</h2>
+            <span>Búsqueda automática UDP / WAN</span>
+          </div>
+          <button class="btn-icon-subtle" onclick="rescanLan()">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            Buscar de nuevo
+          </button>
+        </div>
+
+        <div class="lan-grid">
+          
+          <!-- Device Card 1 -->
+          <div class="device-card">
+            <div class="device-info">
+              <div class="device-icon-box">
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                </svg>
+              </div>
+              <div class="device-text">
+                <h3>DESKTOP-QUUUH1B</h3>
+                <p>
+                  <span>505 229 743</span>
+                  <span>&bull;</span>
+                  <span class="badge-ip">10.10.40.15</span>
+                </p>
+              </div>
+            </div>
+            <button class="btn-connect-sm" onclick="connectToDevice('505 229 743')">Conectar</button>
+          </div>
+
+          <!-- Device Card 2 -->
+          <div class="device-card">
+            <div class="device-info">
+              <div class="device-icon-box">
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/>
+                </svg>
+              </div>
+              <div class="device-text">
+                <h3>SRV-LINUX-STORAGE</h3>
+                <p>
+                  <span>912 401 118</span>
+                  <span>&bull;</span>
+                  <span class="badge-ip">10.10.40.40</span>
+                </p>
+              </div>
+            </div>
+            <button class="btn-connect-sm" onclick="connectToDevice('912 401 118')">Conectar</button>
+          </div>
+
+        </div>
+      </div>
+
+    </main>
+
+    <!-- Footer Meta -->
+    <footer class="app-footer">
+      <div>
+        <span>Protocolo de transmisión: <strong style="color: var(--text-primary); font-family: ui-monospace, monospace;">H.264 / Opus Direct Stream</strong></span>
+      </div>
+      <div class="footer-links">
+        <a href="#seguridad" onclick="showToast('Cifrado de extremo a extremo activo (TLS 1.3)')">Cifrado E2E</a>
+        <a href="#puerto" onclick="showToast('Puerto UDP 5000 abierto en escucha')">Puerto 5000</a>
+        <a href="#acerca" onclick="showToast('NxDesk v2.4.0 (x64 Windows)')">NxDesk v2.4.0</a>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- Non-intrusive Toast Notification -->
+  <div class="toast" id="toast">
+    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+    </svg>
+    <span id="toastMsg">Acción completada</span>
+  </div>
+
+  <!-- Interactive Logic -->
+  <script>
+    let isPasswordRevealed = false;
+    let currentPassword = "K9X-84M2";
+    let activeMode = "Control remoto";
+
+    // Navigation item click: Only the active tab expands its text label
+    function selectNav(clickedItem) {
+      const allItems = document.querySelectorAll('.nav-item');
+      allItems.forEach(item => item.classList.remove('active'));
+      clickedItem.classList.add('active');
+
+      const tabName = clickedItem.getAttribute('data-tab');
+      showToast(`Pestaña activa: ${tabName}`);
+    }
+
+    // Toggle theme (Dark Monochrome <-> Neutral Light)
+    function toggleTheme() {
+      const html = document.documentElement;
+      const isDark = !html.getAttribute('data-theme') || html.getAttribute('data-theme') === 'dark';
+      const newTheme = isDark ? 'light' : 'dark';
+      html.setAttribute('data-theme', newTheme);
+
+      const icon = document.getElementById('themeIcon');
+      if (newTheme === 'light') {
+        // Show moon icon for returning to dark
+        icon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>`;
+      } else {
+        // Show sun icon
+        icon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />`;
+      }
+
+      showToast(`Tema cambiado a: ${newTheme === 'light' ? 'Claro Neutro' : 'Obsidian Oscuro'}`);
+    }
+
+    // Copy to clipboard with UI Toast
+    function copyId(text) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
+      } else {
+        fallbackCopy(text);
+      }
+      showToast(`ID ${text} copiado al portapapeles`);
+    }
+
+    function fallbackCopy(text) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch(e) {}
+      document.body.removeChild(ta);
+    }
+
+    // Toggle temporary password visibility
+    function togglePasswordVisibility() {
+      const pinEl = document.getElementById('pinDisplay');
+      const btn = document.getElementById('pinToggleBtn');
+      isPasswordRevealed = !isPasswordRevealed;
+
+      if (isPasswordRevealed) {
+        pinEl.textContent = currentPassword;
+        btn.textContent = "Ocultar";
+      } else {
+        pinEl.innerHTML = "&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;";
+        btn.textContent = "Ver";
+      }
+    }
+
+    // Regenerate temporary token
+    function regeneratePin() {
+      const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+      let p1 = "", p2 = "";
+      for (let i = 0; i < 3; i++) p1 += chars.charAt(Math.floor(Math.random() * chars.length));
+      for (let i = 0; i < 4; i++) p2 += chars.charAt(Math.floor(Math.random() * chars.length));
+      currentPassword = `${p1}-${p2}`;
+
+      const pinEl = document.getElementById('pinDisplay');
+      const btn = document.getElementById('pinToggleBtn');
+      pinEl.textContent = currentPassword;
+      btn.textContent = "Ocultar";
+      isPasswordRevealed = true;
+
+      showToast(`Nueva clave generada: ${currentPassword}`);
+    }
+
+    // Session Mode Selection (Control remoto / Solo ver / Archivos)
+    function setMode(button, modeName) {
+      const allTabs = document.querySelectorAll('.mode-tab');
+      allTabs.forEach(tab => tab.classList.remove('active'));
+      button.classList.add('active');
+      activeMode = modeName;
+      showToast(`Modo seleccionado: ${modeName}`);
+    }
+
+    // Outbound Connect action
+    function initiateConnection() {
+      const input = document.getElementById('targetIdInput');
+      const target = input.value.trim();
+      if (!target) {
+        showToast("Ingresa un ID o IP remota para conectar");
+        input.focus();
+        return;
+      }
+      showToast(`Estableciendo enlace con ${target} en modo "${activeMode}"...`);
+    }
+
+    function connectToDevice(id) {
+      const input = document.getElementById('targetIdInput');
+      input.value = id;
+      showToast(`Conectando con ${id}...`);
+    }
+
+    function rescanLan() {
+      showToast("Escaneando subred UDP local...");
+    }
+
+    // Toast Utility
+    let toastTimeout;
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toastMsg');
+      toastMsg.textContent = msg;
+      toast.classList.add('show');
+
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        toast.classList.remove('show');
+      }, 2400);
+    }
+  </script>
+</body>
+</html>

@@ -106,6 +106,7 @@ pub struct ScreenCapturer {
     pub last_bitblt_us: u32,
     pub last_scale_us: u32,
     pub dxgi: Option<dxgi::DxgiCapturer>,
+    pub draw_cursor: bool,
 }
 
 impl Drop for ScreenCapturer {
@@ -162,6 +163,7 @@ impl ScreenCapturer {
                 last_bitblt_us: 0,
                 last_scale_us: 0,
                 dxgi: None,
+                draw_cursor: false,
             };
             let screens = capturer.get_screens();
             if let Some(primary) = screens
@@ -195,6 +197,7 @@ impl ScreenCapturer {
                 last_bitblt_us: 0,
                 last_scale_us: 0,
                 dxgi: None,
+                draw_cursor: false,
             }
         }
     }
@@ -410,41 +413,43 @@ impl ScreenCapturer {
                     return Ok(self.generate_standby_frame());
                 }
 
-                // Dibujar el cursor de Windows sobre el bitmap para que se vea en el streaming
-                let mut cursor_info: CURSORINFO = std::mem::zeroed();
-                cursor_info.cbSize = std::mem::size_of::<CURSORINFO>() as u32;
-                if GetCursorInfo(&mut cursor_info) != 0 && (cursor_info.flags & 1) != 0 {
-                    let rel_x = cursor_info.ptScreenPos.x - self.origin_x;
-                    let rel_y = cursor_info.ptScreenPos.y - self.origin_y;
-                    if rel_x >= 0
-                        && rel_x < self.width as i32
-                        && rel_y >= 0
-                        && rel_y < self.height as i32
-                    {
-                        let mut icon_info = ICONINFO {
-                            fIcon: 0,
-                            xHotspot: 0,
-                            yHotspot: 0,
-                            hbmMask: 0,
-                            hbmColor: 0,
-                        };
-                        if GetIconInfo(cursor_info.hCursor, &mut icon_info) != 0 {
-                            DrawIconEx(
-                                hdc_mem,
-                                rel_x - icon_info.xHotspot as i32,
-                                rel_y - icon_info.yHotspot as i32,
-                                cursor_info.hCursor,
-                                0,
-                                0,
-                                0,
-                                0,
-                                3, // DI_NORMAL
-                            );
-                            if icon_info.hbmMask != 0 {
-                                DeleteObject(icon_info.hbmMask);
-                            }
-                            if icon_info.hbmColor != 0 {
-                                DeleteObject(icon_info.hbmColor);
+                // Dibujar el cursor de Windows sobre el bitmap si está habilitado
+                if self.draw_cursor {
+                    let mut cursor_info: CURSORINFO = std::mem::zeroed();
+                    cursor_info.cbSize = std::mem::size_of::<CURSORINFO>() as u32;
+                    if GetCursorInfo(&mut cursor_info) != 0 && (cursor_info.flags & 1) != 0 {
+                        let rel_x = cursor_info.ptScreenPos.x - self.origin_x;
+                        let rel_y = cursor_info.ptScreenPos.y - self.origin_y;
+                        if rel_x >= 0
+                            && rel_x < self.width as i32
+                            && rel_y >= 0
+                            && rel_y < self.height as i32
+                        {
+                            let mut icon_info = ICONINFO {
+                                fIcon: 0,
+                                xHotspot: 0,
+                                yHotspot: 0,
+                                hbmMask: 0,
+                                hbmColor: 0,
+                            };
+                            if GetIconInfo(cursor_info.hCursor, &mut icon_info) != 0 {
+                                DrawIconEx(
+                                    hdc_mem,
+                                    rel_x - icon_info.xHotspot as i32,
+                                    rel_y - icon_info.yHotspot as i32,
+                                    cursor_info.hCursor,
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    3, // DI_NORMAL
+                                );
+                                if icon_info.hbmMask != 0 {
+                                    DeleteObject(icon_info.hbmMask);
+                                }
+                                if icon_info.hbmColor != 0 {
+                                    DeleteObject(icon_info.hbmColor);
+                                }
                             }
                         }
                     }
@@ -637,48 +642,50 @@ impl ScreenCapturer {
                 }
 
                 if bitblt_ok != 0 {
-                    // Dibujar cursor con hotspot en caché
-                    let mut cursor_info: CURSORINFO = std::mem::zeroed();
-                    cursor_info.cbSize = std::mem::size_of::<CURSORINFO>() as u32;
-                    if GetCursorInfo(&mut cursor_info) != 0 && (cursor_info.flags & 1) != 0 {
-                        let rel_x = cursor_info.ptScreenPos.x - self.origin_x;
-                        let rel_y = cursor_info.ptScreenPos.y - self.origin_y;
-                        if rel_x >= 0
-                            && rel_x < self.width as i32
-                            && rel_y >= 0
-                            && rel_y < self.height as i32
-                        {
-                            if cursor_info.hCursor != self.last_cursor {
-                                let mut icon_info = ICONINFO {
-                                    fIcon: 0,
-                                    xHotspot: 0,
-                                    yHotspot: 0,
-                                    hbmMask: 0,
-                                    hbmColor: 0,
-                                };
-                                if GetIconInfo(cursor_info.hCursor, &mut icon_info) != 0 {
-                                    self.last_cursor = cursor_info.hCursor;
-                                    self.last_hotspot_x = icon_info.xHotspot as i32;
-                                    self.last_hotspot_y = icon_info.yHotspot as i32;
-                                    if icon_info.hbmMask != 0 {
-                                        DeleteObject(icon_info.hbmMask);
-                                    }
-                                    if icon_info.hbmColor != 0 {
-                                        DeleteObject(icon_info.hbmColor);
+                    // Dibujar cursor con hotspot en caché si está habilitado
+                    if self.draw_cursor {
+                        let mut cursor_info: CURSORINFO = std::mem::zeroed();
+                        cursor_info.cbSize = std::mem::size_of::<CURSORINFO>() as u32;
+                        if GetCursorInfo(&mut cursor_info) != 0 && (cursor_info.flags & 1) != 0 {
+                            let rel_x = cursor_info.ptScreenPos.x - self.origin_x;
+                            let rel_y = cursor_info.ptScreenPos.y - self.origin_y;
+                            if rel_x >= 0
+                                && rel_x < self.width as i32
+                                && rel_y >= 0
+                                && rel_y < self.height as i32
+                            {
+                                if cursor_info.hCursor != self.last_cursor {
+                                    let mut icon_info = ICONINFO {
+                                        fIcon: 0,
+                                        xHotspot: 0,
+                                        yHotspot: 0,
+                                        hbmMask: 0,
+                                        hbmColor: 0,
+                                    };
+                                    if GetIconInfo(cursor_info.hCursor, &mut icon_info) != 0 {
+                                        self.last_cursor = cursor_info.hCursor;
+                                        self.last_hotspot_x = icon_info.xHotspot as i32;
+                                        self.last_hotspot_y = icon_info.yHotspot as i32;
+                                        if icon_info.hbmMask != 0 {
+                                            DeleteObject(icon_info.hbmMask);
+                                        }
+                                        if icon_info.hbmColor != 0 {
+                                            DeleteObject(icon_info.hbmColor);
+                                        }
                                     }
                                 }
+                                DrawIconEx(
+                                    self.hdc_mem,
+                                    rel_x - self.last_hotspot_x,
+                                    rel_y - self.last_hotspot_y,
+                                    cursor_info.hCursor,
+                                    0,
+                                    0,
+                                    0,
+                                    0,
+                                    3, // DI_NORMAL
+                                );
                             }
-                            DrawIconEx(
-                                self.hdc_mem,
-                                rel_x - self.last_hotspot_x,
-                                rel_y - self.last_hotspot_y,
-                                cursor_info.hCursor,
-                                0,
-                                0,
-                                0,
-                                0,
-                                3, // DI_NORMAL
-                            );
                         }
                     }
 

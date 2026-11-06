@@ -17,17 +17,26 @@ fn get_machine_unique_id() -> String {
 
     #[cfg(target_os = "windows")]
     {
-        if let Ok(output) = std::process::Command::new("reg")
-            .args(&["query", r"HKLM\SOFTWARE\Microsoft\Cryptography", "/v", "MachineGuid"])
-            .output()
-        {
-            let text = String::from_utf8_lossy(&output.stdout);
-            for line in text.lines() {
-                if line.contains("MachineGuid") {
-                    if let Some(guid) = line.split_whitespace().last() {
-                        guid.hash(&mut hasher);
+        use windows_sys::Win32::System::Registry::*;
+        unsafe {
+            let subkey: Vec<u16> = "SOFTWARE\\Microsoft\\Cryptography\0".encode_utf16().collect();
+            let value_name: Vec<u16> = "MachineGuid\0".encode_utf16().collect();
+            let mut hkey: HKEY = 0;
+            if RegOpenKeyExW(HKEY_LOCAL_MACHINE, subkey.as_ptr(), 0, KEY_READ | KEY_WOW64_64KEY, &mut hkey) == 0 {
+                let mut buf = [0u8; 128];
+                let mut buf_len = buf.len() as u32;
+                let mut val_type = 0u32;
+                if RegQueryValueExW(hkey, value_name.as_ptr(), std::ptr::null_mut(), &mut val_type, buf.as_mut_ptr(), &mut buf_len) == 0 {
+                    if buf_len >= 2 {
+                        let u16_slice = std::slice::from_raw_parts(buf.as_ptr() as *const u16, (buf_len / 2) as usize);
+                        let guid_str = String::from_utf16_lossy(u16_slice);
+                        let clean_guid = guid_str.trim_matches('\0').trim();
+                        if !clean_guid.is_empty() {
+                            clean_guid.hash(&mut hasher);
+                        }
                     }
                 }
+                RegCloseKey(hkey);
             }
         }
     }
@@ -265,7 +274,12 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 let t0 = Instant::now();
                 let _rtt_now = state_capture.rtt_ms.load(Ordering::Relaxed);
 
-                // Resolución adaptativa según modo solicitado por el visor (Fit mode 1280 vs Nativo 1:1)
+                // Detección automática de hardware: núcleos de CPU
+                let num_cpus = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
+                let is_low_end_hw = num_cpus <= 4;
+                let enc_us_prev = state_capture.enc_time_us.load(Ordering::Relaxed);
+
+                // Resolución adaptativa según modo solicitado por el visor y perfil de hardware
                 let (screen_w, screen_h) = {
                     let cap = state_capture.capturer.blocking_lock();
                     (cap.width, cap.height)
@@ -274,23 +288,36 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 let req_dim = state_capture.requested_max_dim.load(Ordering::Relaxed);
                 let target_native_dim = if req_dim > 0 && req_dim < max_d {
                     req_dim
-                } else if req_dim == 0 && max_d > 1280 {
-                    // Por defecto: 1280 max dim para codificación ultra rápida (<12 ms) y 60 FPS fluidos
-                    1280
+                } else if req_dim == 0 {
+                    // En hardware de bajo perfil (<= 4 cores) o si la CPU tarda > 14ms en codificar,
+                    // escalar automáticamente a 1280 max dim (720p) para no ahogar los núcleos.
+                    if is_low_end_hw || enc_us_prev > 14_000 {
+                        1280.min(max_d)
+                    } else if max_d > 1600 {
+                        1600
+                    } else {
+                        max_d
+                    }
                 } else {
                     max_d
                 };
-                // Dinámica de FPS de 3 niveles: Mínimo 24 FPS, Normal 30 FPS, Techo Máximo 60 FPS
-                let has_recent_input = state_capture.has_recent_input_activity(400);
-                let has_intense_motion = last_sig_change_time.elapsed() < Duration::from_millis(400);
-                let has_recent_motion = last_sig_change_time.elapsed() < Duration::from_millis(1200);
+
+                // Gobernador dinámico de FPS: Reposo eficiente 8 FPS, Normal 30 FPS, Techo 60 FPS
+                let has_recent_input = state_capture.has_recent_input_activity(500);
+                let has_intense_motion = last_sig_change_time.elapsed() < Duration::from_millis(500);
+                let has_recent_motion = last_sig_change_time.elapsed() < Duration::from_millis(1500);
 
                 let current_fps: u32 = if has_recent_input && has_intense_motion {
-                    60 // Techo máximo: 60 FPS durante interactividad rápida y animación intensa
+                    // Techo de FPS según capacidad: si la CPU es modesta o codifica lento, mantener en 30 FPS
+                    if is_low_end_hw || enc_us_prev > 12_000 {
+                        30
+                    } else {
+                        60
+                    }
                 } else if has_recent_input || has_recent_motion {
-                    30 // Normal: 30 FPS para trabajo fluido y ancho de banda controlado
+                    30 // Normal: 30 FPS fluido con consumo de CPU controlado
                 } else {
-                    24 // Mínimo garantizado: 24 FPS en reposo (nunca baja a 10 o 15)
+                    8 // Reposo eficiente: 8 FPS en pantalla estática (ahorra 70%+ de CPU en gráficos integrados)
                 };
 
                 state_capture.current_fps.store(current_fps, Ordering::Relaxed);
@@ -399,9 +426,13 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     if let Some(raw) = maybe_raw {
                         let t_enc_start = Instant::now();
 
-                        // Codificación adaptativa de ultra alto rendimiento (Single-Pass 60 FPS sin bloqueos)
+                        // Codificación adaptativa de ultra alto rendimiento según RTT y perfil de hardware
+                        let num_cpus = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4);
+                        let is_low_end_hw = num_cpus <= 4;
                         let rtt_now = state_encode.rtt_ms.load(Ordering::Relaxed);
-                        let current_quality = if rtt_now > 160 {
+                        let current_quality = if is_low_end_hw {
+                            if rtt_now > 120 { 58 } else { 64 }
+                        } else if rtt_now > 160 {
                             68
                         } else if rtt_now > 80 {
                             72
@@ -487,9 +518,27 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                 let reencs = state_encode.reencode_count.load(Ordering::Relaxed);
                                 let total_est = cap_ms + enc_ms + net_ms + dec_ms + ren_ms;
 
+                                let transport_str = if let Some(sig) = state_encode.try_get_signaling_client() {
+                                    sig.transport_summary()
+                                } else {
+                                    "Desconectado".to_string()
+                                };
+
+                                let alert_reason = if cap_ms > 16.0 {
+                                    format!(" | ⚠️ ALERTA CAPTURA LENTA ({:.1}ms)", cap_ms)
+                                } else if enc_ms > 14.0 {
+                                    format!(" | ⚠️ ALERTA CPU CODIFICACIÓN LENTA ({:.1}ms)", enc_ms)
+                                } else if rtt_now > 120 {
+                                    format!(" | ⚠️ ALERTA RETARDO RED (RTT={}ms)", rtt_now)
+                                } else if sock_ms > 15.0 {
+                                    format!(" | ⚠️ ALERTA CONGESTIÓN SOCKET ({:.1}ms)", sock_ms)
+                                } else {
+                                    String::new()
+                                };
+
                                 info!(
-                                    "⏱️ [Diagnóstico Video] Total:{:.1}ms | Cap:{:.1}ms (DwmFlush:{:.1}ms, Blt:{:.1}ms, Scale:{:.1}ms) | Enc:{:.1}ms ({}KB) | Socket:{:.1}ms | Red:{:.1}ms | Dec:{:.1}ms | Render:{:.2}ms | FPS TX:{}/RX:{} | RTT:{}ms | Bitrate:{} kbps | Caídas Host:{} | Re-encodes:{}",
-                                    total_est, cap_ms, flush_ms, blt_ms, scale_ms, enc_ms, jpeg_bytes.len() / 1024, sock_ms, net_ms, dec_ms, ren_ms, tx_fps, rx_fps, rtt_now, kbps, drops, reencs
+                                    "⏱️ [HOST] {} | Total Est:{:.1}ms | Cap:{:.1}ms (DwmFlush:{:.1}ms, Blt:{:.1}ms, Scale:{:.1}ms) | Enc:{:.1}ms ({}KB) | Socket:{:.1}ms | Red:{:.1}ms | FPS TX:{}/RX:{} | RTT:{}ms | Bitrate:{} kbps | Caídas:{} | Re-enc:{} | Res:{}x{}{}",
+                                    transport_str, total_est, cap_ms, flush_ms, blt_ms, scale_ms, enc_ms, jpeg_bytes.len() / 1024, sock_ms, net_ms, tx_fps, rx_fps, rtt_now, kbps, drops, reencs, width, height, alert_reason
                                 );
                                 last_log_time = Instant::now();
                             }
@@ -519,10 +568,44 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let is_wan = sig_url.starts_with("wss://")
         || sig_url.contains("trycloudflare.com")
         || sig_url.contains("ngrok");
+
+    // Si la URL apunta a localhost/127.0.0.1 y el puerto 5000 no responde,
+    // intentar auto-iniciar nxdesk-server.exe en segundo plano si existe en la misma carpeta.
+    if sig_url.contains("127.0.0.1:5000") || sig_url.contains("localhost:5000") {
+        let is_running = std::net::TcpStream::connect_timeout(
+            &"127.0.0.1:5000".parse().unwrap(),
+            Duration::from_millis(200),
+        ).is_ok();
+
+        if !is_running {
+            if let Ok(current_exe) = std::env::current_exe() {
+                if let Some(parent_dir) = current_exe.parent() {
+                    let server_exe = parent_dir.join("nxdesk-server.exe");
+                    if server_exe.exists() {
+                        info!("🚀 [Auto-Start] Servidor local en puerto 5000 no detectado. Iniciando nxdesk-server.exe en segundo plano...");
+                        #[cfg(windows)]
+                        {
+                            use std::os::windows::process::CommandExt;
+                            const CREATE_NO_WINDOW: u32 = 0x08000000;
+                            let _ = std::process::Command::new(server_exe)
+                                .creation_flags(CREATE_NO_WINDOW)
+                                .spawn();
+                        }
+                        #[cfg(not(windows))]
+                        {
+                            let _ = std::process::Command::new(server_exe).spawn();
+                        }
+                        std::thread::sleep(Duration::from_millis(500));
+                    }
+                }
+            }
+        }
+    }
+
     let init_timeout = if explicit_server || connect_target_init.is_some() || is_wan {
         Duration::from_millis(5000)
     } else {
-        Duration::from_millis(800)
+        Duration::from_millis(1500)
     };
 
     let initial_pair = rt.block_on(async {
@@ -568,6 +651,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             rt.block_on(async move {
                 let mut last_seq: u32 = 0;
                 let mut last_alert_time = Instant::now();
+                let mut last_viewer_log = Instant::now();
                 // Sonda de jitter: ritmo de llegada a la decode vs su media exponencial (µs)
                 let mut last_rx_at: Option<Instant> = None;
                 let mut ema_interval_ms: f64 = 0.0;
@@ -661,6 +745,42 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
                                 let dec_ms = dec_us as f32 / 1000.0;
                                 let total_latency_ms = cap_ms + enc_ms + net_ms + dec_ms;
+
+                                // Diagnóstico continuo del Visor a 1 Hz
+                                if last_viewer_log.elapsed() >= Duration::from_secs(1) {
+                                    let rx_fps = state_clone.rx_fps.load(Ordering::Relaxed);
+                                    let tx_fps = state_clone.tx_fps.load(Ordering::Relaxed);
+                                    let bitrate = state_clone.rx_kbps.load(Ordering::Relaxed);
+                                    let rtt = state_clone.rtt_ms.load(Ordering::Relaxed);
+                                    let (ren_ms, _, _) = state_clone.stage_render.snapshot_ms();
+                                    let total_e2e = cap_ms + enc_ms + net_ms + dec_ms + ren_ms;
+
+                                    let transport_desc = state_clone
+                                        .try_get_signaling_client()
+                                        .map(|s| s.transport_summary())
+                                        .unwrap_or_else(|| "Desconectado".to_string());
+
+                                    let alert_msg = if rx_fps > 0 && rx_fps < 20 {
+                                        let cause = if net_ms >= enc_ms && net_ms >= dec_ms && net_ms >= cap_ms {
+                                            format!("RED LENTA ({:.1}ms)", net_ms)
+                                        } else if enc_ms >= dec_ms && enc_ms >= cap_ms {
+                                            format!("CPU HOST LENTA ({:.1}ms)", enc_ms)
+                                        } else if cap_ms >= dec_ms {
+                                            format!("CAPTURA HOST LENTA ({:.1}ms)", cap_ms)
+                                        } else {
+                                            format!("CPU VISOR LENTA ({:.1}ms)", dec_ms)
+                                        };
+                                        format!(" | ⚠️ BAJÓN FPS (RX={} FPS) -> Causa: {}", rx_fps, cause)
+                                    } else {
+                                        String::new()
+                                    };
+
+                                    info!(
+                                        "⏱️ [VISOR] {} | Total E2E:{:.1}ms | FPS RX:{}/TX:{} | {}x{} | Bitrate:{} kbps | Cap:{:.1}ms Enc:{:.1}ms Red:{:.1}ms Dec:{:.1}ms Render:{:.2}ms | RTT:{}ms{}",
+                                        transport_desc, total_e2e, rx_fps, tx_fps, w, h, bitrate, cap_ms, enc_ms, net_ms, dec_ms, ren_ms, rtt, alert_msg
+                                    );
+                                    last_viewer_log = Instant::now();
+                                }
 
                                 // Diagnóstico de picos: advertir si la latencia supera 120 ms indicando qué etapa la causó y peor FPS
                                 if total_latency_ms > 120.0 && last_alert_time.elapsed() >= Duration::from_millis(500) {
@@ -851,7 +971,10 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                 }
                             }
 
-                            if let Ok(injector) = state_sup.input_injector.try_lock() {
+                            if matches!(input_evt, nxdesk_core::InputEvent::KeyDown { .. } | nxdesk_core::InputEvent::KeyUp { .. }) {
+                                let injector = state_sup.input_injector.lock().await;
+                                injector.inject(&input_evt);
+                            } else if let Ok(injector) = state_sup.input_injector.try_lock() {
                                 injector.inject(&input_evt);
                             }
                         } else {
@@ -897,7 +1020,10 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                 if let Ok(input_evt) =
                                     serde_json::from_str::<nxdesk_core::InputEvent>(&msg.payload)
                                 {
-                                    if let Ok(injector) = state_sup.input_injector.try_lock() {
+                                    if matches!(input_evt, nxdesk_core::InputEvent::KeyDown { .. } | nxdesk_core::InputEvent::KeyUp { .. }) {
+                                        let injector = state_sup.input_injector.lock().await;
+                                        injector.inject(&input_evt);
+                                    } else if let Ok(injector) = state_sup.input_injector.try_lock() {
                                         injector.inject(&input_evt);
                                     }
                                 }
@@ -963,10 +1089,15 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
                             if is_authorized {
                                 info!("⏹ [Terminal] Solicitud de interrupción Ctrl+C recibida.");
-                                state_sup.terminal_session.interrupt().await;
-                                let notice = "\r\n^C\r\n[Proceso detenido por el usuario]\r\n".to_string();
-                                let _ = state_sup.terminal_out_network_tx.send(notice.clone());
-                                let _ = state_sup.terminal_broadcast_tx.send(notice);
+                                let term_sess = state_sup.terminal_session.clone();
+                                let net_tx = state_sup.terminal_out_network_tx.clone();
+                                let bc_tx = state_sup.terminal_broadcast_tx.clone();
+                                tokio::spawn(async move {
+                                    term_sess.interrupt().await;
+                                    let notice = "\r\n^C\r\n[Proceso detenido por el usuario]\r\n".to_string();
+                                    let _ = net_tx.send(notice.clone());
+                                    let _ = bc_tx.send(notice);
+                                });
                             }
                         }
                         "terminal_out" => {
@@ -1126,8 +1257,21 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                             if let Ok(req) =
                                 serde_json::from_str::<nxdesk_core::SessionRequestDto>(&msg.payload)
                             {
+                                // Filtrar: Si la solicitud especifica target_id, verificar que esté dirigida a este equipo
+                                if let Some(ref target) = req.target_id {
+                                    let clean_target = target.trim().replace('-', "").to_lowercase();
+                                    let clean_my_id = my_id_sup.trim().replace('-', "").to_lowercase();
+                                    if clean_target != clean_my_id {
+                                        info!(
+                                            "🛡️ [Señalización] Solicitud de sesión descartada: dirigida a '{}', este equipo es '{}'",
+                                            target, my_id_sup
+                                        );
+                                        continue;
+                                    }
+                                }
+
                                 info!(
-                                    "🔔 [Señalización] Solicitud de sesión entrante de '{}' ({})",
+                                    "🔔 [Señalización] Solicitud de sesión entrante de '{}' ({}) para este equipo",
                                     req.client_alias, req.client_id
                                 );
                                 let _ = state_sup.request_session(req).await;
@@ -1146,15 +1290,24 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                             if let Ok(decision) =
                                 serde_json::from_str::<nxdesk_core::SessionDecisionDto>(&msg.payload)
                             {
+                                // Validar que la decisión esté dirigida a esta máquina
+                                let clean_my_id = my_id_sup.trim().replace('-', "").to_lowercase();
+                                let is_my_request = decision
+                                    .request_id
+                                    .starts_with(&format!("req-{}-", my_id_sup))
+                                    || decision.client_id.as_deref().map(|c| c.trim().replace('-', "").to_lowercase()) == Some(clean_my_id.clone())
+                                    || decision.target_id.as_deref().map(|t| t.trim().replace('-', "").to_lowercase()) == Some(clean_my_id);
+
+                                if !is_my_request {
+                                    info!("🛡️ [Señalización] session_decision descartada: no corresponde a este visor");
+                                    continue;
+                                }
+
                                 info!(
                                     "🔔 [Señalización] Decisión de sesión recibida: aceptada={}",
                                     decision.accept
                                 );
-                                // Solo el visor que originó la solicitud debe volver al menú inicial.
-                                let is_my_request = decision
-                                    .request_id
-                                    .starts_with(&format!("req-{}-", my_id_sup));
-                                if !decision.accept && is_my_request && state_sup.is_viewer_active() {
+                                if !decision.accept && state_sup.is_viewer_active() {
                                     state_sup.end_session(false).await;
                                 }
                             }
@@ -1307,7 +1460,22 @@ async fn handle_incoming_terminal_cmd(state: &AppState, cmd: &str) {
                     tokio::time::sleep(Duration::from_millis(20) - since).await;
                 }
                 if let Some(sig) = state_clone.get_signaling_client().await {
-                    let msg = nxdesk_core::SignalingMessage::new("terminal_out", &pending);
+                    let mut msg = nxdesk_core::SignalingMessage::new("terminal_out", &pending);
+                    let target = state_clone
+                        .active_remote_peer
+                        .read()
+                        .await
+                        .clone()
+                        .or_else(|| {
+                            state_clone
+                                .active_session
+                                .try_read()
+                                .ok()
+                                .and_then(|s| s.as_ref().map(|x| x.peer_id.clone()))
+                        });
+                    if let Some(t) = target {
+                        msg = msg.with_target(t);
+                    }
                     if sig.send_message(&msg).await.is_ok() {
                         pending.clear();
                     } else if pending.len() > 64 * 1024 {

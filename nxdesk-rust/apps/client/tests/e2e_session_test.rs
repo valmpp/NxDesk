@@ -22,6 +22,7 @@ async fn test_e2e_session_handshake_and_permissions() {
         request_id: "req-e2e-001".to_string(),
         client_id: "client-888".to_string(),
         client_alias: "Remote-Technician".to_string(),
+        target_id: Some("host-local".to_string()),
         requested_role: SessionRole::FullControl,
         allow_input: true,
         allow_clipboard: true,
@@ -40,11 +41,14 @@ async fn test_e2e_session_handshake_and_permissions() {
     // 2. Anfitrión recibe y evalúa en caliente con permisos granulares
     let decision = SessionDecisionDto {
         request_id: "req-e2e-001".to_string(),
+        client_id: Some("client-888".to_string()),
+        target_id: Some("client-888".to_string()),
         accept: true,
         granted_role: Some(SessionRole::FullControl),
         allow_input: true,
         allow_clipboard: true,
         allow_file_transfer: true,
+        allow_terminal: true,
         rejection_reason: None,
     };
 
@@ -80,17 +84,21 @@ async fn test_e2e_input_authorization_guard() {
     // Caso B: Sesión activa creada con allow_input = true
     let decision = SessionDecisionDto {
         request_id: "req-e2e-002".to_string(),
+        client_id: Some("tech-client".to_string()),
+        target_id: Some("tech-client".to_string()),
         accept: true,
         granted_role: Some(SessionRole::FullControl),
         allow_input: true,
         allow_clipboard: true,
         allow_file_transfer: false,
+        allow_terminal: true,
         rejection_reason: None,
     };
     *host_state.pending_session.write().await = Some(SessionRequestDto {
         request_id: "req-e2e-002".to_string(),
         client_id: "tech-client".to_string(),
         client_alias: "Tech".to_string(),
+        target_id: Some("host-local".to_string()),
         requested_role: SessionRole::FullControl,
         allow_input: true,
         allow_clipboard: true,
